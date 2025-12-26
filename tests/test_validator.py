@@ -505,3 +505,55 @@ def test_valid_active_customer_account(test_env):
     assert rep['n_errors'] == 0
     assert rep['records_processed'] == 1
 
+
+def test_account_no_length_validation(test_env):
+    """Account number must be 8-20 digits (no shorter, no longer)."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Too short (7 digits)
+    line_short = _make_fixed_width_line(schema, {"account_no": "1234567"})
+    f_short = Path(test_env["tmp_path"]) / "acct_short.txt"
+    _write_text(f_short, line_short + "\n")
+    
+    rc_short, out_short, _ = _run_cli(f_short, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_short != 0
+    rep_short = json.loads(out_short)
+    assert rep_short['n_errors'] > 0
+    
+    # Too long (21 digits)
+    line_long = _make_fixed_width_line(schema, {"account_no": "123456789012345678901"})
+    f_long = Path(test_env["tmp_path"]) / "acct_long.txt"
+    _write_text(f_long, line_long + "\n")
+    
+    rc_long, out_long, _ = _run_cli(f_long, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_long != 0
+    rep_long = json.loads(out_long)
+    assert rep_long['n_errors'] > 0
+
+
+def test_amount_must_be_positive(test_env):
+    """Amount field must be strictly greater than 0."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Zero amount
+    line_zero = _make_fixed_width_line(schema, {"amount": "0.00"})
+    f_zero = Path(test_env["tmp_path"]) / "amount_zero.txt"
+    _write_text(f_zero, line_zero + "\n")
+    
+    rc_zero, out_zero, _ = _run_cli(f_zero, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_zero != 0
+    rep_zero = json.loads(out_zero)
+    assert rep_zero['n_errors'] > 0
+    errors_text = "\n".join(rep_zero.get('errors', []))
+    assert "must be > 0" in errors_text or "greater than 0" in errors_text.lower()
+    
+    # Negative amount
+    line_neg = _make_fixed_width_line(schema, {"amount": "-10.50"})
+    f_neg = Path(test_env["tmp_path"]) / "amount_neg.txt"
+    _write_text(f_neg, line_neg + "\n")
+    
+    rc_neg, out_neg, _ = _run_cli(f_neg, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_neg != 0
+    rep_neg = json.loads(out_neg)
+    assert rep_neg['n_errors'] > 0
+
