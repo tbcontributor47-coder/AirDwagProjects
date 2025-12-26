@@ -1,0 +1,77 @@
+{
+  "record_length": 296,
+  "fields": [
+    {
+      "name": "eftno",
+      "start": 0,
+      "length": 12,
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "payee_name",
+      "start": 12,
+      "length": 40,
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "account_no",
+      "start": 52,
+      "length": 20,
+      "type": "string",
+      "required": true,
+      "pattern": "^\\d{8,20}$"
+    },
+    {
+      "name": "bank_name",
+      "start": 72,
+      "length": 30,
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "bank_code",
+      "start": 102,
+      "length": 12,
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "start": 114,
+      "length": 12,
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "address",
+      "start": 126,
+      "length": 60,
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "clearance_date",
+      "start": 186,
+      "length": 10,
+      "type": "date",
+      "required": true,
+      "format": "%Y-%m-%d"
+    },
+    {
+      "name": "last_transaction_details",
+      "start": 196,
+      "length": 80,
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "clearing_account",
+      "start": 276,
+      "length": 20,
+      "type": "string",
+      "required": true
+    }
+  ]
+}

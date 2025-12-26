@@ -1,0 +1,20 @@
+version = "1.0.0"
+
+[metadata]
+difficulty = "medium"
+author_name = "Manoj Kumar Selvaraj"
+author_email = "manoj@example.com"
+category = "system-administration"
+tags = ["validation", "banking", "eft", "file-processing", "data-integrity"]
+
+[verifier]
+timeout_sec = 300
+
+[agent]
+timeout_sec = 600
+
+[environment]
+build_timeout_sec = 300
+cpus = 2
+memory_mb = 2048
+storage_mb = 5120
