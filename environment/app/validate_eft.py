@@ -6,9 +6,6 @@ Complete this implementation to validate EFT payment files.
 
 import sys
 import json
-import sqlite3
-import hashlib
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
 

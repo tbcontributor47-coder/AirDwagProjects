@@ -4,9 +4,7 @@ Unit tests for EFT validator
 """
 
 import pytest
-import json
 import sqlite3
-import tempfile
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
