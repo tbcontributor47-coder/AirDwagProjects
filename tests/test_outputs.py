@@ -1294,3 +1294,201 @@ def test_boolean_values() -> None:
         assert diffs == [
             {"attribute": "enabled", "expected": True, "actual": False}
         ]
+
+
+def test_type_coercion_traps() -> None:
+    """Handles type differences that look similar (string vs number, bool vs string)."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "type_trap",
+                    "attributes": {"count": 123, "enabled": True}
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "type_trap",
+                    "attributes": {"count": "123", "enabled": "true"}
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.type_trap"]
+        assert diffs == [
+            {"attribute": "count", "expected": 123, "actual": "123"},
+            {"attribute": "enabled", "expected": True, "actual": "true"}
+        ]
+
+
+def test_extreme_nesting_50_levels() -> None:
+    """Handles extremely deep nesting (50 levels) without stack overflow."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        def build_nested_50(level: int) -> dict:
+            if level == 0:
+                return "deep_value"
+            return {"nested": build_nested_50(level - 1)}
+        
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "extreme",
+                    "attributes": {"config": build_nested_50(50)}
+                }
+            ]
+        }
+        current_obj = ideal_obj.copy()
+        # Change the deepest value
+        deep = current_obj["resources"][0]["attributes"]["config"]
+        for _ in range(49):
+            deep = deep["nested"]
+        deep["nested"] = "changed_deep_value"
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.extreme"]
+        expected_path = ".".join(["config"] + ["nested"] * 50)
+        assert diffs == [
+            {"attribute": expected_path, "expected": "deep_value", "actual": "changed_deep_value"}
+        ]
+
+
+def test_ignore_edge_cases() -> None:
+    """Ignores with partial matches, escaped paths, and multiple prefixes."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "ignore_edge",
+                    "attributes": {
+                        "tags.Env": "prod",
+                        "tags.Environment": "prod",
+                        "config.network.ip": "10.0.0.1",
+                        "config.network\\.ip": "10.0.0.2"
+                    }
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "ignore_edge",
+                    "attributes": {
+                        "tags.Env": "dev",
+                        "tags.Environment": "dev",
+                        "config.network.ip": "10.0.0.3",
+                        "config.network\\.ip": "10.0.0.4"
+                    }
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit(["--ignore", "tags.Env", "--ignore", "config.network", str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.ignore_edge"]
+        # Should ignore tags.Env* and config.network*, but not config.network\.ip
+        assert diffs == [
+            {"attribute": "config.network\\.ip", "expected": "10.0.0.2", "actual": "10.0.0.4"}
+        ]
+
+
+def test_unicode_bombs() -> None:
+    """Handles rare unicode characters, zero-width spaces, and RTL text."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "unicode_bomb",
+                    "attributes": {"key\u200B": "value1", "key\u200E": "value2", "key\u202E": "value3"}  # zero-width, LTR, RTL
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "unicode_bomb",
+                    "attributes": {"key\u200B": "changed1", "key\u200E": "changed2", "key\u202E": "changed3"}
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.unicode_bomb"]
+        assert len(diffs) == 3
+        # Exact matching may vary, but ensure differences are detected
+
+
+def test_large_inputs_1000_attributes() -> None:
+    """Handles resources with 1000 attributes efficiently."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        attrs_ideal = {f"attr_{i}": f"value_{i}" for i in range(1000)}
+        attrs_current = attrs_ideal.copy()
+        attrs_current["attr_500"] = "changed"
+        
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "large",
+                    "attributes": attrs_ideal
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "large",
+                    "attributes": attrs_current
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.large"]
+        assert diffs == [
+            {"attribute": "attr_500", "expected": "value_500", "actual": "changed"}
+        ]
