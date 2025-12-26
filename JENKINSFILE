@@ -49,6 +49,7 @@ else
   EFFECTIVE_TASK_PATH="$TASK_PATH"
 fi
 
+
 echo "Task path: $EFFECTIVE_TASK_PATH"
 if ! TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"; then
   echo "ERROR: TASK_PATH cannot be resolved from WORKSPACE"
