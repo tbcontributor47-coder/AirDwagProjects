@@ -220,7 +220,7 @@ echo "================================================="
 if [ "${KEEP_TMPDIR:-false}" != "true" ]; then
   rm -rf "$TMPDIR" || true
 fi
-'''
+
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [ -z "$PYTHON_BIN" ]; then
   echo "ERROR: python/python3 not found; cannot validate Harbor result.json"
@@ -232,28 +232,28 @@ import json
 import sys
 
 if len(sys.argv) < 2:
-    print("ERROR: result.json path argument missing")
-    sys.exit(1)
+  print("ERROR: result.json path argument missing")
+  sys.exit(1)
 
 path = sys.argv[1]
 
 with open(path, "r", encoding="utf-8") as f:
-    data = json.load(f)
+  data = json.load(f)
 
 def max_errors(node):
-    if isinstance(node, dict):
-        m = 0
-        for k, v in node.items():
-            if isinstance(k, str) and k.lower() in ("n_errors", "errors"):
-                try:
-                    m = max(m, int(v))
-                except Exception:
-                    pass
-            m = max(m, max_errors(v))
-        return m
-    if isinstance(node, list):
-        return max((max_errors(x) for x in node), default=0)
-    return 0
+  if isinstance(node, dict):
+    m = 0
+    for k, v in node.items():
+      if isinstance(k, str) and k.lower() in ("n_errors", "errors"):
+        try:
+          m = max(m, int(v))
+        except Exception:
+          pass
+      m = max(m, max_errors(v))
+    return m
+  if isinstance(node, list):
+    return max((max_errors(x) for x in node), default=0)
+  return 0
 
 err = max_errors(data)
 print(f"Harbor reported errors: {err}")
