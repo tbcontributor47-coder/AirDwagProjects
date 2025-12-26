@@ -271,18 +271,30 @@ else
   EFFECTIVE_TASK_PATH="$TASK_PATH"
 fi
 
+# Copy to lowercase temp dir to avoid Docker invalid image name errors
 TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
 echo "Task absolute path: $TASK_ABS"
 
+BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
+SUFFIX="$(openssl rand -hex 6 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c6 || echo '000000')"
+TMPDIR="/tmp/${BASENAME}.${SUFFIX}"
+mkdir -p "$TMPDIR"
+echo "Using temporary lowercase task dir: $TMPDIR"
+
+rsync -a --exclude='.git' "$TASK_ABS/" "$TMPDIR/" || cp -a "$TASK_ABS/." "$TMPDIR/" || true
+
 if [ "${RUN_ALL_MODES:-false}" = "true" ] || [ "${RUN_CODEX:-false}" = "true" ]; then
   echo "Running GPT-5 agent..."
-  harbor run -a terminus-2 -m openai/@openai-tbench/gpt-5 -p "$TASK_ABS" 2>&1 | tee logs/agent-gpt5.log
+  harbor run -a terminus-2 -m openai/@openai-tbench/gpt-5 -p "$TMPDIR" 2>&1 | tee logs/agent-gpt5.log
 fi
 
 if [ "${RUN_ALL_MODES:-false}" = "true" ] || [ "${RUN_CLAUDE:-false}" = "true" ]; then
   echo "Running Claude Sonnet 4.5 agent..."
-  harbor run -a terminus-2 -m openai/@anthropic-tbench/claude-sonnet-4-5-20250929 -p "$TASK_ABS" 2>&1 | tee logs/agent-claude.log
+  harbor run -a terminus-2 -m openai/@anthropic-tbench/claude-sonnet-4-5-20250929 -p "$TMPDIR" 2>&1 | tee logs/agent-claude.log
 fi
+
+# Cleanup
+[ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
 '''
       }
     }
@@ -308,20 +320,32 @@ else
   EFFECTIVE_TASK_PATH="$TASK_PATH"
 fi
 
+# Copy to lowercase temp dir to avoid Docker invalid image name errors
 TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
 echo "Task absolute path: $TASK_ABS"
+
+BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
+SUFFIX="$(openssl rand -hex 6 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c6 || echo '000000')"
+TMPDIR="/tmp/${BASENAME}.${SUFFIX}"
+mkdir -p "$TMPDIR"
+echo "Using temporary lowercase task dir: $TMPDIR"
+
+rsync -a --exclude='.git' "$TASK_ABS/" "$TMPDIR/" || cp -a "$TASK_ABS/." "$TMPDIR/" || true
 
 echo "===== Difficulty Check (5x each) =====" | tee logs/difficulty-5x.log
 
 for i in $(seq 1 5); do
   echo "GPT-5 run $i/5"
-  harbor run -a terminus-2 -m openai/@openai-tbench/gpt-5 -p "$TASK_ABS" 2>&1 | tee "logs/difficulty-gpt5-${i}.log"
+  harbor run -a terminus-2 -m openai/@openai-tbench/gpt-5 -p "$TMPDIR" 2>&1 | tee "logs/difficulty-gpt5-${i}.log"
 done
 
 for i in $(seq 1 5); do
   echo "Claude run $i/5"
-  harbor run -a terminus-2 -m openai/@anthropic-tbench/claude-sonnet-4-5-20250929 -p "$TASK_ABS" 2>&1 | tee "logs/difficulty-claude-${i}.log"
+  harbor run -a terminus-2 -m openai/@anthropic-tbench/claude-sonnet-4-5-20250929 -p "$TMPDIR" 2>&1 | tee "logs/difficulty-claude-${i}.log"
 done
+
+# Cleanup
+[ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
 
 echo "===== Difficulty check complete =====" | tee -a logs/difficulty-5x.log
 exit 0
