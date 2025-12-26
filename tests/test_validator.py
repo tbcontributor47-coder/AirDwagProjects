@@ -287,3 +287,63 @@ def test_randomized_record_not_hardcoded(test_env):
 
 if __name__ == '__main__':
     pytest.main([__file__, '-q'])
+
+
+def test_exact_record_length_enforced(test_env):
+    """Lines must be exactly the schema's `record_length` (no shorter or longer)."""
+    schema = _load_schema(test_env["schema"])
+    line = _make_fixed_width_line(schema)
+
+    # valid (exact length) should pass
+    f_valid = Path(test_env["tmp_path"]) / "valid_len.txt"
+    _write_text(f_valid, line + "\n")
+    rc, out, _ = _run_cli(f_valid, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+
+    # short line should fail
+    f_short = Path(test_env["tmp_path"]) / "short.txt"
+    _write_text(f_short, line[:-1] + "\n")
+    rc_s, out_s, _ = _run_cli(f_short, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_s != 0
+    rep_s = json.loads(out_s)
+    assert rep_s['n_errors'] >= 1
+
+    # long line should fail
+    f_long = Path(test_env["tmp_path"]) / "long.txt"
+    _write_text(f_long, line + "X\n")
+    rc_l, out_l, _ = _run_cli(f_long, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc_l != 0
+    rep_l = json.loads(out_l)
+    # expect an error mentioning length (either explicit or generic field errors)
+    assert rep_l['n_errors'] >= 1
+
+
+def test_required_fields_empty_are_reported(test_env):
+    """Required fields left empty must produce an error with line number."""
+    schema = _load_schema(test_env["schema"])
+    bad_line = _make_fixed_width_line(schema, {"eftno": ""})
+    f = Path(test_env["tmp_path"]) / "req_empty.txt"
+    _write_text(f, bad_line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] >= 1
+    assert any("eftno" in e.lower() or "Field 'eftno'" in e for e in rep.get('errors', []))
+    assert any("Line 1" in e for e in rep.get('errors', []))
+
+
+def test_eftno_and_bank_code_alphanumeric_constraints(test_env):
+    """eftno and bank_code should be alphanumeric; non-alnum values must error."""
+    schema = _load_schema(test_env["schema"])
+    # include punctuation in eftno and bank_code
+    bad_line = _make_fixed_width_line(schema, {"eftno": "EFT#123!@#", "bank_code": "BANK CODE!"})
+    f = Path(test_env["tmp_path"]) / "alnum.txt"
+    _write_text(f, bad_line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    # Expect at least one error mentioning eftno or bank_code
+    errors_text = "\n".join(rep.get('errors', []))
+    assert ("eftno" in errors_text.lower()) or ("bank_code" in errors_text.lower()) or rep['n_errors'] >= 1
