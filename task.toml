@@ -1,0 +1,11 @@
+[metadata]
+difficulty = "medium"
+
+[resources]
+cpu_count = 1
+memory_mb = 1024
+disk_size_mb = 5120
+
+[timeouts]
+verifier_timeout = 60
+agent_timeout = 300
