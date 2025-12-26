@@ -159,7 +159,15 @@ echo "Task absolute path: $TASK_ABS"
 
 BASENAME="$(basename "$TASK_ABS")"
 BASENAME_LC="$(echo "$BASENAME" | tr '[:upper:]' '[:lower:]')"
-TMPDIR="$(mktemp -d /tmp/${BASENAME_LC}.XXXXXX)"
+# Create a deterministic lowercase hex suffix to avoid mktemp producing uppercase
+# characters which can lead to invalid Docker tag/repo names.
+if command -v openssl >/dev/null 2>&1; then
+  SUFFIX="$(openssl rand -hex 6)"
+else
+  SUFFIX="$(tr -dc 'a-f0-9' < /dev/urandom | head -c6 || echo '000000')"
+fi
+TMPDIR="/tmp/${BASENAME_LC}.${SUFFIX}"
+mkdir -p "$TMPDIR"
 echo "Using temporary lowercase task dir: $TMPDIR"
 
 # Copy files into TMPDIR preserving permissions; ignore failures but try to be robust.
