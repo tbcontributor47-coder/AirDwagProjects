@@ -154,6 +154,69 @@ echo ""
             }
         }
 
+        stage('FixAndVerify') {
+            steps {
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs
+
+# Multibranch support
+if [ -n "${BRANCH_NAME:-}" ] && [ -d "$WORKSPACE/$BRANCH_NAME" ]; then
+    EFFECTIVE_TASK_PATH="$BRANCH_NAME"
+else
+    EFFECTIVE_TASK_PATH="$TASK_PATH"
+fi
+
+TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
+echo "Task absolute path: $TASK_ABS"
+
+BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
+IMAGE_NAME="${BASENAME}:baseline-test"
+
+echo ""
+echo "===== Running solution/solve.sh inside container and re-testing ====="
+docker run --rm \
+    -v "$TASK_ABS/tests:/mnt/tests" \
+    -v "$TASK_ABS/solution:/mnt/solution:ro" \
+    "$IMAGE_NAME" \
+    /bin/bash -c "
+        set -euo pipefail
+        echo 'Applying solution fixer to /app/eft_validator.py'
+        if [ -f /mnt/solution/solve.sh ]; then
+            bash /mnt/solution/solve.sh
+        else
+            echo 'ERROR: /mnt/solution/solve.sh not found in container'
+            exit 1
+        fi
+        echo 'Re-running tests after fixer'
+        pip install -q pytest 2>&1 >/dev/null
+        pytest /mnt/tests/test_validator.py -v --tb=short --junitxml=/mnt/tests/fix-report.xml || true
+    " \
+    2>&1 | tee logs/fix-and-verify.log || true
+
+# Copy the junit xml from the mounted volume if it exists
+if [ -f "$TASK_ABS/tests/fix-report.xml" ]; then
+    cp "$TASK_ABS/tests/fix-report.xml" fix-report.xml
+fi
+
+echo ""
+echo "===== FixAndVerify Test Summary ====="
+grep -E "(PASSED|FAILED|passed|failed)" logs/fix-and-verify.log | tail -1 || echo "No test summary found"
+echo ""
+'''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'fix-report.xml,logs/fix-and-verify.log', allowEmptyArchive: true
+                    // Publish junit but do not change overall build status if tests fail here
+                    catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                        junit 'fix-report.xml'
+                    }
+                    echo 'FixAndVerify stage completed; see fix-report.xml and logs/fix-and-verify.log for details'
+                }
+            }
+        }
+
         stage('Oracle') {
             steps {
                 sh '''#!/usr/bin/env bash
