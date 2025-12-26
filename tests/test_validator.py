@@ -557,3 +557,296 @@ def test_amount_must_be_positive(test_env):
     rep_neg = json.loads(out_neg)
     assert rep_neg['n_errors'] > 0
 
+
+def test_unicode_in_payee_name(test_env):
+    """Payee name with unicode characters should be handled correctly."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"payee_name": "JOSÉ MARÍA", "account_no": "12345678"})
+    f = Path(test_env["tmp_path"]) / "unicode_name.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+
+
+def test_crlf_line_endings_with_trailing_spaces(test_env):
+    """Content with CRLF and trailing spaces should be normalized for hashing."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"payee_name": "JOHN DOE   ", "account_no": "12345678"})
+    content = line + "   \r\n"  # Trailing spaces and CRLF
+    f = Path(test_env["tmp_path"]) / "crlf_spaces.txt"
+    _write_text(f, content)
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+    # Should not be duplicate on second run due to normalization
+    rc2, out2, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    rep2 = json.loads(out2)
+    assert rep2['duplicate'] == False  # Bug: normalization incomplete
+
+
+def test_empty_lines_at_end(test_env):
+    """Empty trailing lines should be ignored in hashing."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"account_no": "12345678"})
+    content = line + "\n\n\n"
+    f = Path(test_env["tmp_path"]) / "empty_lines.txt"
+    _write_text(f, content)
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+
+
+def test_record_too_short(test_env):
+    """Records shorter than 296 characters should be rejected."""
+    schema = _load_schema(test_env["schema"])
+
+    short_line = "SHORT"  # Much shorter
+    f = Path(test_env["tmp_path"]) / "short_record.txt"
+    _write_text(f, short_line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_record_too_long(test_env):
+    """Records longer than 296 characters should be handled."""
+    schema = _load_schema(test_env["schema"])
+
+    long_line = _make_fixed_width_line(schema) + "EXTRA"
+    f = Path(test_env["tmp_path"]) / "long_record.txt"
+    _write_text(f, long_line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_invalid_date_format(test_env):
+    """Invalid date formats should be rejected."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"clearance_date": "2025-13-45"})
+    f = Path(test_env["tmp_path"]) / "invalid_date.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_amount_with_more_than_two_decimals(test_env):
+    """Amounts with more than 2 decimal places should be invalid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"amount": "100.123"})
+    f = Path(test_env["tmp_path"]) / "amount_decimals.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_account_forbidden_first_four_zeros_ones(test_env):
+    """Account numbers with first four digits only 0s and 1s should be invalid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"account_no": "0110123456"})
+    f = Path(test_env["tmp_path"]) / "forbidden_first_four.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_clearing_account_substring_match_bug(test_env):
+    """Clearing account substring match should fail exact match requirement."""
+    schema = _load_schema(test_env["schema"])
+
+    # Use a clearing account that is substring of allowed, but not exact
+    line = _make_fixed_width_line(schema, {"clearing_account": "1234567890123456789"})  # Missing last digit
+    f = Path(test_env["tmp_path"]) / "substring_clearing.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_duplicate_different_filename_bug(test_env):
+    """Duplicate detection should work regardless of filename."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"account_no": "12345678"})
+    f1 = Path(test_env["tmp_path"]) / "file1.txt"
+    _write_text(f1, line + "\n")
+
+    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc1 == 0
+
+    # Same content, different filename
+    f2 = Path(test_env["tmp_path"]) / "file2.txt"
+    _write_text(f2, line + "\n")
+
+    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    rep2 = json.loads(out2)
+    assert rep2['duplicate'] == False  # Bug: should be True
+
+
+def test_retention_days_ignored_bug(test_env):
+    """Retention days flag should affect duplicate detection."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"account_no": "12345678"})
+    f = Path(test_env["tmp_path"]) / "retention_test.txt"
+    _write_text(f, line + "\n")
+
+    # First run
+    rc1, _, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
+    assert rc1 == 0
+
+    # Second run with retention 0, should be duplicate
+    rc2, out2, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
+    rep2 = json.loads(out2)
+    assert rep2['duplicate'] == False  # Bug: retention ignored
+
+
+def test_payee_name_case_insensitive_match(test_env):
+    """Payee name should match database case-insensitively."""
+    schema = _load_schema(test_env["schema"])
+
+    # Use uppercase in file, lowercase in DB
+    line = _make_fixed_width_line(schema, {"account_no": "12345678", "payee_name": "john doe"})
+    f = Path(test_env["tmp_path"]) / "case_name.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+
+
+def test_multiple_errors_in_one_record(test_env):
+    """Records with multiple validation errors should report all."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {
+        "account_no": "0000123",  # Forbidden prefix
+        "amount": "0.00",  # Zero amount
+        "clearance_date": "invalid"
+    })
+    f = Path(test_env["tmp_path"]) / "multi_errors.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] >= 2
+
+
+def test_very_large_file(test_env):
+    """Large files with many records should be handled."""
+    schema = _load_schema(test_env["schema"])
+
+    lines = []
+    for i in range(1000):
+        line = _make_fixed_width_line(schema, {"eftno": f"EFT{i:010d}", "account_no": "12345678"})
+        lines.append(line)
+    content = "\n".join(lines)
+    f = Path(test_env["tmp_path"]) / "large_file.txt"
+    _write_text(f, content)
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['records_processed'] == 1000
+
+
+def test_special_characters_in_address(test_env):
+    """Address fields with special characters should be valid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"address": "123 MAIN ST, APT #5 & SUITE", "account_no": "12345678"})
+    f = Path(test_env["tmp_path"]) / "special_addr.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+
+
+def test_bank_code_starting_with_letter(test_env):
+    """Bank codes starting with letters should be invalid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"bank_code": "aBANKCODE1"})
+    f = Path(test_env["tmp_path"]) / "bank_code_letter.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_bank_code_with_lowercase(test_env):
+    """Bank codes with lowercase letters should be invalid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"bank_code": "1bankcode1"})
+    f = Path(test_env["tmp_path"]) / "bank_code_lower.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+
+
+def test_exact_length_with_padding(test_env):
+    """Records exactly 296 chars with trailing spaces should be valid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema) + " " * 10  # Add padding
+    assert len(line) == 296
+    f = Path(test_env["tmp_path"]) / "exact_padding.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+
+
+def test_eftno_with_special_chars(test_env):
+    """EFT numbers with non-alphanumeric should be invalid."""
+    schema = _load_schema(test_env["schema"])
+
+    line = _make_fixed_width_line(schema, {"eftno": "EFT@000001"})
+    f = Path(test_env["tmp_path"]) / "eftno_special.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep['n_errors'] > 0
+

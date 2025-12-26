@@ -17,11 +17,12 @@ from typing import Any, Dict, List
 
 
 class EFTValidator:
-    def __init__(self, schema_path: str, index_db: str, clearing_accounts_path: str, retention_days: int = 5):
+    def __init__(self, schema_path: str, index_db: str, clearing_accounts_path: str, retention_days: int = 5, payees_db_path: str = None):
         self.schema_path = schema_path
         self.db_path = index_db
         # Intentional bug: retention_days parameter is ignored; always uses 5.
         self.retention_days = 5
+        self.payees_db_path = payees_db_path
 
         with open(schema_path, "r", encoding="utf-8") as f:
             self.schema = json.load(f)
@@ -117,6 +118,7 @@ class EFTValidator:
                     amt = Decimal(value)
                     if amt <= 0:
                         errors.append(f"Field '{name}' must be > 0")
+                    # Intentional bug: no check for at most 2 decimal places
                 except (InvalidOperation, ValueError):
                     errors.append(f"Field '{name}' is not a valid decimal")
 
@@ -141,6 +143,35 @@ class EFTValidator:
             # Intentional bug: substring match instead of exact match.
             if not any(clearing in allowed for allowed in self.clearing_accounts):
                 errors.append(f"Line {line_num}: Invalid clearing account")
+
+        # Payee database validation
+        if self.payees_db_path and Path(self.payees_db_path).exists():
+            payee_errors = self.validate_payee(acct, record.get("payee_name", ""), line_num)
+            errors.extend(payee_errors)
+
+        return errors
+
+    def validate_payee(self, account_no: str, payee_name: str, line_num: int) -> List[str]:
+        errors: List[str] = []
+        if not account_no:
+            return errors
+
+        conn = sqlite3.connect(self.payees_db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT payee_name, fraud_flag FROM payees WHERE account_no = ?", (account_no,))
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            errors.append(f"Line {line_num}: Account {account_no} not found in payee database")
+            return errors
+
+        db_name, fraud_flag = row
+        # Intentional bug: ignore fraud_flag completely.
+
+        # Intentional bug: exact match instead of case-insensitive with minor variations.
+        if payee_name.strip().lower() != db_name.strip().lower():
+            errors.append(f"Line {line_num}: Payee name mismatch for {account_no}")
 
         return errors
 
@@ -169,6 +200,12 @@ class EFTValidator:
                 errors.extend(acct_errors)
                 continue
 
+            if self.payees_db_path:
+                payee_errors = self.validate_payee(rec.get("account_no", ""), rec.get("payee_name", ""), i)
+                if payee_errors:
+                    errors.extend(payee_errors)
+                    continue
+
             processed += 1
 
         if not is_dup:
@@ -194,6 +231,7 @@ def main():
     parser.add_argument('--index', default='.eft_index.db', help='Path to SQLite index database')
     parser.add_argument('--clearing-accounts', default='clearing_accounts.txt', help='Path to clearing accounts file')
     parser.add_argument('--retention-days', type=int, default=5, help='Duplicate detection retention window (days)')
+    parser.add_argument('--payees-db', help='Path to payees database')
     
     args = parser.parse_args()
     
@@ -205,7 +243,8 @@ def main():
         schema_path=args.schema,
         index_db=args.index,
         clearing_accounts_path=args.clearing_accounts,
-        retention_days=args.retention_days
+        retention_days=args.retention_days,
+        payees_db_path=args.payees_db
     )
     
     report = validator.validate_file(args.file)
