@@ -27,20 +27,8 @@ def _normalize_simplified(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def main(argv: list[str]) -> int:
-    # BUG: ignore flags are parsed but not applied
-    ignore_prefixes: list[str] = []
-    args: list[str] = []
-
-    it = iter(argv)
-    for a in it:
-        if a == "--ignore":
-            try:
-                ignore_prefixes.append(next(it))
-            except StopIteration:
-                print(USAGE, file=sys.stderr)
-                return 2
-        else:
-            args.append(a)
+    # BUG: ignore flags are NOT parsed at all
+    args = argv
 
     if len(args) != 2:
         print(USAGE, file=sys.stderr)
@@ -59,11 +47,11 @@ def main(argv: list[str]) -> int:
         print("Error: invalid JSON", file=sys.stderr)
         return 2
 
-    # BUG: only supports simplified format; Terraform-like state is rejected.
-    if not isinstance(ideal_doc, dict) or "resources" not in ideal_doc:
+    # BUG: only supports simplified format; Terraform-like state is explicitly rejected.
+    if not isinstance(ideal_doc, dict) or "resources" not in ideal_doc or "values" in ideal_doc:
         print("Error: unsupported ideal schema", file=sys.stderr)
         return 2
-    if not isinstance(current_doc, dict) or "resources" not in current_doc:
+    if not isinstance(current_doc, dict) or "resources" not in current_doc or "values" in current_doc:
         print("Error: unsupported current schema", file=sys.stderr)
         return 2
 
@@ -73,12 +61,13 @@ def main(argv: list[str]) -> int:
     missing = sorted(set(ideal) - set(current))
     extra = sorted(set(current) - set(ideal))
 
-    # BUG: compares only shallow keys and only keys present in ideal
+    # BUG: compares only shallow keys, doesn't flatten nested dicts, and only keys present in ideal
     attribute_drift: dict[str, list[dict[str, Any]]] = {}
     for rid in sorted(set(ideal) & set(current)):
         diffs: list[dict[str, Any]] = []
         for k, expected in ideal[rid].items():
             actual = current[rid].get(k)
+            # Simple equality check - doesn't handle nested dicts or lists properly
             if expected != actual:
                 diffs.append({"attribute": k, "expected": expected, "actual": actual})
         if diffs:
