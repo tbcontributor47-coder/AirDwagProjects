@@ -33,6 +33,8 @@ No Python traceback may be printed.
 
 Both inputs are UTF-8 JSON files.
 
+If either input cannot be parsed as JSON due to invalid JSON syntax, that is a **parse error** and the program must exit `2`.
+
 ### Supported snapshot formats
 
 A snapshot may be in either of the following formats:
@@ -135,7 +137,7 @@ The output must follow this schema:
 
 - Exit `0` on success.
 - Exit `1` for file I/O errors (missing file, unreadable file).
-- Exit `2` for usage errors or parse errors.
+- Exit `2` for usage errors or parse errors (including invalid JSON syntax / JSON decoding errors).
 
 ### What is a parse error?
 

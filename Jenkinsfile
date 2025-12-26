@@ -184,7 +184,7 @@ echo "Using temporary lowercase task dir: $TMPDIR"
 
 rsync -a --exclude='.git' "$TASK_ABS/" "$TMPDIR/" || cp -a "$TASK_ABS/." "$TMPDIR/" || true
 
-harbor run --agent oracle --path "$TMPDIR" --force-build 2>&1 | tee logs/oracle.log || true
+harbor run --agent oracle --path "$TMPDIR" --force-build 2>&1 | tee logs/oracle.log
 
 RESULT_JSON="$(awk '/Results written to /{print $NF}' logs/oracle.log | tail -n1)"
 [ -z "$RESULT_JSON" ] && RESULT_JSON="$(find jobs -name result.json -type f | head -n1 || true)"
@@ -215,9 +215,19 @@ if [ -f "$VERIFIER_LOG" ]; then
   echo "Detailed verifier output:"
   tail -30 "$VERIFIER_LOG" || true
 else
-  echo "Verifier log not found at: $VERIFIER_LOG"
+  echo "ERROR: Verifier log not found at: $VERIFIER_LOG"
+  echo "This usually means the oracle run did not execute the verifier, or the job artifacts were written somewhere unexpected."
+  echo "Failing the build to avoid a misleading PASS."
+  exit 1
 fi
 echo "================================================="
+
+# If pytest summary indicates failures, fail the build.
+if grep -Eqi "\b([1-9][0-9]*)\s+failed\b" "$VERIFIER_LOG"; then
+  echo "ERROR: Oracle verifier reports failing tests"
+  grep -Ei "\b([0-9]+)\s+failed\b" "$VERIFIER_LOG" | tail -n 5 || true
+  exit 1
+fi
 
 # Validate no errors
 python3 - "$RESULT_JSON" <<'PY'
@@ -279,7 +289,10 @@ harbor run --agent nop --path "$TMPDIR" --force-build 2>&1 | tee logs/nop.log ||
 
     stage('Checks') {
       steps {
-        sh '''#!/usr/bin/env bash
+        script {
+          def rc = sh(
+            returnStatus: true,
+            script: '''#!/usr/bin/env bash
 set -euo pipefail
 mkdir -p logs
 
@@ -299,6 +312,27 @@ TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
 echo "Task absolute path: $TASK_ABS"
 harbor tasks check "$TASK_ABS" --model openai/@openai-tbench/gpt-5 2>&1 | tee logs/checks.log
 '''
+          )
+
+          // If Harbor itself failed, fail the build.
+          if (rc != 0) {
+            error("Checks failed (exit ${rc}). See logs/checks.log")
+          }
+
+          // Harbor sometimes logs provider/quota errors but exits 0.
+          def checksLog = readFile('logs/checks.log')
+          def hasApiError = (
+            checksLog.contains('litellm.APIError') ||
+            checksLog.contains('Portkey Error') ||
+            checksLog.contains('API Key Usage Limit') ||
+            checksLog.contains('Error Code: 04') ||
+            checksLog.contains('OpenAIException')
+          )
+
+          if (hasApiError) {
+            unstable('Checks hit LLM provider/quota error (see logs/checks.log)')
+          }
+        }
       }
     }
 
@@ -307,7 +341,10 @@ harbor tasks check "$TASK_ABS" --model openai/@openai-tbench/gpt-5 2>&1 | tee lo
         expression { return env.OPENAI_API_KEY?.trim() && (params.RUN_ALL_MODES || params.RUN_CODEX || params.RUN_CLAUDE) }
       }
       steps {
-        sh '''#!/usr/bin/env bash
+        script {
+          def rc = sh(
+            returnStatus: true,
+            script: '''#!/usr/bin/env bash
 set -euo pipefail
 mkdir -p logs
 
@@ -348,6 +385,30 @@ fi
 # Cleanup
 [ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
 '''
+          )
+
+          // Agent runs are optional; if they fail due to quota/provider issues, mark UNSTABLE.
+          def gptLog = fileExists('logs/agent-gpt5.log') ? readFile('logs/agent-gpt5.log') : ''
+          def claudeLog = fileExists('logs/agent-claude.log') ? readFile('logs/agent-claude.log') : ''
+          def combined = gptLog + "\n" + claudeLog
+
+          def hasApiError = (
+            combined.contains('litellm.APIError') ||
+            combined.contains('Portkey Error') ||
+            combined.contains('API Key Usage Limit') ||
+            combined.contains('Error Code: 04') ||
+            combined.contains('Unknown Error in LLM interaction')
+          )
+
+          if (rc != 0) {
+            // Non-zero exit: treat as a real failure.
+            error("Agent Runs failed (exit ${rc}). See logs/agent-*.log")
+          }
+
+          if (hasApiError) {
+            unstable('Agent Runs hit LLM provider/quota error (see logs/agent-*.log)')
+          }
+        }
       }
     }
 
