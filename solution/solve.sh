@@ -268,5 +268,12 @@ PYTHON
 
 chmod +x /app/validate_eft.py
 
+# If a requirements.txt exists in this solution directory, install it (idempotent)
+if [ -f ./requirements.txt ]; then
+    echo "Found requirements.txt; installing..."
+    python3 -m pip install --upgrade pip >/dev/null 2>&1 || true
+    python3 -m pip install --no-cache-dir -r ./requirements.txt || echo "Warning: some requirements failed to install"
+fi
+
 # Execute with arguments passed to solve.sh
 exec python3 /app/validate_eft.py "$@"

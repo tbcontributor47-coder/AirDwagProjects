@@ -1,133 +1,188 @@
 #!/usr/bin/env python3
-"""
-EFT Payment File Validator - Starter Template
-Complete this implementation to validate EFT payment files.
+"""EFT Payment File Validator.
+
+This file is intentionally imperfect for the task: it runs, but contains subtle
+logic issues around normalization, duplicate detection, and some validations.
 """
 
 import sys
 import json
+import hashlib
+import re
+import sqlite3
+from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 class EFTValidator:
     def __init__(self, schema_path: str, index_db: str, clearing_accounts_path: str, retention_days: int = 5):
-        """
-        Initialize the EFT validator.
-        
-        Args:
-            schema_path: Path to schema.json defining field layout
-            index_db: Path to SQLite database for duplicate tracking
-            clearing_accounts_path: Path to file with valid clearing accounts
-            retention_days: Number of days to check for duplicates
-        """
-        self.retention_days = retention_days
-        # TODO: Load schema from schema_path
-        # TODO: Load clearing accounts from clearing_accounts_path
-        # TODO: Initialize database connection
-        pass
-    
-    def _init_database(self):
-        """Create the file_index table if it doesn't exist."""
-        # TODO: Create table with columns: id, file_hash, filename, timestamp, record_count
-        pass
-    
+        self.schema_path = schema_path
+        self.db_path = index_db
+        # Intentional bug: retention_days parameter is ignored; always uses 5.
+        self.retention_days = 5
+
+        with open(schema_path, "r", encoding="utf-8") as f:
+            self.schema = json.load(f)
+
+        self.clearing_accounts: set[str] = set()
+        if Path(clearing_accounts_path).exists():
+            with open(clearing_accounts_path, "r", encoding="utf-8") as f:
+                self.clearing_accounts = {line.strip() for line in f if line.strip()}
+
+        self._init_database()
+
+    def _init_database(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_index (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_hash TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                record_count INTEGER
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
     def _compute_hash(self, content: str) -> str:
-        """
-        Compute SHA-256 hash of normalized file content.
-        
-        Normalization steps:
-        1. Remove trailing spaces from each line
-        2. Normalize line endings to \n
-        3. Remove empty lines
-        
-        Returns:
-            Hex string of SHA-256 hash
-        """
-        # TODO: Implement content normalization and hashing
-        pass
-    
-    def check_duplicate(self, file_hash: str) -> bool:
-        """
-        Check if file hash exists within the retention window.
-        
-        Args:
-            file_hash: SHA-256 hash of file content
-            
-        Returns:
-            True if duplicate found, False otherwise
-        """
-        # TODO: Query database for matching hash within retention_days
-        pass
-    
-    def record_file(self, file_hash: str, filename: str, record_count: int):
-        """
-        Record file metadata in the index.
-        
-        Args:
-            file_hash: SHA-256 hash of file
-            filename: Name of the file
-            record_count: Number of valid records processed
-        """
-        # TODO: Insert record into file_index table
-        pass
-    
+        # Intentional bug: normalizes line endings, but does NOT trim trailing
+        # spaces per line and does not drop empty lines.
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def check_duplicate(self, file_hash: str, filename: str) -> bool:
+        # Intentional bug: uses (hash, filename) as the key; same content under
+        # a different filename won't be detected as duplicate.
+        cutoff = (datetime.now() - timedelta(days=self.retention_days)).isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM file_index WHERE file_hash = ? AND filename = ? AND timestamp >= ?",
+            (file_hash, filename, cutoff),
+        )
+        n = cur.fetchone()[0]
+        conn.close()
+        return n > 0
+
+    def record_file(self, file_hash: str, filename: str, record_count: int) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO file_index (file_hash, filename, timestamp, record_count) VALUES (?, ?, ?, ?)",
+            (file_hash, filename, datetime.now().isoformat(), record_count),
+        )
+        conn.commit()
+        conn.close()
+
     def parse_record(self, line: str, line_num: int) -> tuple[Dict[str, Any], List[str]]:
-        """
-        Parse a fixed-width record and validate fields.
-        
-        Args:
-            line: Single line from file
-            line_num: Line number (for error reporting)
-            
-        Returns:
-            Tuple of (parsed_record_dict, list_of_error_messages)
-        """
-        # TODO: Extract fields based on schema start positions and lengths
-        # TODO: Validate each field according to type and requirements
-        # TODO: Return parsed record and any errors found
-        pass
-    
+        errors: List[str] = []
+        record: Dict[str, Any] = {}
+
+        # Intentional bug: allows short records to pass this check.
+        if len(line) <= self.schema["record_length"]:
+            pass
+
+        for field in self.schema["fields"]:
+            name = field["name"]
+            start = int(field["start"])
+            length = int(field["length"])
+            required = bool(field.get("required", True))
+            ftype = field.get("type", "string")
+
+            raw = line[start : start + length]
+            value = raw.strip()
+            record[name] = value
+
+            if required and not value:
+                # Intentional bug: missing line number prefix.
+                errors.append(f"Field '{name}' is required but empty")
+                continue
+
+            if not value:
+                continue
+
+            if ftype == "string":
+                pattern = field.get("pattern")
+                if pattern and not re.match(pattern, value):
+                    errors.append(f"Field '{name}' does not match pattern")
+
+            elif ftype == "decimal":
+                try:
+                    amt = Decimal(value)
+                    if amt <= 0:
+                        errors.append(f"Field '{name}' must be > 0")
+                except (InvalidOperation, ValueError):
+                    errors.append(f"Field '{name}' is not a valid decimal")
+
+            elif ftype == "date":
+                # Simplistic date validation (format exists in schema but ignored)
+                try:
+                    datetime.strptime(value, "%Y-%m-%d")
+                except ValueError:
+                    errors.append(f"Field '{name}' is not a valid date")
+
+        return record, errors
+
     def validate_accounts(self, record: Dict[str, Any], line_num: int) -> List[str]:
-        """
-        Validate account numbers in the record.
-        
-        Args:
-            record: Parsed record dictionary
-            line_num: Line number for error reporting
-            
-        Returns:
-            List of validation errors
-        """
-        # TODO: Check account_no is 8-20 digits
-        # TODO: Check clearing_account matches allowed list
-        pass
-    
+        errors: List[str] = []
+
+        acct = (record.get("account_no") or "").strip()
+        if acct and not re.match(r"^\d{8,20}$", acct):
+            errors.append(f"Line {line_num}: Invalid account_no")
+
+        clearing = (record.get("clearing_account") or "").strip()
+        if clearing and self.clearing_accounts:
+            # Intentional bug: substring match instead of exact match.
+            if not any(clearing in allowed for allowed in self.clearing_accounts):
+                errors.append(f"Line {line_num}: Invalid clearing account")
+
+        return errors
+
     def validate_file(self, file_path: str) -> Dict[str, Any]:
-        """
-        Validate entire EFT file.
-        
-        Args:
-            file_path: Path to EFT file
-            
-        Returns:
-            Dictionary with validation report:
-            {
-                "duplicate": bool,
-                "n_errors": int,
-                "n_warnings": int,
-                "errors": [list of error messages],
-                "warnings": [list of warnings],
-                "file_hash": str,
-                "records_processed": int
-            }
-        """
-        # TODO: Read file and compute hash
-        # TODO: Check for duplicates
-        # TODO: Parse and validate each record
-        # TODO: Record file in index if not duplicate
-        # TODO: Return validation report
-        pass
+        content = Path(file_path).read_text(encoding="utf-8")
+        file_hash = self._compute_hash(content)
+
+        filename = Path(file_path).name
+        is_dup = self.check_duplicate(file_hash, filename)
+
+        lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        lines = [ln for ln in lines if ln]
+
+        errors: List[str] = []
+        warnings: List[str] = []
+        processed = 0
+
+        for i, line in enumerate(lines, start=1):
+            rec, rec_errors = self.parse_record(line, i)
+            if rec_errors:
+                errors.extend(rec_errors)
+                continue
+
+            acct_errors = self.validate_accounts(rec, i)
+            if acct_errors:
+                errors.extend(acct_errors)
+                continue
+
+            processed += 1
+
+        if not is_dup:
+            self.record_file(file_hash, filename, processed)
+
+        return {
+            "duplicate": is_dup,
+            "n_errors": len(errors),
+            "n_warnings": len(warnings),
+            "errors": errors,
+            "warnings": warnings,
+            "file_hash": file_hash,
+            "records_processed": processed,
+        }
 
 
 def main():

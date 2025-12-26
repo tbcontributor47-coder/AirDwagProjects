@@ -2,6 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Minimal runtime utilities:
+# - bash: required by verifier `tests/test.sh`
+# - ca-certificates: required for pip to fetch wheels reliably
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends bash ca-certificates \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& mkdir -p /logs/verifier
+
 # Copy application files from the environment build context
 COPY app/ /app/
 

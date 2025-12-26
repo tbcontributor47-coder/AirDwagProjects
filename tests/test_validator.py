@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
-"""Verifier-style tests for the EFT validator CLI.
+"""Verifier tests for the EFT validator CLI.
 
-These tests invoke the CLI (`/app/validate_eft.py` in verifier/runtime) via
-subprocess instead of importing the oracle directly. When run locally, they
-fall back to `solution/validate_eft.py` so maintainers can run tests.
+Important:
+- Tests must invoke the CLI (no importing from `solution/`).
+- Tests check stdout JSON + exit codes + key edge cases.
 """
 
 import json
-import sqlite3
+import os
+import random
 import shutil
+import sqlite3
 import subprocess
 import sys
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 
-def _cli_path():
-    # Prefer runtime CLI location; fall back to solution for local runs
-    if Path('/app/validate_eft.py').exists():
-        return '/app/validate_eft.py'
-    return str(Path(__file__).parent.parent / 'solution' / 'validate_eft.py')
+CLI_DEFAULT = "/app/validate_eft.py"
+
+
+def _cli_path() -> str:
+    return os.environ.get("EFT_VALIDATOR_CLI", CLI_DEFAULT)
 
 
 @pytest.fixture
@@ -57,12 +59,61 @@ def _run_cli(file_path, schema, clearing, db, extra_args=None):
     return proc.returncode, out, err
 
 
+def _load_schema(path: str) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _make_fixed_width_line(schema: dict, overrides: dict | None = None) -> str:
+    """Generate a single fixed-width record matching schema.json."""
+    record_length = int(schema["record_length"])
+    buf = [" "] * record_length
+
+    data = {
+        "eftno": "EFT000000001",
+        "payee_name": "JOHN DOE",
+        "account_no": "12345678",
+        "bank_name": "ABC BANK",
+        "bank_code": "BANKCODE01",
+        "amount": "100.00",
+        "address": "1 MAIN ST",
+        "clearance_date": "2025-12-31",
+        "last_transaction_details": "REF",
+        "clearing_account": "12345678901234567890",
+    }
+    if overrides:
+        data.update(overrides)
+
+    for f in schema["fields"]:
+        name = f["name"]
+        start = int(f["start"])
+        length = int(f["length"])
+        value = str(data.get(name, ""))
+        value = value[:length]
+        padded = value.ljust(length)
+        buf[start : start + length] = list(padded)
+
+    return "".join(buf)
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+
+
 def test_valid_file_validation(test_env):
     test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
 
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
     assert rc == 0
     report = json.loads(out)
+    assert set(report.keys()) >= {
+        "duplicate",
+        "n_errors",
+        "n_warnings",
+        "errors",
+        "warnings",
+        "file_hash",
+        "records_processed",
+    }
     assert report['duplicate'] is False
     assert report['n_errors'] == 0
     assert report['records_processed'] == 3
@@ -84,6 +135,25 @@ def test_duplicate_detection(test_env):
     assert rep2['duplicate'] is True
 
 
+def test_duplicate_detection_across_filenames(test_env):
+    """Same content under a different filename must still count as duplicate."""
+    schema = _load_schema(test_env["schema"])
+    line = _make_fixed_width_line(schema)
+
+    f1 = Path(test_env["tmp_path"]) / "a.txt"
+    f2 = Path(test_env["tmp_path"]) / "b.txt"
+    _write_text(f1, line + "\n")
+    _write_text(f2, line + "\n")
+
+    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc1 == 0
+    assert json.loads(out1)["duplicate"] is False
+
+    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc2 != 0
+    assert json.loads(out2)["duplicate"] is True
+
+
 def test_invalid_file_validation(test_env):
     test_file = Path(__file__).parent / 'data' / 'invalid_payment.txt'
     rc, out, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
@@ -91,6 +161,29 @@ def test_invalid_file_validation(test_env):
     assert rc != 0
     rep = json.loads(out)
     assert rep['n_errors'] > 0
+
+
+def test_errors_include_line_numbers_and_multiple_issues(test_env):
+    """Errors should include line numbers and be specific per record."""
+    schema = _load_schema(test_env["schema"])
+    bad_line = _make_fixed_width_line(
+        schema,
+        {
+            "account_no": "12",  # too short
+            "amount": "0.001",  # too many decimals
+            "clearance_date": "2025-13-40",  # invalid date
+            "clearing_account": "99999999999999999999",  # invalid
+        },
+    )
+    f = Path(test_env["tmp_path"]) / "bad.txt"
+    _write_text(f, bad_line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep["n_errors"] >= 1
+    # Must include a line-number prefix
+    assert any("Line 1" in e for e in rep.get("errors", []))
 
 
 def test_retention_window(test_env):
@@ -120,6 +213,76 @@ def test_retention_window(test_env):
     assert rc == 0
     rep = json.loads(out)
     assert rep['duplicate'] is False
+
+
+def test_retention_days_flag_affects_duplicate_detection(test_env):
+    """--retention-days must be honored by the CLI."""
+    test_file = Path(__file__).parent / 'data' / 'duplicate_payment.txt'
+
+    rc1, out1, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '5'])
+    assert rc1 == 0
+    assert json.loads(out1)["duplicate"] is False
+
+    # With a 0-day window, a prior run moments ago should not count.
+    rc2, out2, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
+    rep2 = json.loads(out2)
+    assert rep2["duplicate"] is False
+
+
+def test_hash_normalization_crlf_and_trailing_spaces(test_env):
+    """Same logical lines with different line endings/trailing spaces should hash the same."""
+    schema = _load_schema(test_env["schema"])
+    line = _make_fixed_width_line(schema, {"eftno": "EFTNORM00001"})
+    # one version has trailing spaces, CRLF, and extra blank lines
+    f1 = Path(test_env["tmp_path"]) / "norm1.txt"
+    f2 = Path(test_env["tmp_path"]) / "norm2.txt"
+    _write_text(f1, (line + "   \r\n\r\n"))
+    _write_text(f2, (line + "\n"))
+
+    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc1 == 0
+    assert json.loads(out1)["duplicate"] is False
+
+    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc2 != 0
+    assert json.loads(out2)["duplicate"] is True
+
+
+def test_clearing_account_requires_exact_match_not_substring(test_env):
+    """clearing_account must match an allowed account exactly (no substring matching)."""
+    schema = _load_schema(test_env["schema"])
+
+    # Override clearing accounts to create a substring trap
+    clearing_path = Path(test_env["tmp_path"]) / "clearing_accounts.txt"
+    _write_text(clearing_path, "1234567890\n")
+
+    line = _make_fixed_width_line(schema, {"clearing_account": "2345"})
+    f = Path(test_env["tmp_path"]) / "sub.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], str(clearing_path), test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    assert rep["n_errors"] >= 1
+
+
+def test_randomized_record_not_hardcoded(test_env):
+    """A small randomized valid record should validate (guards against hardcoding)."""
+    schema = _load_schema(test_env["schema"])
+    rnd = random.Random(1337)
+
+    eftno = f"EFT{rnd.randint(10000000, 99999999)}".ljust(12, "0")[:12]
+    acct = str(rnd.randint(10**7, 10**12)).zfill(8)[:8]
+    amount = f"{rnd.randint(1, 9999)}.{rnd.randint(0, 99):02d}"
+
+    line = _make_fixed_width_line(schema, {"eftno": eftno, "account_no": acct, "amount": amount})
+    f = Path(test_env["tmp_path"]) / "rand.txt"
+    _write_text(f, line + "\n")
+
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep["n_errors"] == 0
 
 
 if __name__ == '__main__':

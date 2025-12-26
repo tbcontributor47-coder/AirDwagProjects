@@ -4,10 +4,10 @@
 An insurance company sends Electronic Funds Transfer (EFT) payment files to a bank daily. Each file contains payee details in a fixed-width text format. The bank must validate these files before processing payments.
 
 ## Problem
-The bank needs an automated validation system that:
-1. **Detects duplicate files** submitted within the last 5 days
-2. **Validates file format** against a fixed-width schema
-3. **Validates account numbers** (payee and clearing accounts)
+You are implementing the bank-side validator. The validator is judged by a harness that checks:
+- whether the file looks structurally correct (fixed-width schema)
+- whether the content is acceptable (field-level validation and account checks)
+- whether the file has already been submitted recently (duplicate detection)
 
 ## File Format
 Each payment file contains fixed-width records (one per line) with these fields:
@@ -28,29 +28,42 @@ Each payment file contains fixed-width records (one per line) with these fields:
 **Total record length**: 296 characters per line
 
 ## Your Task
-Create a validation script (`validate_eft.py`) that:
+Create a validation script (`validate_eft.py`). The validator is invoked via CLI and must emit a single JSON report to stdout.
 
-### 1. Duplicate Detection
-- Normalize the file content (trim trailing spaces, canonical line endings)
-- Compute SHA-256 hash of normalized content
-- Store file metadata (hash, filename, timestamp) in SQLite database
-- Flag files as duplicates if the same hash exists within the last 5 days
-- Configurable retention window via `--retention-days` parameter
+CLI shape (arguments are required by the harness):
 
-### 2. Format Validation
-- Parse each record using the fixed-width schema
-- Validate required fields are non-empty
-- Check data types and formats:
+`python validate_eft.py --file <path> --schema <schema.json> --clearing-accounts <clearing_accounts.txt> --index <.eft_index.db> [--retention-days N]`
+
+The details below describe what the harness expects your report and exit code to reflect.
+
+### Duplicate Detection
+Each submission is identified by its (normalized) content. The “name on the envelope” (filename) may change, but the bank still considers the same content to be a re-submission.
+
+Expected behavior:
+- Canonicalize the file’s text before hashing (at minimum: canonical line endings and trimming trailing spaces; ignore empty trailing lines).
+- Compute a SHA-256 hash of the canonicalized content and include it as `file_hash` in the JSON.
+- Track prior submissions in a SQLite index (create it if needed).
+- A file is a duplicate if the same hash exists within the last `N` days, where `N` defaults to 5 and is configurable via `--retention-days`.
+
+### Format Validation
+Use `schema.json` as the source of truth for offsets and lengths.
+
+Expected behavior:
+- Each input line must be exactly 296 characters (anything else is an error).
+- Parse fields by fixed offsets/lengths.
+- Required fields must be present (non-empty after trimming).
+- Type/format checks:
   - `eftno`: non-empty alphanumeric
-  - `account_no`: 8-20 digits
+  - `account_no`: 8–20 digits
   - `bank_code`: alphanumeric
-  - `amount`: valid decimal > 0, max 2 decimal places
-  - `clearance_date`: valid date in YYYY-MM-DD format
-- Report per-record errors with line numbers
+  - `amount`: decimal, strictly greater than 0, with at most 2 decimal places
+  - `clearance_date`: a real date in `YYYY-MM-DD`
+- Errors are reported per record with a line number prefix (e.g., `Line 7: ...`).
 
-### 3. Account Validation
-- `account_no`: must be 8-20 digits
-- `clearing_account`: must match one of the allowed clearing accounts in the database or config file
+### Account Validation
+Expected behavior:
+- `account_no` must match the digit/length rule above.
+- `clearing_account` must match one of the allowed values from `clearing_accounts.txt` (exact match).
 
 ## Expected Output
 Your script should output a JSON report to stdout:
