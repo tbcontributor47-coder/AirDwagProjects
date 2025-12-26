@@ -54,15 +54,19 @@ Expected behavior:
 - Required fields must be present (non-empty after trimming).
 - Type/format checks:
   - `eftno`: non-empty alphanumeric
-  - `account_no`: 8–20 digits
-  - `bank_code`: alphanumeric
+  - `account_no`: 8–20 digits (with additional pattern rules below)
+  - `bank_code`: must start with a digit (0-9), contain only uppercase letters and digits (no lowercase, no special characters)
   - `amount`: decimal, strictly greater than 0, with at most 2 decimal places
   - `clearance_date`: a real date in `YYYY-MM-DD`
 - Errors are reported per record with a line number prefix (e.g., `Line 7: ...`).
 
 ### Account Validation
 Expected behavior:
-- `account_no` must match the digit/length rule above.
+- `account_no` must be 8–20 digits AND:
+  - Must NOT start with `0000`, `0001`, `0010`, or `0100`
+  - The first 4 digits must NOT consist solely of `0` and `1` (e.g., `0110`, `1011` are invalid)
+  - The last 4 digits must NOT contain any `0` (e.g., ending in `1203` is invalid)
+  - These rules apply only to accounts in the incoming file (existing customers)
 - `clearing_account` must match one of the allowed values from `clearing_accounts.txt` (exact match).
 
 ## Expected Output
@@ -86,16 +90,42 @@ Exit with:
 
 ## Environment
 - SQLite database: `.eft_index.db` (created if doesn't exist)
+- Payee database: `payees.db` (contains registered payee details and risk flags)
 - Schema file: `schema.json` (defines field layout)
 - Clearing accounts config: `clearing_accounts.txt` (one account per line)
 
+### Payee Database Validation
+The validator must cross-reference each `account_no` against the `payees` table in `payees.db`:
+
+**Database Schema:**
+```sql
+CREATE TABLE payees (
+    account_no TEXT PRIMARY KEY,
+    payee_name TEXT NOT NULL,
+    home_branch TEXT,
+    address TEXT,
+    national_id TEXT,
+    fraud_flag INTEGER DEFAULT 0  -- 0=clean, 1=fraud/risk reported
+);
+```
+
+**Validation Rules:**
+1. Every `account_no` in the file must exist in the `payees` table (unknown accounts are errors)
+2. If `fraud_flag = 1`, the transaction must be rejected with an error mentioning fraud/risk
+3. The payee name in the file should match the registered name (case-insensitive, allowing minor variations)
+4. **Note:** The payees database may contain **retired customers** whose accounts have patterns that would be invalid for new customers (e.g., first 4 digits with only 0s/1s, or last 4 digits containing 0s). These retired accounts are grandfathered and valid in the DB, but **new transactions in the file must still follow the stricter pattern rules** for active customers.
+
 ## Testing
 Your solution will be tested with:
-- Valid payment files
+- Valid payment files (with accounts in payee DB, no fraud flags)
 - Duplicate files (same content submitted multiple times)
 - Files with format errors (wrong field lengths, invalid dates, bad amounts)
-- Files with invalid account numbers
+- Files with invalid account number patterns (forbidden prefixes, 0/1 patterns, trailing zeros)
+- Files with invalid bank codes (lowercase, special chars, or not starting with digit)
 - Files with wrong clearing accounts
+- Files with unknown payee accounts (not in DB)
+- Files with fraud-flagged accounts
+- Files with name mismatches vs. payee DB
 
 ## Constraints
 - Use Python 3.11+

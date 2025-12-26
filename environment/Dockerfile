@@ -16,5 +16,9 @@ COPY app/ /app/
 # Make the primary script executable if present
 RUN if [ -f /app/validate_eft.py ]; then chmod +x /app/validate_eft.py; fi
 
+# Create payees DB inside the image so the runtime `/app` contains `payees.db`
+# The helper script `create_payees_db.py` is included in the app/ directory.
+RUN if [ -f /app/create_payees_db.py ]; then python3 /app/create_payees_db.py /app/payees.db; fi
+
 # Default command: run tests if any are present under /app/tests
 CMD ["/bin/sh", "-c", "if [ -d /app/tests ]; then python3 -m pytest /app/tests/test_validator.py -v; else sleep 1; fi"]

@@ -73,7 +73,7 @@ def _make_fixed_width_line(schema: dict, overrides: dict | None = None) -> str:
         "payee_name": "JOHN DOE",
         "account_no": "12345678",
         "bank_name": "ABC BANK",
-        "bank_code": "BANKCODE01",
+        "bank_code": "1BANKCODE1",
         "amount": "100.00",
         "address": "1 MAIN ST",
         "clearance_date": "2025-12-31",
@@ -347,3 +347,161 @@ def test_eftno_and_bank_code_alphanumeric_constraints(test_env):
     # Expect at least one error mentioning eftno or bank_code
     errors_text = "\n".join(rep.get('errors', []))
     assert ("eftno" in errors_text.lower()) or ("bank_code" in errors_text.lower()) or rep['n_errors'] >= 1
+
+
+def test_account_forbidden_prefixes(test_env):
+    """Account numbers with forbidden prefixes (0000, 0001, 0010, 0100) must error."""
+    schema = _load_schema(test_env["schema"])
+    
+    forbidden = ["00001234", "00012345", "00101234", "01001234"]
+    for acc in forbidden:
+        line = _make_fixed_width_line(schema, {"account_no": acc})
+        f = Path(test_env["tmp_path"]) / f"prefix_{acc}.txt"
+        _write_text(f, line + "\n")
+        
+        rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+        assert rc != 0
+        rep = json.loads(out)
+        assert rep['n_errors'] >= 1
+
+
+def test_account_first_four_only_zeros_and_ones(test_env):
+    """First 4 digits consisting only of 0 and 1 must error."""
+    schema = _load_schema(test_env["schema"])
+    
+    invalid = ["01011234", "11001234", "10101234", "00111234"]
+    for acc in invalid:
+        line = _make_fixed_width_line(schema, {"account_no": acc})
+        f = Path(test_env["tmp_path"]) / f"first4_{acc}.txt"
+        _write_text(f, line + "\n")
+        
+        rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+        assert rc != 0
+        rep = json.loads(out)
+        errors_text = "\n".join(rep.get('errors', []))
+        assert "First 4 digits" in errors_text or "0 and 1" in errors_text
+
+
+def test_account_last_four_cannot_have_zeros(test_env):
+    """Last 4 digits containing 0 must error."""
+    schema = _load_schema(test_env["schema"])
+    
+    invalid = ["12345670", "23456700", "34567000", "45678901"]
+    for acc in invalid:
+        line = _make_fixed_width_line(schema, {"account_no": acc})
+        f = Path(test_env["tmp_path"]) / f"last4_{acc}.txt"
+        _write_text(f, line + "\n")
+        
+        rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+        assert rc != 0
+        rep = json.loads(out)
+        errors_text = "\n".join(rep.get('errors', []))
+        assert "Last 4 digits" in errors_text or "cannot contain 0" in errors_text
+
+
+def test_bank_code_must_start_with_digit(test_env):
+    """Bank code must start with a digit (0-9)."""
+    schema = _load_schema(test_env["schema"])
+    
+    line = _make_fixed_width_line(schema, {"bank_code": "ABCD123456"})
+    f = Path(test_env["tmp_path"]) / "bank_start.txt"
+    _write_text(f, line + "\n")
+    
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc != 0
+    rep = json.loads(out)
+    errors_text = "\n".join(rep.get('errors', []))
+    assert "must start with a digit" in errors_text or "Bank code" in errors_text
+
+
+def test_bank_code_no_lowercase_or_special_chars(test_env):
+    """Bank code cannot have lowercase or special characters."""
+    schema = _load_schema(test_env["schema"])
+    
+    # lowercase
+    line1 = _make_fixed_width_line(schema, {"bank_code": "1BankCode"})
+    f1 = Path(test_env["tmp_path"]) / "bank_lower.txt"
+    _write_text(f1, line1 + "\n")
+    
+    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc1 != 0
+    rep1 = json.loads(out1)
+    errors_text1 = "\n".join(rep1.get('errors', []))
+    assert "lowercase" in errors_text1 or "uppercase" in errors_text1
+    
+    # special chars
+    line2 = _make_fixed_width_line(schema, {"bank_code": "1BANK-CODE"})
+    f2 = Path(test_env["tmp_path"]) / "bank_special.txt"
+    _write_text(f2, line2 + "\n")
+    
+    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc2 != 0
+    rep2 = json.loads(out2)
+    errors_text2 = "\n".join(rep2.get('errors', []))
+    assert "special" in errors_text2 or "uppercase" in errors_text2 or "digits" in errors_text2
+
+
+def test_payee_database_unknown_account(test_env):
+    """Accounts not in payees.db must error."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Use an account that's not in payees.db
+    line = _make_fixed_width_line(schema, {"account_no": "99999999"})
+    f = Path(test_env["tmp_path"]) / "unknown_acc.txt"
+    _write_text(f, line + "\n")
+    
+    # Need to point to payees.db
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc != 0
+    rep = json.loads(out)
+    errors_text = "\n".join(rep.get('errors', []))
+    assert "not found in payee database" in errors_text or "Account" in errors_text
+
+
+def test_payee_fraud_flag_rejection(test_env):
+    """Accounts with fraud_flag=1 must be rejected."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Use a fraud-flagged account from payees.db (98765432)
+    line = _make_fixed_width_line(schema, {"account_no": "98765432", "payee_name": "SUSPICIOUS PERSON A"})
+    f = Path(test_env["tmp_path"]) / "fraud_acc.txt"
+    _write_text(f, line + "\n")
+    
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc != 0
+    rep = json.loads(out)
+    errors_text = "\n".join(rep.get('errors', []))
+    assert "fraud" in errors_text.lower() or "risk" in errors_text.lower()
+
+
+def test_payee_name_mismatch(test_env):
+    """Payee name in file should reasonably match registered name."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Use a valid account but wrong name
+    line = _make_fixed_width_line(schema, {"account_no": "12345678", "payee_name": "TOTALLY DIFFERENT NAME"})
+    f = Path(test_env["tmp_path"]) / "name_mismatch.txt"
+    _write_text(f, line + "\n")
+    
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc != 0
+    rep = json.loads(out)
+    errors_text = "\n".join(rep.get('errors', []))
+    assert "name mismatch" in errors_text.lower() or "payee name" in errors_text.lower()
+
+
+def test_valid_active_customer_account(test_env):
+    """Valid active customer account should pass all checks."""
+    schema = _load_schema(test_env["schema"])
+    
+    # Use a clean account from payees.db with valid pattern
+    line = _make_fixed_width_line(schema, {"account_no": "12345678", "payee_name": "JOHN DOE", "bank_code": "1BANKCODE1"})
+    f = Path(test_env["tmp_path"]) / "valid_active.txt"
+    _write_text(f, line + "\n")
+    
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    assert rc == 0
+    rep = json.loads(out)
+    assert rep['n_errors'] == 0
+    assert rep['records_processed'] == 1
+
