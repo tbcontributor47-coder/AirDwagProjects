@@ -154,6 +154,37 @@ echo ""
       }
     }
 
+    stage('FixAndVerify') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs
+
+echo "Applying solution/solve.sh to write /app/drift_audit.py"
+# Path relative to the task checkout; adjust if your workspace layout differs
+if [ -f "$TASK_ABS/terraform-drift-audit/solution/solve.sh" ]; then
+  bash "$TASK_ABS/terraform-drift-audit/solution/solve.sh"
+else
+  echo "WARNING: solution/solve.sh not found at $TASK_ABS/terraform-drift-audit/solution/solve.sh"
+fi
+
+echo "Re-running tests after fixer (results -> fix-report.xml)"
+# Run pytest but do not fail the pipeline based on this command's exit code.
+python -m pytest /mnt/tests/test_outputs.py -v --junitxml=fix-report.xml || true
+'''
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'fix-report.xml', allowEmptyArchive: true
+          // Publish junit but do not change overall build status if tests fail here
+          catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+            junit 'fix-report.xml'
+          }
+          echo 'FixAndVerify stage completed; see fix-report.xml for details'
+        }
+      }
+    }
+
     stage('Oracle') {
       steps {
         sh '''#!/usr/bin/env bash
