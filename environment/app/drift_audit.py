@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Terraform drift audit (BUGGY starter).
-
-This intentionally does not fully implement the task specification.
-"""
+"""Terraform drift audit starter."""
 
 import json
 import os
@@ -27,7 +24,6 @@ def _normalize_simplified(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def main(argv: list[str]) -> int:
-    # BUG: ignore flags are NOT parsed at all
     args = argv
 
     if len(args) != 2:
@@ -47,7 +43,6 @@ def main(argv: list[str]) -> int:
         print("Error: invalid JSON", file=sys.stderr)
         return 2
 
-    # BUG: only supports simplified format; Terraform-like state is explicitly rejected.
     if not isinstance(ideal_doc, dict) or "resources" not in ideal_doc or "values" in ideal_doc:
         print("Error: unsupported ideal schema", file=sys.stderr)
         return 2
@@ -61,13 +56,11 @@ def main(argv: list[str]) -> int:
     missing = sorted(set(ideal) - set(current))
     extra = sorted(set(current) - set(ideal))
 
-    # BUG: compares only shallow keys, doesn't flatten nested dicts, and only keys present in ideal
     attribute_drift: dict[str, list[dict[str, Any]]] = {}
     for rid in sorted(set(ideal) & set(current)):
         diffs: list[dict[str, Any]] = []
         for k, expected in ideal[rid].items():
             actual = current[rid].get(k)
-            # Simple equality check - doesn't handle nested dicts or lists properly
             if expected != actual:
                 diffs.append({"attribute": k, "expected": expected, "actual": actual})
         if diffs:
@@ -75,7 +68,6 @@ def main(argv: list[str]) -> int:
 
     drift_detected = bool(missing or extra or attribute_drift)
 
-    # BUG: non-deterministic timestamp would violate spec (kept static here to pass basic shape)
     report = {
         "audit_timestamp": "STATIC",
         "drift_detected": drift_detected,

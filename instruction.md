@@ -88,7 +88,13 @@ All attributes present in either snapshot must be compared.
 
 - Compare nested objects recursively.
 - Attribute paths in the report must be **dot-delimited** (example: `tags.Environment`).
+- **Escaping:** if any attribute key contains `.` or `\`, it must be escaped in the output path using a backslash:
+  - `\` becomes `\\`
+  - `.` becomes `\.`
+  - Example: key `Environment.Name` under `tags` becomes `tags.Environment\.Name`.
 - Lists are treated as **atomic** values (no per-index flattening). If two lists differ, the attribute path is the list's key.
+
+`--ignore PREFIX` matching is applied to these rendered (escaped) attribute paths.
 
 ## Output
 
@@ -129,7 +135,15 @@ The output must follow this schema:
 
 - Exit `0` on success.
 - Exit `1` for file I/O errors (missing file, unreadable file).
-- Exit `2` for usage errors or parse errors (invalid JSON, unsupported schema, duplicate resources).
+- Exit `2` for usage errors or parse errors.
+
+### What is a parse error?
+
+Treat each of the following as a **parse error** (exit code `2`):
+
+- **Invalid JSON syntax** (e.g., the file contains malformed JSON like `{`).
+- Unsupported schema / missing required keys.
+- Duplicate normalized resource identifiers.
 
 On any error:
 

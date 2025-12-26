@@ -342,3 +342,81 @@ def test_duplicate_resource_ids_are_parse_errors() -> None:
         assert out == ""
         assert err.strip() != ""
         assert "Traceback" not in err
+
+
+def test_attribute_paths_escape_dots_in_keys() -> None:
+    """Keys containing '.' must be escaped as '\\.' in dot-delimited attribute paths."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"tags": {"Environment.Name": "prod"}},
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"tags": {"Environment.Name": "dev"}},
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.web"]
+        assert diffs == [
+            {
+                "attribute": "tags.Environment\\.Name",
+                "expected": "prod",
+                "actual": "dev",
+            }
+        ]
+
+
+def test_ignore_prefix_matches_escaped_attribute_paths() -> None:
+    """--ignore prefixes are matched against the rendered (escaped) attribute paths."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"tags": {"Environment.Name": "prod"}},
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"tags": {"Environment.Name": "dev"}},
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit(
+            ["--ignore", "tags.Environment\\.Name", str(ideal), str(current)]
+        )
+        assert code == 0, err
+        report = parse_report(out)
+
+        assert report["attribute_drift"] == {}
+        assert report["missing_resources"] == []
+        assert report["extra_resources"] == []
+        assert report["drift_detected"] is False

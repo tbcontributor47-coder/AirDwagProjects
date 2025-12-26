@@ -110,6 +110,10 @@ def normalize_snapshot(doc: Any) -> dict[str, dict[str, Any]]:
 
 
 def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
+    def escape_key(key: str) -> str:
+        # Attribute paths are dot-delimited; escape '.' and '\\' within keys.
+        return key.replace("\\\\", "\\\\\\\\").replace(".", "\\\\.")
+
     out: dict[str, Any] = {}
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -118,7 +122,8 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
                 key = str(k)
             else:
                 key = k
-            path = f"{prefix}.{key}" if prefix else key
+            key_escaped = escape_key(key)
+            path = f"{prefix}.{key_escaped}" if prefix else key_escaped
             if isinstance(v, dict):
                 out.update(flatten_attributes(v, path))
             else:
