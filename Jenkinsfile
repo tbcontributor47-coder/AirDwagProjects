@@ -152,13 +152,31 @@ fi
 
 command -v harbor >/dev/null || { echo "harbor not found in PATH (did Preflight run?)"; exit 127; }
 
+# To avoid Docker image/tag errors from uppercase characters, copy the task
+# to a temporary directory whose basename is lowercased and run Harbor from there.
 TASK_ABS="$(cd "$WORKSPACE/$TASK_PATH" 2>/dev/null && pwd -P)"
 echo "Task absolute path: $TASK_ABS"
-harbor run --agent oracle --path "$TASK_ABS" --force-build 2>&1 | tee logs/oracle.log
+
+BASENAME="$(basename "$TASK_ABS")"
+BASENAME_LC="$(echo "$BASENAME" | tr '[:upper:]' '[:lower:]')"
+TMPDIR="$(mktemp -d /tmp/${BASENAME_LC}.XXXXXX)"
+echo "Using temporary lowercase task dir: $TMPDIR"
+
+# Copy files into TMPDIR preserving permissions; ignore failures but try to be robust.
+rsync -a --exclude='.git' "$TASK_ABS/" "$TMPDIR/" || cp -a "$TASK_ABS/." "$TMPDIR/" || true
+
+harbor run --agent oracle --path "$TMPDIR" --force-build 2>&1 | tee logs/oracle.log || true
 
 RESULT_JSON="$(awk '/Results written to /{print $NF}' logs/oracle.log | tail -n1)"
 if [ -z "$RESULT_JSON" ]; then
-  echo "ERROR: Could not find result.json path in logs/oracle.log"
+  # try to locate a result.json under jobs/
+  RESULT_JSON="$(find jobs -name result.json | head -n1 || true)"
+fi
+
+if [ -z "$RESULT_JSON" ]; then
+  echo "ERROR: Could not find result.json path in logs/oracle.log or jobs/"
+  # keep the temporary dir for debugging
+  echo "Temporary task dir left at: $TMPDIR"
   exit 1
 fi
 
@@ -168,6 +186,7 @@ fi
 
 if [ ! -f "$RESULT_JSON" ]; then
   echo "ERROR: Harbor result file not found: $RESULT_JSON"
+  echo "Temporary task dir left at: $TMPDIR"
   exit 1
 fi
 
@@ -196,6 +215,12 @@ if [ -n "$TRIAL_DIR" ]; then
 fi
 echo "================================================="
 
+# Cleanup temporary dir to avoid filling disk; keep for debugging if needed by setting
+# KEEP_TMPDIR=true as a build parameter.
+if [ "${KEEP_TMPDIR:-false}" != "true" ]; then
+  rm -rf "$TMPDIR" || true
+fi
+'''
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [ -z "$PYTHON_BIN" ]; then
   echo "ERROR: python/python3 not found; cannot validate Harbor result.json"
