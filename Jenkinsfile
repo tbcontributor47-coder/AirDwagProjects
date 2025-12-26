@@ -223,9 +223,10 @@ fi
 echo "================================================="
 
 # If pytest summary indicates failures, fail the build.
-if grep -Eqi "\b([1-9][0-9]*)\s+failed\b" "$VERIFIER_LOG"; then
+# NOTE: Avoid backslash escapes like '\s' in this Groovy string; use POSIX classes.
+if grep -Eqi '(^|[[:space:]])([1-9][0-9]*)[[:space:]]+failed([[:space:]]|$)' "$VERIFIER_LOG"; then
   echo "ERROR: Oracle verifier reports failing tests"
-  grep -Ei "\b([0-9]+)\s+failed\b" "$VERIFIER_LOG" | tail -n 5 || true
+  grep -Ei '(^|[[:space:]])([0-9]+)[[:space:]]+failed([[:space:]]|$)' "$VERIFIER_LOG" | tail -n 5 || true
   exit 1
 fi
 
