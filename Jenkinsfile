@@ -116,6 +116,44 @@ echo "===== End snapshot =====" | tee -a logs/permissions.log
       }
     }
 
+    stage('Baseline Test (Buggy)') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs
+
+# Multibranch support
+if [ -n "${BRANCH_NAME:-}" ] && [ -d "$WORKSPACE/$BRANCH_NAME" ]; then
+  EFFECTIVE_TASK_PATH="$BRANCH_NAME"
+else
+  EFFECTIVE_TASK_PATH="$TASK_PATH"
+fi
+
+TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
+echo "Task absolute path: $TASK_ABS"
+
+BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
+IMAGE_NAME="${BASENAME}:baseline-test"
+
+echo "===== Building Docker image for baseline testing ====="
+docker build -f "$TASK_ABS/environment/Dockerfile" -t "$IMAGE_NAME" "$TASK_ABS/environment" 2>&1 | tee logs/baseline-build.log
+
+echo ""
+echo "===== Running tests against BUGGY baseline (should have failures) ====="
+docker run --rm \
+  -v "$TASK_ABS/tests:/mnt/tests" \
+  "$IMAGE_NAME" \
+  /bin/bash -c "pip install -q pytest 2>&1 >/dev/null && pytest /mnt/tests/test_outputs.py -v --tb=short" \
+  2>&1 | tee logs/baseline-test.log || true
+
+echo ""
+echo "===== Baseline Test Summary ====="
+grep -E "(PASSED|FAILED|passed|failed)" logs/baseline-test.log | tail -1 || echo "No test summary found"
+echo ""
+'''
+      }
+    }
+
     stage('Oracle') {
       steps {
         sh '''#!/usr/bin/env bash
@@ -166,6 +204,20 @@ echo "================================================="
 
 # Cleanup
 [ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
+
+# Extract and display verifier test results from oracle run
+echo ""
+echo "===== Oracle Test Results (with solution applied) ====="
+VERIFIER_LOG="$(dirname "$RESULT_JSON")/verifier/test-stdout.txt"
+if [ -f "$VERIFIER_LOG" ]; then
+  grep -E "(PASSED|FAILED|passed|failed)" "$VERIFIER_LOG" | tail -1 || echo "No test summary in verifier log"
+  echo ""
+  echo "Detailed verifier output:"
+  tail -30 "$VERIFIER_LOG" || true
+else
+  echo "Verifier log not found at: $VERIFIER_LOG"
+fi
+echo "================================================="
 
 # Validate no errors
 python3 - "$RESULT_JSON" <<'PY'
@@ -365,6 +417,32 @@ mkdir -p logs
 echo "===== Consolidated summary =====" | tee logs/consolidate.log
 echo "Node: $(hostname)" | tee -a logs/consolidate.log
 echo "Workspace: $WORKSPACE" | tee -a logs/consolidate.log
+
+echo "" | tee -a logs/consolidate.log
+echo "===== Test Results Comparison =====" | tee -a logs/consolidate.log
+
+if [ -f logs/baseline-test.log ]; then
+  echo "" | tee -a logs/consolidate.log
+  echo "--- Baseline (Buggy) Test Results ---" | tee -a logs/consolidate.log
+  grep -E "(PASSED|FAILED|passed|failed)" logs/baseline-test.log | tail -1 | tee -a logs/consolidate.log || echo "No baseline summary" | tee -a logs/consolidate.log
+else
+  echo "No baseline test log found" | tee -a logs/consolidate.log
+fi
+
+if [ -f logs/oracle.log ]; then
+  echo "" | tee -a logs/consolidate.log
+  echo "--- Oracle (Fixed) Test Results ---" | tee -a logs/consolidate.log
+  # Try to find verifier logs in jobs directory
+  VERIFIER_RESULT=$(find jobs -name "test-stdout.txt" -type f 2>/dev/null | head -n1)
+  if [ -n "$VERIFIER_RESULT" ] && [ -f "$VERIFIER_RESULT" ]; then
+    grep -E "(PASSED|FAILED|passed|failed)" "$VERIFIER_RESULT" | tail -1 | tee -a logs/consolidate.log || echo "No oracle test summary" | tee -a logs/consolidate.log
+  else
+    echo "No oracle verifier log found" | tee -a logs/consolidate.log
+  fi
+fi
+
+echo "" | tee -a logs/consolidate.log
+echo "Expected: Baseline should have ~5 failures, Oracle should have 0 failures" | tee -a logs/consolidate.log
 
 if [ -d jobs ]; then
   echo "" | tee -a logs/consolidate.log
