@@ -1,7 +1,7 @@
 # EFT Payment File Validation
 
 ## Background
-An insurance company sends Electronic Funds Transfer (EFT) payment files to a bank daily. Each file contains payee details in a fixed-width (mainframe-style) text format. The bank must validate these files before processing payments.
+An insurance company sends Electronic Funds Transfer (EFT) payment files to a bank daily. Each file contains payee details in a fixed-width text format. The bank must validate these files before processing payments.
 
 ## Problem
 The bank needs an automated validation system that:

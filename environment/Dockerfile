@@ -2,9 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install minimal test runtime
-RUN pip install --no-cache-dir pytest
-
+# Copy application files from the environment build context
 COPY app/ /app/
 
 # Make the primary script executable if present

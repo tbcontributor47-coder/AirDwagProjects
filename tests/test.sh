@@ -16,6 +16,10 @@ rm -f /logs/verifier/reward.txt
 
 echo "Running EFT Validator Tests..."
 
+# Install pinned test dependencies locally (test-time only)
+python3 -m pip install --upgrade pip >/dev/null 2>&1 || true
+python3 -m pip install "pytest==8.4.1" >/dev/null 2>&1
+
 # Run pytest and capture exit code
 if python3 -m pytest tests/test_validator.py -v -rA --tb=short; then
     echo "Tests passed"
