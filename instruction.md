@@ -32,7 +32,7 @@ Create a validation script (`validate_eft.py`). The validator is invoked via CLI
 
 CLI shape (arguments are required by the harness):
 
-`python validate_eft.py --file <path> --schema <schema.json> --clearing-accounts <clearing_accounts.txt> --index <.eft_index.db> [--retention-days N]`
+`python validate_eft.py --file <path> --schema <schema.json> --clearing-accounts <clearing_accounts.txt> --index <.eft_index.db> [--retention-days N] [--payees-db <payees.db>]`
 
 The details below describe what the harness expects your report and exit code to reflect.
 
@@ -86,7 +86,7 @@ Your script should output a JSON report to stdout:
 
 Exit with:
 - **0** if validation passes (no errors, not duplicate)
-- **1** if validation fails (errors found or duplicate detected)
+- **non-zero** if validation fails (errors found or duplicate detected)
 
 ## Environment
 - SQLite database: `.eft_index.db` (created if doesn't exist)
