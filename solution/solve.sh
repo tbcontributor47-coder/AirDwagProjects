@@ -248,7 +248,10 @@ def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
         # Partial match for the final component with word-boundary rule
         if path_last.startswith(prefix_last):
             remaining = path_last[len(prefix_last) :]
-            if remaining and (remaining[0].isupper() or not remaining[0].isalpha()):
+            # Only treat CamelCase / digit boundaries as a valid continuation.
+            # Do NOT treat punctuation (e.g. '.') as a boundary; that would make
+            # "config.network" match "config.network\.ip" which the tests forbid.
+            if remaining and (remaining[0].isupper() or remaining[0].isdigit()):
                 return True
 
     return False
