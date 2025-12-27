@@ -521,7 +521,13 @@ def test_account_no_length_validation(test_env):
     assert rep_short['n_errors'] > 0
     
     # Too long (21 digits)
-    line_long = _make_fixed_width_line(schema, {"account_no": "123456789012345678901"})
+    acct_field = next(f for f in schema["fields"] if f["name"] == "account_no")
+    start = int(acct_field["start"])
+    length = int(acct_field["length"])
+    base = _make_fixed_width_line(schema)
+    too_long = "123456789012345678901"
+    # Insert 21 digits into a 20-char field to create an overlong record.
+    line_long = base[:start] + too_long + base[start + length :]
     f_long = Path(test_env["tmp_path"]) / "acct_long.txt"
     _write_text(f_long, line_long + "\n")
     
@@ -566,7 +572,7 @@ def test_unicode_in_payee_name(test_env):
     f = Path(test_env["tmp_path"]) / "unicode_name.txt"
     _write_text(f, line + "\n")
 
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--payees-db', 'payees.db'])
+    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
     assert rc == 0
     rep = json.loads(out)
     assert rep['n_errors'] == 0
@@ -585,10 +591,10 @@ def test_crlf_line_endings_with_trailing_spaces(test_env):
     assert rc == 0
     rep = json.loads(out)
     assert rep['n_errors'] == 0
-    # Should not be duplicate on second run due to normalization
     rc2, out2, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc2 != 0
     rep2 = json.loads(out2)
-    assert rep2['duplicate'] == False  # Bug: normalization incomplete
+    assert rep2['duplicate'] is True
 
 
 def test_empty_lines_at_end(test_env):
@@ -707,8 +713,9 @@ def test_duplicate_different_filename_bug(test_env):
     _write_text(f2, line + "\n")
 
     rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc2 != 0
     rep2 = json.loads(out2)
-    assert rep2['duplicate'] == False  # Bug: should be True
+    assert rep2['duplicate'] is True
 
 
 def test_retention_days_ignored_bug(test_env):
@@ -723,10 +730,10 @@ def test_retention_days_ignored_bug(test_env):
     rc1, _, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
     assert rc1 == 0
 
-    # Second run with retention 0, should be duplicate
+    # With a 0-day retention window, prior runs moments ago should not count as duplicates.
     rc2, out2, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
     rep2 = json.loads(out2)
-    assert rep2['duplicate'] == False  # Bug: retention ignored
+    assert rep2['duplicate'] is False
 
 
 def test_payee_name_case_insensitive_match(test_env):
@@ -823,11 +830,11 @@ def test_bank_code_with_lowercase(test_env):
 
 
 def test_exact_length_with_padding(test_env):
-    """Records exactly 296 chars with trailing spaces should be valid."""
+    """Records with extra trailing spaces beyond record length should be valid."""
     schema = _load_schema(test_env["schema"])
 
     line = _make_fixed_width_line(schema) + " " * 10  # Add padding
-    assert len(line) == 296
+    assert len(line) == int(schema["record_length"]) + 10
     f = Path(test_env["tmp_path"]) / "exact_padding.txt"
     _write_text(f, line + "\n")
 

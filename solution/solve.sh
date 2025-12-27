@@ -166,16 +166,24 @@ def validate_bank_code(bank_code: str) -> List[str]:
 def validate_account_pattern(account_no: str) -> List[str]:
     """Validate account number against pattern rules for active customers (8-digit accounts only)."""
     errs = []
-    if not account_no or not account_no.isdigit():
+    if not account_no:
         return errs
-    # These rules only apply to 8-digit account numbers
+    if not account_no.isdigit():
+        errs.append('Account number must contain only digits')
+        return errs
+    if not (8 <= len(account_no) <= 20):
+        errs.append('Account number must be 8-20 digits')
+        return errs
+
+    first4 = account_no[:4]
+    if set(first4) <= {'0', '1'}:
+        errs.append('First 4 digits cannot consist only of 0 and 1')
+
+    # The additional pattern rules below only apply to 8-digit account numbers
     if len(account_no) != 8:
         return errs
     if account_no.startswith('0000') or account_no.startswith('0001') or account_no.startswith('0010') or account_no.startswith('0100'):
         errs.append('Account has forbidden prefix')
-    first4 = account_no[:4]
-    if set(first4) <= {'0', '1'}:
-        errs.append('First 4 digits cannot consist only of 0 and 1')
     last4 = account_no[-4:]
     # Tests expect the randomized account to pass even when last4 has leading zeros (e.g., "0069"),
     # but still reject zeros elsewhere and the degenerate "0000" case.
@@ -201,11 +209,18 @@ def parse_and_validate_lines(
     for i, raw in enumerate(lines, start=1):
         if not raw.strip():
             continue
-        line = raw.rstrip()  # Strip all trailing whitespace
+        # Preserve fixed-width padding. Only allow extra trailing whitespace beyond record length.
+        line = raw
         processed += 1
-        if len(line) != record_len:
+        if len(line) < record_len:
             errors.append(f'Line {i}: Record length expected {record_len} got {len(line)}')
             continue
+        if len(line) > record_len:
+            extra = line[record_len:]
+            if extra.strip():
+                errors.append(f'Line {i}: Record length expected {record_len} got {len(line)}')
+                continue
+            line = line[:record_len]
 
         # Build record map
         record = {}
