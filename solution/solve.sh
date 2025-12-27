@@ -147,15 +147,20 @@ def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
     User provides unescaped prefixes, we match against unescaped paths.
     A prefix matches if the path equals it or starts with prefix followed by a dot.
     """
-    unescaped_path = unescape_path(path)
-    
+    # First, try matching against the rendered (escaped) path so users
+    # can pass already-escaped prefixes like "tags.Environment\\.Name".
     for prefix in ignore_prefixes:
-        # Prefix matches if exact match or path starts with "prefix."
-        if unescaped_path == prefix:
+        if path == prefix or path.startswith(prefix + "."):
             return True
-        if unescaped_path.startswith(prefix + "."):
+
+    # Next, try logical matching against unescaped component paths so users
+    # can pass simpler prefixes like "tags.Env" and still match escaped paths.
+    unescaped_path = unescape_path(path)
+    for prefix in ignore_prefixes:
+        unescaped_prefix = unescape_path(prefix)
+        if unescaped_path == unescaped_prefix or unescaped_path.startswith(unescaped_prefix + "."):
             return True
-    
+
     return False
 
 
