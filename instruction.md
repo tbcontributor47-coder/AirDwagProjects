@@ -6,21 +6,11 @@ You are given a small CLI program inside the container at:
 
 The program is **buggy**. Fix it.
 
-The tool compares an **ideal** Terraform state snapshot against a **current** snapshot and emits a deterministic drift report.
+The tool compares an **ideal** Terraform state snapshot against a **current** snapshot and prints a deterministic drift report as JSON.
 
-## What You Must Implement (no guessing)
+This document is the full runtime contract. Do not guess; implement exactly what is specified.
 
-Implement `/app/drift_audit.py` so that:
-
-- It accepts two JSON snapshot files and optional repeated `--ignore PREFIX` arguments.
-- It parses both snapshot formats described below and produces a single drift report JSON on stdout.
-- It is fully deterministic (ordering + fixed timestamp).
-- It has strict, test-checked error handling:
-  - No Python traceback is allowed.
-  - On any non-zero exit, **stdout must be empty** and a human-readable message must be printed to stderr.
-  - Usage errors and parse errors exit `2`; file I/O errors exit `1`.
-
-## CLI
+## CLI contract
 
 The CLI must be invoked as:
 
@@ -28,15 +18,16 @@ The CLI must be invoked as:
 python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>
 ```
 
-- `<ideal_state.json>` and `<current_state.json>` are required.
-- `--ignore PREFIX` may be repeated. Any attribute drift whose `attribute` path starts with `PREFIX` is excluded.
-
-Notes:
-- `--ignore` must be followed by a value. If `--ignore` is provided without a following `PREFIX`, that is a usage error.
+- `<ideal_state.json>` and `<current_state.json>` are required positional arguments.
+- `--ignore PREFIX` can be repeated.
 
 ### Usage errors
 
-If the CLI is invoked incorrectly, exit `2` and print **exactly** this usage line to stderr:
+If the CLI is invoked incorrectly (wrong number of args, `--ignore` missing its value, unknown flags, etc.):
+
+- Exit code: `2`
+- Stdout: **must be empty**
+- Stderr: must be **exactly** the single usage line below, followed by `\n`
 
 ```
 Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>
@@ -44,25 +35,36 @@ Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <curre
 
 No Python traceback may be printed.
 
-Additionally:
-- On usage errors, stdout must be empty.
+## Errors and exit codes
 
-## Input
+The program must never print a Python traceback.
+
+On any non-zero exit:
+
+- Stdout must be **empty**.
+- Stderr must be **non-empty** and human-readable.
+
+Exit codes:
+
+- `0`: success (report printed to stdout)
+- `1`: file I/O errors (missing file, unreadable file)
+- `2`: usage errors or parse errors
+
+### Parse errors (exit 2)
+
+Treat any of the following as a parse error:
+
+- Invalid JSON syntax (JSON decode error)
+- Unsupported snapshot shape / missing required keys / wrong types (where required keys must be objects/lists)
+- Duplicate normalized resource identifiers within a single snapshot
+
+## Input snapshots
 
 Both inputs are UTF-8 JSON files.
 
-If either input cannot be parsed as JSON due to invalid JSON syntax, that is a **parse error** and the program must exit `2`.
+Each snapshot is in one of these supported formats.
 
-On parse errors:
-- stdout must be empty
-- stderr must be non-empty
-- no traceback
-
-### Supported snapshot formats
-
-A snapshot may be in either of the following formats:
-
-1) **Simplified format**
+### Format A: simplified
 
 ```
 {
@@ -76,7 +78,15 @@ A snapshot may be in either of the following formats:
 }
 ```
 
-2) **Terraform-like format** (subset)
+Requirements:
+
+- Top-level `resources` must exist and be a list.
+- Each `resources[*]` must be an object containing:
+  - `type` (string)
+  - `name` (string)
+  - `attributes` (object)
+
+### Format B: terraform-like (subset)
 
 ```
 {
@@ -89,216 +99,177 @@ A snapshot may be in either of the following formats:
           "values": { ... }
         }
       ],
-      "child_modules": [ ... same shape recursively ... ]
+      "child_modules": [ ... ]
     }
   }
 }
 ```
 
-### Resource identifier normalization
+Requirements:
 
-Every resource must be identified as:
+- `values.root_module` must exist and be an object.
+- A module object can contain:
+  - `resources`: list of resource objects (same `type`/`name`, but attributes are under `values`)
+  - `child_modules`: list of module objects (same shape recursively)
+
+Traversal:
+
+- Walk `values.root_module` and all nested modules in depth-first order.
+- Collect all resources from every module.
+
+### Mixed formats
+
+The ideal snapshot may be Format A while the current snapshot is Format B (and vice-versa). Handle this.
+
+## Resource identity
+
+Every resource is identified by:
 
 ```
-<resource_type>.<resource_name>
+<type>.<name>
 ```
 
 Example: `aws_instance.web`.
 
-If a snapshot contains duplicate identifiers, treat it as a **parse error**.
+If a single snapshot contains the same identifier more than once, that snapshot is a **parse error** (exit `2`).
 
-Required keys (parse errors if missing):
-- Simplified format: top-level `resources` must be a list of objects each containing `type`, `name`, and `attributes`.
-- Terraform-like format: top-level `values.root_module` must exist; `resources` are under `root_module.resources` and recursively under each `child_modules[*]`.
+## Attribute flattening and rendering
 
-### Attribute comparison
+Each resource has an attribute object:
 
-All attributes present in either snapshot must be compared.
+- Format A uses `attributes`
+- Format B uses `values`
 
-- Compare nested objects recursively.
-- Attribute paths in the report must be **dot-delimited** (example: `tags.Environment`).
-- Lists are treated as **atomic** values (no per-index flattening). If two lists differ, the attribute path is the list's key.
+You must compare all attributes present in either snapshot (union).
 
-### Flattening / attribute path rendering
+### Comparison rules
 
-Flatten nested objects recursively into dot-delimited attribute paths.
+- Nested JSON objects are compared recursively (flattened into paths).
+- Lists are **atomic** values (no per-index flattening). If two lists differ, drift is reported at the list key path.
+- Do not coerce types. For example, `123` and `"123"` are different.
 
-**Escaping (literal key characters)**
+### Rendered attribute paths
 
-When rendering a *key name* into a path segment, escape characters in this order:
+Flatten nested objects into dot-delimited paths.
 
-1) Escape backslashes: `\` becomes `\\`
-2) Escape dots: `.` becomes `\.`
+#### Escaping a literal key name into one path segment
 
-Example: key `Environment.Name` under `tags` becomes `tags.Environment\.Name`.
+When a key name is treated as a **literal key name** (a single path component), escape it in this exact order:
 
-Example (backslash + dot): key `path\to.file` under `meta` becomes `meta.path\\to\.file`.
-
-Concrete example (matches the verifier):
-- Input attributes: `{ "meta": { "path\\to.file": "B" } }`
-- Rendered drift attribute path: `meta.path\\to\.file`
-
-Algorithm (precise):
-
-- To render a literal key name into a single path segment, apply:
-  1) Replace every `\` with `\\`.
-  2) Then replace every `.` with `\.`.
+1) Escape backslashes: `\` → `\\`
+2) Escape dots: `.` → `\.`
 
 No other characters are escaped.
 
-**Top-level key handling (important)**
+Examples:
 
-Some snapshots contain already-rendered dot paths as top-level attribute keys.
-For top-level attributes (i.e., when the current prefix is empty):
+- Nested key `Environment.Name` under `tags` renders as `tags.Environment\\.Name`.
+- Nested key `path\to.file` under `meta` renders as `meta.path\\\\to\\.file`.
 
-- If the key starts with `config.`: treat it as an already-rendered dot path (do **not** escape the separator dots).
-- If the key starts with `tags.`: treat it as an already-rendered dot path *unless* `tags.Env` is present as a top-level key in the same attributes object.
-  - If `tags.Env` is present, treat **all** top-level `tags.*` keys as **literal keys** and therefore escape their dots/backslashes as normal.
-- Otherwise: treat the key as a literal key name and escape dots/backslashes as above.
+#### Top-level special handling
 
-Clarification (already-rendered vs literal):
+At the **top level only** (i.e., when the current prefix is empty):
 
-- “Already-rendered dot path” means the key string itself is used as the path prefix *as-is* at the top level (its unescaped dots act as component separators). If its value is a nested object, flatten that object under this prefix, and for those nested keys (prefix is now non-empty) apply the literal escaping rules.
-- “Literal key” means the key string is treated as a single key name, so any `.` inside it must be escaped to `\.` and any `\` must be escaped to `\\`.
+- If the key starts with `config.`: treat the key string as an **already-rendered path**.
+- If the key starts with `tags.`: treat the key string as an **already-rendered path**.
+- Otherwise: treat the key as a **literal key name** and escape it using the literal escaping rules above.
 
-Example (tags exception): if the top-level attributes contain both `tags.Env` and `tags.Environment`, then both are treated as *literal keys* and their rendered paths are `tags\.Env` and `tags\.Environment`.
+Meaning of “already-rendered path”:
 
-Concrete example (matches the verifier):
-- If attributes include `{ "tags.Env": "prod", "tags.Environment": "prod" }` then the rendered keys are `tags\.Env` and `tags\.Environment` (dots escaped) because `tags.Env` exists.
+- The top-level key string is used as the path prefix **as-is**.
+- Its unescaped `.` characters are path separators.
+- The sequences `\.` and `\\` inside that string are treated as the same escape sequences used elsewhere (i.e., an escaped dot is a literal dot inside a component).
 
-For nested objects (i.e., when prefix is non-empty), key names are always treated as literal and must be escaped.
+If an already-rendered top-level key maps to a nested object, flatten that nested object under this prefix, and for those nested keys (prefix is now non-empty) treat nested keys as literal key names (escape them).
 
-### `--ignore` prefix matching
+## Drift report
 
-`--ignore PREFIX` is matched against the **rendered** attribute paths.
-
-Important: ignore matching is **segment-aware**. A prefix must match **path components**, not arbitrary substrings. For example, the ignore prefix `ags` must not match the attribute path `tags.Environment`.
-
-Matching is **component-aware**, where components are separated by **unescaped dots**:
-
-- Unescaped `.` separates components.
-- Escaped dots (`\.`) are literal dots within a component.
-- Escaped backslashes (`\\`) are literal backslashes within a component.
-
-Parsing rendered paths into components (precise):
-
-- Scan the rendered string left-to-right.
-- A `.` character starts a new component **only** when it is **not** escaped.
-- A backslash escape is recognized only for these two sequences:
-  - `\.` represents a literal `.` within the current component.
-  - `\\` represents a literal `\` within the current component.
-- Any other `\X` sequence (where `X` is not `.` or `\`) is treated as a literal backslash followed by `X` (i.e., it does **not** form an escape).
-
-Unescaping (used only for the “single component” case below):
-
-- Convert `\\` to `\`, then convert `\.` to `.`.
-
-An ignore prefix matches an attribute path if either:
-
-1) The rendered attribute path is a *single component* (i.e., it contains **no unescaped dots**). In this case, unescape both the rendered attribute path and the provided `PREFIX` (using the unescape procedure above) and treat it as a simple string-prefix match.
-
-2) Otherwise, do component-aware matching:
-   - All components except the last must match exactly.
-   - For the final component:
-     - Exact match is ignored.
-     - Additionally, allow a **partial** match where the final component starts with the prefix's final component **and** the next character is an uppercase letter or digit. (This supports patterns like ignoring `tags.Env*` matching `tags.EnvName` but not `tags.Environment`.)
-
-Notes (to avoid substring ambiguity):
-
-- The “partial match” rule applies **only** to the final component, and only with the uppercase/digit lookahead. Otherwise, components must match exactly at component boundaries.
-- Example: `--ignore tags.Env` matches `tags.EnvName` (next char after `Env` is `N`) but does **not** match `tags.Environment` (next char after `Env` is `i`).
-
-Concrete example (matches the verifier):
-- If drift contains both `tags.Environment` and `tags.EnvName`, and you run:
-  `python /app/drift_audit.py --ignore tags.Env <ideal> <current>`
-  then only `tags.EnvName` is ignored; `tags.Environment` remains.
-
-This component-aware behavior is required so that, for example, `--ignore config.network` ignores `config.network.ip` but does **not** ignore `config.network\.ip` (where the dot is literal/escaped).
-
-### Unicode handling for `--ignore` prefixes (clarification)
-
-Attribute keys and ignore prefixes may contain non-ASCII characters (for example, `café`). To avoid ambiguity about how such characters are matched, the following precise procedure MUST be used when determining whether an ignore prefix matches a rendered attribute path:
-
-1. Rendering and escaping: produce the rendered attribute path exactly as described above (with backslashes and dots escaped per the rules). The matching algorithm works on these rendered strings.
-
-2. Matching-normalization: to produce a stable matching form for both the rendered attribute path and for each provided `PREFIX`, apply the following transforms to each string before performing prefix/component comparisons:
-  - Normalize to Unicode Normalization Form C (NFC).
-  - Case-fold using Unicode casefolding (i.e., `str.casefold()` semantics) so matching is case-insensitive in a Unicode-aware way.
-  - Apply compatibility decomposition (NFKD) and remove all combining marks (Unicode category `Mn`) to strip diacritics (so `café` becomes `cafe`). This makes ignore prefixes with ASCII letters match attributes that differ only by diacritics.
-
-  The result is the "matching key" for that path or prefix.
-
-3. Component splitting: split the rendered attribute path into components on unescaped dots (as described previously). Also split the provided `PREFIX` on unescaped dots. Create matching-key components by applying the matching-normalization above to each component separately.
-
-4. Component-aware comparison: apply the same component-aware matching rules described earlier, but operate on the matching-key components:
-  - All components except the final one must match exactly (matching-key equality).
-  - For the final component apply either an exact match (matching-key equality) or, when the final matching-key of the attribute starts with the final matching-key of the prefix and the character immediately after the prefix in the original (pre-normalized, rendered) final component is an uppercase letter or a digit, treat that as a valid partial match (this preserves the original rule that allows `tags.Env*` semantics while still using fold/diacritic-insensitive matching for equality/prefix checks).
-
-5. Notes and rationale:
-  - The matching process is intentionally diacritic- and case-insensitive to make `--ignore cafe` match both `cafe` and `café` as the test expects.
-  - The special-case lookahead (uppercase-or-digit) is evaluated on the original rendered final component (before casefold/diacritic stripping) so it continues to support the original intent of treating `tags.Env*` as matching `tags.EnvName` but not `tags.Environment`.
-  - Escaped dots and backslashes are still respected when splitting components and when rendering the report; only the matching step uses the normalized/diacritic-stripped matching keys.
-
-Adding this explicit procedure removes ambiguity around Unicode characters in ignore prefixes while preserving the component-aware and literal-escaping semantics already described.
-
-## Output
-
-On success, print the audit report as JSON to stdout, followed by a newline.
-
-The output must be fully deterministic:
-
-- `audit_timestamp` must be the literal string `STATIC`.
-- `missing_resources` and `extra_resources` must be sorted.
-- `attribute_drift` keys must be sorted.
-- Each resource's drift entries must be sorted by `attribute`.
-  - Sorting is lexicographic on the rendered `attribute` string, with a special case: treat spaces as sorting *after* all other characters (i.e., as if `' '` were a very large character) so that keys with spaces come last.
-
-Concrete example (matches the verifier):
-- If a resource has drift attributes `key\.with\.dots` and `key with spaces`, the output order must be:
-  1) `key\.with\.dots`
-  2) `key with spaces`
-
-### Output schema
-
-The output must follow this schema:
-
-- `audit_timestamp`: string (must be `STATIC`)
-- `drift_detected`: boolean
-- `missing_resources`: array of strings
-- `extra_resources`: array of strings
-- `attribute_drift`: object mapping resource id -> list of entries
-  - each entry is an object with keys:
-    - `attribute` (string)
-    - `expected` (any JSON value or null)
-    - `actual` (any JSON value or null)
-
-## Drift definition
+### Drift types
 
 - **Missing resources**: present in ideal, absent in current.
 - **Extra resources**: present in current, absent in ideal.
-- **Attribute drift**: for resources present in both, any attribute where `expected != actual`, including:
-  - attribute present only in ideal (actual is null)
-  - attribute present only in current (expected is null)
+- **Attribute drift**: for resources present in both, any flattened attribute path where expected and actual differ.
+  - If an attribute exists only in ideal: `actual` is `null`.
+  - If an attribute exists only in current: `expected` is `null`.
 
-`drift_detected` must be `true` if and only if any of the above is non-empty.
+### Ignore filtering (`--ignore`)
 
-## Exit codes / error handling
+Each provided `--ignore PREFIX` removes any attribute drift entry whose rendered `attribute` path matches `PREFIX`.
 
-- Exit `0` on success.
-- Exit `1` for file I/O errors (missing file, unreadable file).
-- Exit `2` for usage errors or parse errors (including invalid JSON syntax / JSON decoding errors).
+Ignore matching is **segment-aware** (component-aware), not an arbitrary substring match.
 
-### What is a parse error?
+#### Component splitting for matching
 
-Treat each of the following as a **parse error** (exit code `2`):
+Split a rendered path string into components by scanning left-to-right:
 
-- **Invalid JSON syntax** (e.g., the file contains malformed JSON like `{`).
-- Unsupported schema / missing required keys.
-- Duplicate normalized resource identifiers.
+- An unescaped `.` starts a new component.
+- The only recognized escape sequences are:
+  - `\.` (literal dot in current component)
+  - `\\` (literal backslash in current component)
+- Any other `\X` is treated as a literal backslash followed by `X`.
 
-On any error:
+#### Matching normalization (Unicode)
 
-- Print a human-readable message to stderr.
-- Do not print a Python traceback.
-- Do not print anything to stdout.
-- Do not print a Python traceback.
+Ignore matching must be stable for Unicode text. For matching only (not for rendering), transform each component as follows:
+
+1) Normalize with NFC
+2) Case-fold (`casefold()`)
+3) Normalize with NFKD and remove all combining marks (category `Mn`)
+
+This makes `café` match `cafe`.
+
+#### Matching rule
+
+Let `P = PREFIX components` and `A = attribute components` (after splitting). Compare using the normalized forms, but keep the original (pre-normalized) final component around for the lookahead rule.
+
+Single-component special case (required):
+
+- If the rendered attribute path has exactly one component (i.e., it contains **no unescaped dots**), then ignore matching is a plain string prefix match on that single component:
+  1) Unescape both strings by converting `\\` → `\` and then `\.` → `.`.
+  2) Apply the matching normalization (NFC → casefold → NFKD + strip `Mn`) to the entire unescaped strings.
+  3) Treat `PREFIX` as matching if the normalized attribute string starts with the normalized prefix string.
+
+This is required so `--ignore café` matches both `café` and `café\.au_lait`.
+
+`PREFIX` matches `attribute` if:
+
+- `P` is longer than `A`: no match.
+- For all components except the last component of `P`: they must match exactly.
+- For the final component of `P`, allow either:
+  - exact match, OR
+  - a partial match where the attribute final component starts with the prefix final component and the next character in the **original rendered attribute final component** (right after the matched prefix) is an uppercase letter (`A`-`Z`) or a digit (`0`-`9`).
+
+This rule is required so `--ignore tags.Env` ignores `tags.EnvName` but does not ignore `tags.Environment`.
+
+### Output JSON schema
+
+On success, print a single JSON object to stdout followed by a newline:
+
+- `audit_timestamp`: string, must be exactly `STATIC`
+- `drift_detected`: boolean
+- `missing_resources`: array of resource id strings
+- `extra_resources`: array of resource id strings
+- `attribute_drift`: object mapping resource id → list of drift entries
+  - Each drift entry is an object:
+    - `attribute`: rendered attribute path (string)
+    - `expected`: JSON value or `null`
+    - `actual`: JSON value or `null`
+
+`drift_detected` must be `true` iff any of:
+
+- `missing_resources` is non-empty
+- `extra_resources` is non-empty
+- any `attribute_drift[resource]` list is non-empty
+
+### Deterministic ordering
+
+The output must be fully deterministic:
+
+- `audit_timestamp` is always `STATIC`.
+- `missing_resources` and `extra_resources` must be sorted lexicographically.
+- The keys of `attribute_drift` must be sorted lexicographically.
+- For each resource, its list of drift entries must be sorted by `attribute` using this ordering:
+  - primary: lexicographic on the rendered attribute string
+  - special-case: treat a space character `' '` as sorting *after* all other characters
+
+Resources with zero drift entries after ignore filtering must not appear in `attribute_drift`.
