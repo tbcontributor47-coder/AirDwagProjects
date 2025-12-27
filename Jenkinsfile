@@ -150,6 +150,13 @@ echo ""
 echo "===== Baseline Test Summary ====="
 grep -E "(PASSED|FAILED|passed|failed)" logs/baseline-test.log | tail -1 || echo "No test summary found"
 echo ""
+echo "----- Full baseline test log -----"
+if [ -f logs/baseline-test.log ]; then
+    sed -n '1,20000p' logs/baseline-test.log || true
+else
+    echo "No baseline test log file found"
+fi
+echo ""
 '''
             }
         }
@@ -202,6 +209,18 @@ fi
 echo ""
 echo "===== FixAndVerify Test Summary ====="
 grep -E "(PASSED|FAILED|passed|failed)" logs/fix-and-verify.log | tail -1 || echo "No test summary found"
+echo ""
+echo "----- Full fix-and-verify log -----"
+if [ -f logs/fix-and-verify.log ]; then
+    sed -n '1,20000p' logs/fix-and-verify.log || true
+else
+    echo "No fix-and-verify log file found"
+fi
+
+if [ -f fix-report.xml ]; then
+    echo "----- fix-report.xml -----"
+    sed -n '1,2000p' fix-report.xml || true
+fi
 echo ""
 '''
             }
