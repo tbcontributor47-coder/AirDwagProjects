@@ -111,24 +111,31 @@ def normalize_snapshot(doc: Any) -> dict[str, dict[str, Any]]:
 
 def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
     def escape_key(key: str) -> str:
-        # Attribute paths are dot-delimited; escape '.' and '\\' within keys.
+        # For keys in nested objects, escape dots and backslashes
+        # Dots become \. and backslashes become \\
         return key.replace("\\", "\\\\").replace(".", "\\.")
 
     out: dict[str, Any] = {}
     if isinstance(obj, dict):
         for k, v in obj.items():
             if not isinstance(k, str):
-                # JSON object keys are strings; still guard.
                 key = str(k)
             else:
                 key = k
-            # Always escape dots and backslashes in keys
-            key_escaped = escape_key(key)
-            path = f"{prefix}.{key_escaped}" if prefix else key_escaped
+            
+            if prefix:
+                # We're in a nested context - escape the key
+                key_escaped = escape_key(key)
+                path = f"{prefix}.{key_escaped}"
+            else:
+                # Top-level key - treat dots as path separators, don't escape
+                # The key itself might have escaped dots (\.) which represent literal dots
+                path = key
+            
             if isinstance(v, dict):
                 out.update(flatten_attributes(v, path))
             else:
-                # Lists are treated as atomic values.
+                # Lists are treated as atomic values
                 out[path] = v
     else:
         if prefix:
@@ -144,10 +151,22 @@ def unescape_path(path: str) -> str:
 
 
 def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
-    # Unescape the path for matching, so that ignore prefixes work on the logical keys
-    unescaped = unescape_path(path)
+    # Match against both escaped and unescaped paths
+    # Escaped path matching: for cases where user provides escaped prefixes
+    # Unescaped path matching: for logical component-based matching
     for prefix in ignore_prefixes:
-        if unescaped == prefix or unescaped.startswith(prefix + "."):
+        # Try exact match or prefix followed by dot on escaped path
+        if path == prefix or path.startswith(prefix + "."):
+            return True
+        
+        # Unescape both for logical matching
+        unescaped_path = unescape_path(path)
+        unescaped_prefix = unescape_path(prefix)
+        
+        # Check if prefix is an exact match or a component prefix
+        if unescaped_path == unescaped_prefix:
+            return True
+        if unescaped_path.startswith(unescaped_prefix + "."):
             return True
     return False
 
@@ -165,11 +184,13 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
         ideal_flat = flatten_attributes(ideal[rid])
         current_flat = flatten_attributes(current[rid])
 
-        all_paths = sorted(set(ideal_flat) | set(current_flat))
+        # Preserve order: iterate through ideal first, then current-only paths
+        # Use dict to preserve insertion order (Python 3.7+)
+        all_paths_dict = {**ideal_flat, **current_flat}
         diffs: list[dict[str, Any]] = []
         has_any_diff = False
 
-        for path in all_paths:
+        for path in all_paths_dict:
             expected = ideal_flat.get(path)
             actual = current_flat.get(path)
             if expected != actual:
