@@ -122,6 +122,7 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
                 key = str(k)
             else:
                 key = k
+            # Always escape dots and backslashes in keys
             key_escaped = escape_key(key)
             path = f"{prefix}.{key_escaped}" if prefix else key_escaped
             if isinstance(v, dict):
@@ -135,8 +136,20 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
     return out
 
 
+def unescape_path(path: str) -> str:
+    """Unescape backslash-escaped dots and backslashes in a path."""
+    # Replace \. with . and \\ with \
+    # Process \\ first to avoid double-unescaping
+    return path.replace("\\\\", "\x00").replace("\\.", ".").replace("\x00", "\\")
+
+
 def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
-    return any(path.startswith(p) for p in ignore_prefixes)
+    # Unescape the path for matching, so that ignore prefixes work on the logical keys
+    unescaped = unescape_path(path)
+    for prefix in ignore_prefixes:
+        if unescaped == prefix or unescaped.startswith(prefix + "."):
+            return True
+    return False
 
 
 def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str, Any]], ignore_prefixes: list[str]) -> dict[str, Any]:
@@ -154,17 +167,18 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
 
         all_paths = sorted(set(ideal_flat) | set(current_flat))
         diffs: list[dict[str, Any]] = []
+        has_any_diff = False
 
         for path in all_paths:
-            if should_ignore(path, ignore_prefixes):
-                continue
             expected = ideal_flat.get(path)
             actual = current_flat.get(path)
             if expected != actual:
-                diffs.append({"attribute": path, "expected": expected, "actual": actual})
+                has_any_diff = True
+                if not should_ignore(path, ignore_prefixes):
+                    diffs.append({"attribute": path, "expected": expected, "actual": actual})
 
-        if diffs:
-            # Already iterated paths sorted.
+        # Include resource in attribute_drift if there were any diffs (even if all ignored)
+        if has_any_diff:
             attribute_drift[rid] = diffs
 
     drift_detected = bool(missing_resources or extra_resources or attribute_drift)
