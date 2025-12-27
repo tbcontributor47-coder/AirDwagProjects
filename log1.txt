@@ -1,0 +1,1111 @@
+=== Build CodeExecutionEnvironment:0d04699d-f14a-4c19-ba8a-5eb1b1282e5d ===
+[Container] 2025/12/27 03:15:21.878007 Running on CodeBuild On-demand
+[Container] 2025/12/27 03:15:21.878017 Waiting for agent ping
+[Container] 2025/12/27 03:15:22.079315 Waiting for DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:15:23.161993 Phase is DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:15:23.163034 CODEBUILD_SRC_DIR=/codebuild/output/src3395712136/src
+[Container] 2025/12/27 03:15:23.163584 YAML location is /codebuild/readonly/buildspec.yml
+[Container] 2025/12/27 03:15:23.173649 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:15:23.173761 Processing environment variables
+[Container] 2025/12/27 03:15:23.178389 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:15:23.238907 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:15:23.284948 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:15:23.328132 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:15:23.586731 No runtime version selected in buildspec.
+[Container] 2025/12/27 03:15:23.634747 Moving to directory /codebuild/output/src3395712136/src
+[Container] 2025/12/27 03:15:23.634769 Cache is not defined in the buildspec
+[Container] 2025/12/27 03:15:23.668355 Skip cache due to: no paths specified to be cached
+[Container] 2025/12/27 03:15:23.668654 Registering with agent
+[Container] 2025/12/27 03:15:23.700189 Phases found in YAML: 0
+[Container] 2025/12/27 03:15:23.700656 Phase complete: DOWNLOAD_SOURCE State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.700667 Phase context status code:  Message: 
+[Container] 2025/12/27 03:15:23.804165 Entering phase INSTALL
+[Container] 2025/12/27 03:15:23.836843 Phase complete: INSTALL State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.836865 Phase context status code:  Message: 
+[Container] 2025/12/27 03:15:23.872980 Entering phase PRE_BUILD
+[Container] 2025/12/27 03:15:23.875589 Phase complete: PRE_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.875599 Phase context status code:  Message: 
+[Container] 2025/12/27 03:15:23.908986 Entering phase BUILD
+[Container] 2025/12/27 03:15:23.911367 Phase complete: BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.911378 Phase context status code:  Message: 
+[Container] 2025/12/27 03:15:23.942381 Entering phase POST_BUILD
+[Container] 2025/12/27 03:15:23.944963 Phase complete: POST_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.944975 Phase context status code:  Message: 
+[Container] 2025/12/27 03:15:23.991045 Set report auto-discover timeout to 5 seconds
+[Container] 2025/12/27 03:15:23.991072 Expanding base directory path:  .
+[Container] 2025/12/27 03:15:23.993828 Assembling file list
+[Container] 2025/12/27 03:15:23.993842 Expanding .
+[Container] 2025/12/27 03:15:23.996628 Expanding file paths for base directory .
+[Container] 2025/12/27 03:15:23.996642 Assembling file list
+[Container] 2025/12/27 03:15:23.996671 Expanding **/*
+[Container] 2025/12/27 03:15:23.999552 No matching auto-discover report paths found
+[Container] 2025/12/27 03:15:23.999567 Report auto-discover file discovery took 0.008522 seconds
+[Container] 2025/12/27 03:15:23.999647 Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED
+[Container] 2025/12/27 03:15:23.999670 Phase context status code:  Message: 
+
+
+=== Build CodeExecutionEnvironment:72450ef0-800e-4f3f-b35b-d7d647352d61 ===
+[Container] 2025/12/27 03:16:28.324586 Running on CodeBuild On-demand
+[Container] 2025/12/27 03:16:28.324597 Waiting for agent ping
+[Container] 2025/12/27 03:16:28.526044 Waiting for DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:16:29.859771 Phase is DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:16:29.861297 CODEBUILD_SRC_DIR=/codebuild/output/src187/src/s3/00
+[Container] 2025/12/27 03:16:29.861468 CODEBUILD_SRC_DIR_helper=/codebuild/output/src187/src/s3/01
+[Container] 2025/12/27 03:16:29.862170 YAML location is /codebuild/readonly/buildspec.yml
+[Container] 2025/12/27 03:16:29.863121 No commands found for phase name: install
+[Container] 2025/12/27 03:16:29.865868 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:29.865956 Processing environment variables
+[Container] 2025/12/27 03:16:29.870541 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:29.939570 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:29.984521 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.042456 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.322799 Selecting 'python' runtime version '3.13' based on manual selections...
+[Container] 2025/12/27 03:16:30.322866 Running command echo "Installing Python version 3.13 ..."
+Installing Python version 3.13 ...
+
+[Container] 2025/12/27 03:16:30.330408 Running command pyenv global $PYTHON_313_VERSION
+
+[Container] 2025/12/27 03:16:30.895147 Moving to directory /codebuild/output/src187/src/s3/00
+[Container] 2025/12/27 03:16:30.895167 Cache is not defined in the buildspec
+[Container] 2025/12/27 03:16:30.935518 Skip cache due to: no paths specified to be cached
+[Container] 2025/12/27 03:16:30.935752 Registering with agent
+[Container] 2025/12/27 03:16:30.972760 Phases found in YAML: 3
+[Container] 2025/12/27 03:16:30.972775  INSTALL: 0 commands
+[Container] 2025/12/27 03:16:30.972779  PRE_BUILD: 12 commands
+[Container] 2025/12/27 03:16:30.972782  BUILD: 7 commands
+[Container] 2025/12/27 03:16:30.973022 Phase complete: DOWNLOAD_SOURCE State: SUCCEEDED
+[Container] 2025/12/27 03:16:30.973034 Phase context status code:  Message: 
+[Container] 2025/12/27 03:16:31.089687 Entering phase INSTALL
+[Container] 2025/12/27 03:16:31.173549 Phase complete: INSTALL State: SUCCEEDED
+[Container] 2025/12/27 03:16:31.173568 Phase context status code:  Message: 
+[Container] 2025/12/27 03:16:31.216983 Entering phase PRE_BUILD
+[Container] 2025/12/27 03:16:31.217957 Running command echo "================================================"
+================================================
+
+[Container] 2025/12/27 03:16:31.225663 Running command echo "Running difficulty checks"
+Running difficulty checks
+
+[Container] 2025/12/27 03:16:31.232981 Running command echo "================================================"
+================================================
+
+[Container] 2025/12/27 03:16:31.240252 Running command echo "Installing uv"
+Installing uv
+
+[Container] 2025/12/27 03:16:31.247529 Running command curl -LsSf https://astral.sh/uv/install.sh | sh
+downloading uv 0.9.18 x86_64-unknown-linux-gnu
+no checksums to verify
+installing to /root/.local/bin
+  uv
+  uvx
+everything's installed!
+
+To add $HOME/.local/bin to your PATH, either restart your shell or run:
+
+    source $HOME/.local/bin/env (sh, bash, zsh)
+    source $HOME/.local/bin/env.fish (fish)
+
+[Container] 2025/12/27 03:16:33.423779 Running command source $HOME/.local/bin/env
+
+[Container] 2025/12/27 03:16:33.431285 Running command echo "Installing harbor"
+Installing harbor
+
+[Container] 2025/12/27 03:16:33.438495 Running command uv pip install --system -qq "git+https://github.com/laude-institute/harbor.git@47852c74ec7da74016becfb80e311caf7524b185"
+
+[Container] 2025/12/27 03:16:39.968846 Running command echo "Installing terminal bench for test parsing"
+Installing terminal bench for test parsing
+
+[Container] 2025/12/27 03:16:39.983221 Running command uv pip install --system -qq terminal-bench==0.2.18
+
+[Container] 2025/12/27 03:16:52.429103 Running command echo "Installing packages with yum"
+Installing packages with yum
+
+[Container] 2025/12/27 03:16:52.439103 Running command yum install -y bc
+Amazon Linux 2023 repository                     46 kB/s | 3.6 kB     00:00    
+Amazon Corretto                                 139 kB/s | 2.9 kB     00:00    
+packages for the GitHub CLI                     100 kB/s | 3.0 kB     00:00    
+google-chrome                                   7.6 kB/s | 1.3 kB     00:00    
+google-chrome                                    14 kB/s | 6.5 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package   Architecture  Version                       Repository          Size
+================================================================================
+Installing:
+ bc        x86_64        1.07.1-14.amzn2023.0.2        amazonlinux        120 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total download size: 120 k
+Installed size: 226 k
+Downloading Packages:
+bc-1.07.1-14.amzn2023.0.2.x86_64.rpm            3.2 MB/s | 120 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                           1.3 MB/s | 120 kB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+  Running scriptlet: bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+  Verifying        : bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+
+Installed:
+  bc-1.07.1-14.amzn2023.0.2.x86_64                                              
+
+Complete!
+
+[Container] 2025/12/27 03:17:30.645868 Phase complete: PRE_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:17:30.645886 Phase context status code:  Message: 
+[Container] 2025/12/27 03:17:30.681239 Entering phase BUILD
+[Container] 2025/12/27 03:17:30.682249 Running command mkdir -p ~/harbor_tasks/tbench-task
+
+[Container] 2025/12/27 03:17:30.691030 Running command cp -r $CODEBUILD_SRC_DIR/* ~/harbor_tasks/tbench-task/
+
+[Container] 2025/12/27 03:17:30.699889 Running command ls -R ~/harbor_tasks/tbench-task
+/root/harbor_tasks/tbench-task:
+clearing_accounts.txt
+environment
+instruction.md
+schema.json
+solution
+task.toml
+tests
+
+/root/harbor_tasks/tbench-task/environment:
+app
+Dockerfile
+
+/root/harbor_tasks/tbench-task/environment/app:
+create_payees_db.py
+schema.json
+validate_eft.py
+
+/root/harbor_tasks/tbench-task/solution:
+solve.sh
+
+/root/harbor_tasks/tbench-task/tests:
+data
+__init__.py
+test.sh
+test_validator.py
+
+/root/harbor_tasks/tbench-task/tests/data:
+duplicate_payment.txt
+invalid_payment.txt
+valid_payment.txt
+
+[Container] 2025/12/27 03:17:30.709136 Running command echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USERNAME" --password-stdin
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credential-stores
+
+Login Succeeded
+
+[Container] 2025/12/27 03:17:31.348174 Running command cd ~ && TASK=tbench-task
+
+[Container] 2025/12/27 03:17:31.355724 Running command echo '{"solvable":"","difficulty":"","agents":"","tests_results":"","text_summary":""}' | aws s3 cp - ${OUTPUT_S3_URI}
+
+[Container] 2025/12/27 03:17:38.705130 Running command set -e
+if [ "$TEST_TYPE" = "oracle" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent oracle --key oracle "$TASK"
+elif [ "$TEST_TYPE" = "nop" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent nop --key nop "$TASK"
+elif [ "$TEST_TYPE" = "codex" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent codex --model openai/gpt-5 --run "$RUN_NUM" --key codex-gpt5 "$TASK"
+elif [ "$TEST_TYPE" = "claude" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent claude-code --model anthropic/claude-sonnet-4-5-20250929 --run "$RUN_NUM" --key claude-code-4-5-sonnet "$TASK"
+elif [ "$TEST_TYPE" = "consolidate" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_batch_difficulty_check.py "$TASK"
+  $CODEBUILD_SRC_DIR_helper/harbor-print-agent-logs.sh jobs
+fi
+
+🤖 Testing with nop agent
+========================================
+Running tests for tbench-task with nop
+  1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:29 0:00:00Results written to jobs/github-action-nop_tbench-task_1/result.json
+         nop on adhoc          
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Metric              ┃ Value ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+│ Agent               │ nop   │
+│ Dataset             │ adhoc │
+│ Trials              │ 1     │
+│ Errors              │ 0     │
+│                     │       │
+│ Mean                │ 0.000 │
+│                     │       │
+│ Reward Distribution │       │
+│   reward = 0.0      │ 1     │
+└─────────────────────┴───────┘
+
+ID						RECLAIMABLE	SIZE		LAST ACCESSED
+mx4w7appbt3vrqhf2iahsopwf*              	true 		994B      	21 seconds ago
+xqp9iphxch9dvrj1pjf2x6su2*              	true 	0B        	21 seconds ago
+zk7aku9cptkbrsvt3e4p2wbh3               	true 	792.5kB   	21 seconds ago
+rar22l4xloqsz1aam210io83r*              	true 	16.36kB   	21 seconds ago
+yn6koznjkm0yb1zjnr5ybjb50               	true 	10.01kB   	21 seconds ago
+8f710fobng985tmdolfwca08y               	true 	16.36kB   	21 seconds ago
+84ob7oco4zbq0xt7lym8vhpi9               	true 	4.001kB   	21 seconds ago
+hzdcp9jo3t8qpczkdok6gyuow               	true 	0B        	21 seconds ago
+bmiz9seaihow53p5w5t1p10tz               	true 	0B        	21 seconds ago
+4sbmkok87qf7w2yq4vtbc18ql               	true 	0B        	26 seconds ago
+xegfuu0bexw3qlg2ocd7jtht4               	true 	0B        	26 seconds ago
+p5ktwp3t8swltrese0kr3fxbq               	true 	0B        	26 seconds ago
+Total:	840.2kB
+Test mean reward for tbench-task with nop: 0.0
+❌ Tests for tbench-task failed with nop (mean_reward: 0.0)
+
+==========================================
+❌ SUMMARY: The following tasks failed with nop:
+- tbench-task
+==========================================
+✅ NOP agent correctly failed all tasks (expected behavior)
+Completed 6.0 KiB/6.0 KiB (83.2 KiB/s) with 1 file(s) remaining
+upload: ./nop_1.zip to s3://daas-blobs/codebuild_uploads/autoeval_artifacts/7e62b42f43cf426b83d0d5208246a648/nop_1.zip
+Testing with NOP...
+Zipping /root/jobs to /root/nop_1.zip for build artifact directory...
+Uploading /root/nop_1.zip to build artifact directory...
+✓ Build artifacts uploaded to build artifact directory
+
+[Container] 2025/12/27 03:18:27.385654 Phase complete: BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:18:27.385674 Phase context status code:  Message: 
+[Container] 2025/12/27 03:18:27.423088 Entering phase POST_BUILD
+[Container] 2025/12/27 03:18:27.425782 Phase complete: POST_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:18:27.425797 Phase context status code:  Message: 
+[Container] 2025/12/27 03:18:27.476637 Set report auto-discover timeout to 5 seconds
+[Container] 2025/12/27 03:18:27.476674 Expanding base directory path:  .
+[Container] 2025/12/27 03:18:27.479810 Assembling file list
+[Container] 2025/12/27 03:18:27.479826 Expanding .
+[Container] 2025/12/27 03:18:27.483054 Expanding file paths for base directory .
+[Container] 2025/12/27 03:18:27.483066 Assembling file list
+[Container] 2025/12/27 03:18:27.483069 Expanding **/*
+[Container] 2025/12/27 03:18:27.486339 No matching auto-discover report paths found
+[Container] 2025/12/27 03:18:27.486351 Report auto-discover file discovery took 0.009713 seconds
+[Container] 2025/12/27 03:18:27.486361 Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED
+[Container] 2025/12/27 03:18:27.486374 Phase context status code:  Message: 
+
+
+=== Build CodeExecutionEnvironment:a1f34234-88d8-4173-b12a-5a7b0a58950d ===
+[Container] 2025/12/27 03:16:28.838928 Running on CodeBuild On-demand
+[Container] 2025/12/27 03:16:28.838942 Waiting for agent ping
+[Container] 2025/12/27 03:16:29.040470 Waiting for DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:16:30.272939 Phase is DOWNLOAD_SOURCE
+[Container] 2025/12/27 03:16:30.274127 CODEBUILD_SRC_DIR=/codebuild/output/src668/src/s3/00
+[Container] 2025/12/27 03:16:30.274210 CODEBUILD_SRC_DIR_helper=/codebuild/output/src668/src/s3/01
+[Container] 2025/12/27 03:16:30.276874 YAML location is /codebuild/readonly/buildspec.yml
+[Container] 2025/12/27 03:16:30.277226 No commands found for phase name: install
+[Container] 2025/12/27 03:16:30.279172 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.279247 Processing environment variables
+[Container] 2025/12/27 03:16:30.285167 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.360004 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.405187 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.454296 Setting HTTP client timeout to higher timeout for S3 source
+[Container] 2025/12/27 03:16:30.642408 Selecting 'python' runtime version '3.13' based on manual selections...
+[Container] 2025/12/27 03:16:30.642487 Running command echo "Installing Python version 3.13 ..."
+Installing Python version 3.13 ...
+
+[Container] 2025/12/27 03:16:30.650177 Running command pyenv global $PYTHON_313_VERSION
+
+[Container] 2025/12/27 03:16:31.225936 Moving to directory /codebuild/output/src668/src/s3/00
+[Container] 2025/12/27 03:16:31.225960 Cache is not defined in the buildspec
+[Container] 2025/12/27 03:16:31.268669 Skip cache due to: no paths specified to be cached
+[Container] 2025/12/27 03:16:31.268890 Registering with agent
+[Container] 2025/12/27 03:16:31.306630 Phases found in YAML: 3
+[Container] 2025/12/27 03:16:31.306648  PRE_BUILD: 12 commands
+[Container] 2025/12/27 03:16:31.306651  BUILD: 7 commands
+[Container] 2025/12/27 03:16:31.306654  INSTALL: 0 commands
+[Container] 2025/12/27 03:16:31.306927 Phase complete: DOWNLOAD_SOURCE State: SUCCEEDED
+[Container] 2025/12/27 03:16:31.306940 Phase context status code:  Message: 
+[Container] 2025/12/27 03:16:31.414172 Entering phase INSTALL
+[Container] 2025/12/27 03:16:31.489418 Phase complete: INSTALL State: SUCCEEDED
+[Container] 2025/12/27 03:16:31.489437 Phase context status code:  Message: 
+[Container] 2025/12/27 03:16:31.527012 Entering phase PRE_BUILD
+[Container] 2025/12/27 03:16:31.528026 Running command echo "================================================"
+================================================
+
+[Container] 2025/12/27 03:16:31.535932 Running command echo "Running difficulty checks"
+Running difficulty checks
+
+[Container] 2025/12/27 03:16:31.543231 Running command echo "================================================"
+================================================
+
+[Container] 2025/12/27 03:16:31.550599 Running command echo "Installing uv"
+Installing uv
+
+[Container] 2025/12/27 03:16:31.558181 Running command curl -LsSf https://astral.sh/uv/install.sh | sh
+downloading uv 0.9.18 x86_64-unknown-linux-gnu
+no checksums to verify
+installing to /root/.local/bin
+  uv
+  uvx
+everything's installed!
+
+To add $HOME/.local/bin to your PATH, either restart your shell or run:
+
+    source $HOME/.local/bin/env (sh, bash, zsh)
+    source $HOME/.local/bin/env.fish (fish)
+
+[Container] 2025/12/27 03:16:33.892634 Running command source $HOME/.local/bin/env
+
+[Container] 2025/12/27 03:16:33.901332 Running command echo "Installing harbor"
+Installing harbor
+
+[Container] 2025/12/27 03:16:33.908913 Running command uv pip install --system -qq "git+https://github.com/laude-institute/harbor.git@47852c74ec7da74016becfb80e311caf7524b185"
+
+[Container] 2025/12/27 03:16:39.086582 Running command echo "Installing terminal bench for test parsing"
+Installing terminal bench for test parsing
+
+[Container] 2025/12/27 03:16:39.094496 Running command uv pip install --system -qq terminal-bench==0.2.18
+
+[Container] 2025/12/27 03:16:51.483144 Running command echo "Installing packages with yum"
+Installing packages with yum
+
+[Container] 2025/12/27 03:16:51.491159 Running command yum install -y bc
+Amazon Linux 2023 repository                     33 kB/s | 3.6 kB     00:00    
+Amazon Corretto                                 123 kB/s | 2.9 kB     00:00    
+packages for the GitHub CLI                     110 kB/s | 3.0 kB     00:00    
+google-chrome                                   6.5 kB/s | 1.3 kB     00:00    
+google-chrome                                    13 kB/s | 6.5 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package   Architecture  Version                       Repository          Size
+================================================================================
+Installing:
+ bc        x86_64        1.07.1-14.amzn2023.0.2        amazonlinux        120 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total download size: 120 k
+Installed size: 226 k
+Downloading Packages:
+bc-1.07.1-14.amzn2023.0.2.x86_64.rpm            2.7 MB/s | 120 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                           979 kB/s | 120 kB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+  Running scriptlet: bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+  Verifying        : bc-1.07.1-14.amzn2023.0.2.x86_64                       1/1 
+
+Installed:
+  bc-1.07.1-14.amzn2023.0.2.x86_64                                              
+
+Complete!
+
+[Container] 2025/12/27 03:17:29.771207 Phase complete: PRE_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:17:29.771228 Phase context status code:  Message: 
+[Container] 2025/12/27 03:17:29.808731 Entering phase BUILD
+[Container] 2025/12/27 03:17:29.809740 Running command mkdir -p ~/harbor_tasks/tbench-task
+
+[Container] 2025/12/27 03:17:29.818243 Running command cp -r $CODEBUILD_SRC_DIR/* ~/harbor_tasks/tbench-task/
+
+[Container] 2025/12/27 03:17:29.827071 Running command ls -R ~/harbor_tasks/tbench-task
+/root/harbor_tasks/tbench-task:
+clearing_accounts.txt
+environment
+instruction.md
+schema.json
+solution
+task.toml
+tests
+
+/root/harbor_tasks/tbench-task/environment:
+app
+Dockerfile
+
+/root/harbor_tasks/tbench-task/environment/app:
+create_payees_db.py
+schema.json
+validate_eft.py
+
+/root/harbor_tasks/tbench-task/solution:
+solve.sh
+
+/root/harbor_tasks/tbench-task/tests:
+data
+__init__.py
+test.sh
+test_validator.py
+
+/root/harbor_tasks/tbench-task/tests/data:
+duplicate_payment.txt
+invalid_payment.txt
+valid_payment.txt
+
+[Container] 2025/12/27 03:17:29.835277 Running command echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USERNAME" --password-stdin
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credential-stores
+
+Login Succeeded
+
+[Container] 2025/12/27 03:17:30.477057 Running command cd ~ && TASK=tbench-task
+
+[Container] 2025/12/27 03:17:30.484828 Running command echo '{"solvable":"","difficulty":"","agents":"","tests_results":"","text_summary":""}' | aws s3 cp - ${OUTPUT_S3_URI}
+
+[Container] 2025/12/27 03:17:37.303020 Running command set -e
+if [ "$TEST_TYPE" = "oracle" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent oracle --key oracle "$TASK"
+elif [ "$TEST_TYPE" = "nop" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent nop --key nop "$TASK"
+elif [ "$TEST_TYPE" = "codex" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent codex --model openai/gpt-5 --run "$RUN_NUM" --key codex-gpt5 "$TASK"
+elif [ "$TEST_TYPE" = "claude" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent claude-code --model anthropic/claude-sonnet-4-5-20250929 --run "$RUN_NUM" --key claude-code-4-5-sonnet "$TASK"
+elif [ "$TEST_TYPE" = "consolidate" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_batch_difficulty_check.py "$TASK"
+  $CODEBUILD_SRC_DIR_helper/harbor-print-agent-logs.sh jobs
+fi
+
+🤖 Testing with Oracle agent
+========================================
+Running tests for tbench-task with Oracle
+  1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:29 0:00:00Results written to jobs/github-action-oracle_tbench-task_1/result.json
+        oracle on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Metric              ┃ Value  ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Agent               │ oracle │
+│ Dataset             │ adhoc  │
+│ Trials              │ 1      │
+│ Errors              │ 0      │
+│                     │        │
+│ Mean                │ 0.000  │
+│                     │        │
+│ Reward Distribution │        │
+│   reward = 0.0      │ 1      │
+└─────────────────────┴────────┘
+
+ID						RECLAIMABLE	SIZE		LAST ACCESSED
+q51dvi3mxir4smrp3mx8j59nc*              	true 		16.36kB   	21 seconds ago
+ng04c4cl0joxi4zh0v4uyuprv               	true 	792.5kB   	21 seconds ago
+sn7corzzxtmdb2qm1gqs8z62g*              	true 	994B      	21 seconds ago
+c3wg472w8oa2h4b69768r48mu*              	true 	0B        	21 seconds ago
+1vxmt1zmtd1h4asu0xryvzoyb               	true 	10.01kB   	21 seconds ago
+nlu9u7kock46wualg4tjp5vbo               	true 	16.36kB   	21 seconds ago
+io4we6hwcynmhyqeko3ag42ag               	true 	4.001kB   	21 seconds ago
+zys63in1iojc5elsh7jzk8elk               	true 	0B        	21 seconds ago
+qdjp0gw9ij3sc930g58s6cbbm               	true 	0B        	21 seconds ago
+sy9aejxfi8oqimidls6cfob44               	true 	0B        	26 seconds ago
+dprx83ro0y6ilfk3jmqub5oh0               	true 	0B        	26 seconds ago
+utegq3fr26x33zhwjtzbluqva               	true 	0B        	26 seconds ago
+Total:	840.2kB
+Test mean reward for tbench-task with Oracle: 0.0
+❌ Tests for tbench-task failed with Oracle (mean_reward: 0.0)
+
+==========================================
+❌ SUMMARY: The following tasks failed with Oracle:
+- tbench-task
+==========================================
+Testing with Oracle
+❌ Oracle solution failed! Task is not solvable or has issues.
+
+========================================
+📄 PRINTING DEBUG FILES
+========================================
+
+================================================================================
+📄 Printing file: github-action-oracle_tbench-task_1/job.log
+================================================================================
+(file is empty)
+================================================================================
+
+
+================================================================================
+📄 Printing file: github-action-oracle_tbench-task_1/tbench-task__72Qr2YC/agent/oracle.txt
+================================================================================
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+
+================================================================================
+
+
+================================================================================
+📄 Printing file: github-action-oracle_tbench-task_1/tbench-task__72Qr2YC/verifier/test-stdout.txt
+================================================================================
+Running EFT Validator Tests...
+============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-8.4.1, pluggy-1.6.0 -- /usr/local/bin/python3
+cachedir: .pytest_cache
+rootdir: /tests
+collecting ... collected 43 items
+
+../tests/test_validator.py::test_valid_file_validation ERROR             [  2%]
+../tests/test_validator.py::test_duplicate_detection ERROR               [  4%]
+../tests/test_validator.py::test_duplicate_detection_across_filenames ERROR [  6%]
+../tests/test_validator.py::test_invalid_file_validation ERROR           [  9%]
+../tests/test_validator.py::test_errors_include_line_numbers_and_multiple_issues ERROR [ 11%]
+../tests/test_validator.py::test_retention_window ERROR                  [ 13%]
+../tests/test_validator.py::test_retention_days_flag_affects_duplicate_detection ERROR [ 16%]
+../tests/test_validator.py::test_hash_normalization_crlf_and_trailing_spaces ERROR [ 18%]
+../tests/test_validator.py::test_clearing_account_requires_exact_match_not_substring ERROR [ 20%]
+../tests/test_validator.py::test_randomized_record_not_hardcoded ERROR   [ 23%]
+../tests/test_validator.py::test_exact_record_length_enforced ERROR      [ 25%]
+../tests/test_validator.py::test_required_fields_empty_are_reported ERROR [ 27%]
+../tests/test_validator.py::test_eftno_and_bank_code_alphanumeric_constraints ERROR [ 30%]
+../tests/test_validator.py::test_account_forbidden_prefixes ERROR        [ 32%]
+../tests/test_validator.py::test_account_first_four_only_zeros_and_ones ERROR [ 34%]
+../tests/test_validator.py::test_account_last_four_cannot_have_zeros ERROR [ 37%]
+../tests/test_validator.py::test_bank_code_must_start_with_digit ERROR   [ 39%]
+../tests/test_validator.py::test_bank_code_no_lowercase_or_special_chars ERROR [ 41%]
+../tests/test_validator.py::test_payee_database_unknown_account ERROR    [ 44%]
+../tests/test_validator.py::test_payee_fraud_flag_rejection ERROR        [ 46%]
+../tests/test_validator.py::test_payee_name_mismatch ERROR               [ 48%]
+../tests/test_validator.py::test_valid_active_customer_account ERROR     [ 51%]
+../tests/test_validator.py::test_account_no_length_validation ERROR      [ 53%]
+../tests/test_validator.py::test_amount_must_be_positive ERROR           [ 55%]
+../tests/test_validator.py::test_unicode_in_payee_name ERROR             [ 58%]
+../tests/test_validator.py::test_crlf_line_endings_with_trailing_spaces ERROR [ 60%]
+../tests/test_validator.py::test_empty_lines_at_end ERROR                [ 62%]
+../tests/test_validator.py::test_record_too_short ERROR                  [ 65%]
+../tests/test_validator.py::test_record_too_long ERROR                   [ 67%]
+../tests/test_validator.py::test_invalid_date_format ERROR               [ 69%]
+../tests/test_validator.py::test_amount_with_more_than_two_decimals ERROR [ 72%]
+../tests/test_validator.py::test_account_forbidden_first_four_zeros_ones ERROR [ 74%]
+../tests/test_validator.py::test_clearing_account_substring_match_bug ERROR [ 76%]
+../tests/test_validator.py::test_duplicate_different_filename_bug ERROR  [ 79%]
+../tests/test_validator.py::test_retention_days_ignored_bug ERROR        [ 81%]
+../tests/test_validator.py::test_payee_name_case_insensitive_match ERROR [ 83%]
+../tests/test_validator.py::test_multiple_errors_in_one_record ERROR     [ 86%]
+../tests/test_validator.py::test_very_large_file ERROR                   [ 88%]
+../tests/test_validator.py::test_special_characters_in_address ERROR     [ 90%]
+../tests/test_validator.py::test_bank_code_starting_with_letter ERROR    [ 93%]
+../tests/test_validator.py::test_bank_code_with_lowercase ERROR          [ 95%]
+../tests/test_validator.py::test_exact_length_with_padding ERROR         [ 97%]
+../tests/test_validator.py::test_eftno_with_special_chars ERROR          [100%]
+
+==================================== ERRORS ====================================
+_________________ ERROR at setup of test_valid_file_validation _________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________________ ERROR at setup of test_duplicate_detection __________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_________ ERROR at setup of test_duplicate_detection_across_filenames __________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________________ ERROR at setup of test_invalid_file_validation ________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____ ERROR at setup of test_errors_include_line_numbers_and_multiple_issues ____
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+___________________ ERROR at setup of test_retention_window ____________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____ ERROR at setup of test_retention_days_flag_affects_duplicate_detection ____
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+______ ERROR at setup of test_hash_normalization_crlf_and_trailing_spaces ______
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__ ERROR at setup of test_clearing_account_requires_exact_match_not_substring __
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________ ERROR at setup of test_randomized_record_not_hardcoded ____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____________ ERROR at setup of test_exact_record_length_enforced ______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________ ERROR at setup of test_required_fields_empty_are_reported ___________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____ ERROR at setup of test_eftno_and_bank_code_alphanumeric_constraints ______
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+______________ ERROR at setup of test_account_forbidden_prefixes _______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________ ERROR at setup of test_account_first_four_only_zeros_and_ones _________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________ ERROR at setup of test_account_last_four_cannot_have_zeros __________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________ ERROR at setup of test_bank_code_must_start_with_digit ____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________ ERROR at setup of test_bank_code_no_lowercase_or_special_chars ________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________ ERROR at setup of test_payee_database_unknown_account _____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+______________ ERROR at setup of test_payee_fraud_flag_rejection _______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________________ ERROR at setup of test_payee_name_mismatch __________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____________ ERROR at setup of test_valid_active_customer_account _____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____________ ERROR at setup of test_account_no_length_validation ______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________________ ERROR at setup of test_amount_must_be_positive ________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_________________ ERROR at setup of test_unicode_in_payee_name _________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________ ERROR at setup of test_crlf_line_endings_with_trailing_spaces _________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________________ ERROR at setup of test_empty_lines_at_end ___________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+___________________ ERROR at setup of test_record_too_short ____________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________________ ERROR at setup of test_record_too_long ____________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________________ ERROR at setup of test_invalid_date_format __________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+__________ ERROR at setup of test_amount_with_more_than_two_decimals ___________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+________ ERROR at setup of test_account_forbidden_first_four_zeros_ones ________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_________ ERROR at setup of test_clearing_account_substring_match_bug __________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+___________ ERROR at setup of test_duplicate_different_filename_bug ____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+______________ ERROR at setup of test_retention_days_ignored_bug _______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+___________ ERROR at setup of test_payee_name_case_insensitive_match ___________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____________ ERROR at setup of test_multiple_errors_in_one_record _____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________________ ERROR at setup of test_very_large_file ____________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_____________ ERROR at setup of test_special_characters_in_address _____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+____________ ERROR at setup of test_bank_code_starting_with_letter _____________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_______________ ERROR at setup of test_bank_code_with_lowercase ________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_______________ ERROR at setup of test_exact_length_with_padding _______________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+_______________ ERROR at setup of test_eftno_with_special_chars ________________
+/tests/test_validator.py:39: in test_env
+    shutil.copy(schema_src, schema_dest)
+/usr/local/lib/python3.11/shutil.py:431: in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+/usr/local/lib/python3.11/shutil.py:256: in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/schema.json'
+=========================== short test summary info ============================
+ERROR ../tests/test_validator.py::test_valid_file_validation - FileNotFoundEr...
+ERROR ../tests/test_validator.py::test_duplicate_detection - FileNotFoundErro...
+ERROR ../tests/test_validator.py::test_duplicate_detection_across_filenames
+ERROR ../tests/test_validator.py::test_invalid_file_validation - FileNotFound...
+ERROR ../tests/test_validator.py::test_errors_include_line_numbers_and_multiple_issues
+ERROR ../tests/test_validator.py::test_retention_window - FileNotFoundError: ...
+ERROR ../tests/test_validator.py::test_retention_days_flag_affects_duplicate_detection
+ERROR ../tests/test_validator.py::test_hash_normalization_crlf_and_trailing_spaces
+ERROR ../tests/test_validator.py::test_clearing_account_requires_exact_match_not_substring
+ERROR ../tests/test_validator.py::test_randomized_record_not_hardcoded - File...
+ERROR ../tests/test_validator.py::test_exact_record_length_enforced - FileNot...
+ERROR ../tests/test_validator.py::test_required_fields_empty_are_reported - F...
+ERROR ../tests/test_validator.py::test_eftno_and_bank_code_alphanumeric_constraints
+ERROR ../tests/test_validator.py::test_account_forbidden_prefixes - FileNotFo...
+ERROR ../tests/test_validator.py::test_account_first_four_only_zeros_and_ones
+ERROR ../tests/test_validator.py::test_account_last_four_cannot_have_zeros - ...
+ERROR ../tests/test_validator.py::test_bank_code_must_start_with_digit - File...
+ERROR ../tests/test_validator.py::test_bank_code_no_lowercase_or_special_chars
+ERROR ../tests/test_validator.py::test_payee_database_unknown_account - FileN...
+ERROR ../tests/test_validator.py::test_payee_fraud_flag_rejection - FileNotFo...
+ERROR ../tests/test_validator.py::test_payee_name_mismatch - FileNotFoundErro...
+ERROR ../tests/test_validator.py::test_valid_active_customer_account - FileNo...
+ERROR ../tests/test_validator.py::test_account_no_length_validation - FileNot...
+ERROR ../tests/test_validator.py::test_amount_must_be_positive - FileNotFound...
+ERROR ../tests/test_validator.py::test_unicode_in_payee_name - FileNotFoundEr...
+ERROR ../tests/test_validator.py::test_crlf_line_endings_with_trailing_spaces
+ERROR ../tests/test_validator.py::test_empty_lines_at_end - FileNotFoundError...
+ERROR ../tests/test_validator.py::test_record_too_short - FileNotFoundError: ...
+ERROR ../tests/test_validator.py::test_record_too_long - FileNotFoundError: [...
+ERROR ../tests/test_validator.py::test_invalid_date_format - FileNotFoundErro...
+ERROR ../tests/test_validator.py::test_amount_with_more_than_two_decimals - F...
+ERROR ../tests/test_validator.py::test_account_forbidden_first_four_zeros_ones
+ERROR ../tests/test_validator.py::test_clearing_account_substring_match_bug
+ERROR ../tests/test_validator.py::test_duplicate_different_filename_bug - Fil...
+ERROR ../tests/test_validator.py::test_retention_days_ignored_bug - FileNotFo...
+ERROR ../tests/test_validator.py::test_payee_name_case_insensitive_match - Fi...
+ERROR ../tests/test_validator.py::test_multiple_errors_in_one_record - FileNo...
+ERROR ../tests/test_validator.py::test_very_large_file - FileNotFoundError: [...
+ERROR ../tests/test_validator.py::test_special_characters_in_address - FileNo...
+ERROR ../tests/test_validator.py::test_bank_code_starting_with_letter - FileN...
+ERROR ../tests/test_validator.py::test_bank_code_with_lowercase - FileNotFoun...
+ERROR ../tests/test_validator.py::test_exact_length_with_padding - FileNotFou...
+ERROR ../tests/test_validator.py::test_eftno_with_special_chars - FileNotFoun...
+============================== 43 errors in 1.66s ==============================
+Tests failed
+Completed 7.3 KiB/7.3 KiB (109.5 KiB/s) with 1 file(s) remaining
+upload: ./difficulty_check_artifact.zip to s3://daas-blobs/codebuild_uploads/autoeval_artifacts/7e62b42f43cf426b83d0d5208246a648/difficulty_check_artifact.zip
+Completed 6.4 KiB/6.4 KiB (89.5 KiB/s) with 1 file(s) remaining
+upload: ./oracle_1.zip to s3://daas-blobs/codebuild_uploads/autoeval_artifacts/7e62b42f43cf426b83d0d5208246a648/oracle_1.zip
+
+================================================================================
+
+========================================END OF PRINTING DEBUG FILES========================================
+
+✅ Jobs and additional files zipped: difficulty_check_artifact.zip
+✅ Jobs uploaded to build artifact directory
+Zipping /root/jobs to /root/oracle_1.zip for build artifact directory...
+Uploading /root/oracle_1.zip to build artifact directory...
+✓ Build artifacts uploaded to build artifact directory
+
+[Container] 2025/12/27 03:18:28.631610 Command did not exit successfully set -e
+if [ "$TEST_TYPE" = "oracle" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent oracle --key oracle "$TASK"
+elif [ "$TEST_TYPE" = "nop" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent nop --key nop "$TASK"
+elif [ "$TEST_TYPE" = "codex" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent codex --model openai/gpt-5 --run "$RUN_NUM" --key codex-gpt5 "$TASK"
+elif [ "$TEST_TYPE" = "claude" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent claude-code --model anthropic/claude-sonnet-4-5-20250929 --run "$RUN_NUM" --key claude-code-4-5-sonnet "$TASK"
+elif [ "$TEST_TYPE" = "consolidate" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_batch_difficulty_check.py "$TASK"
+  $CODEBUILD_SRC_DIR_helper/harbor-print-agent-logs.sh jobs
+fi
+ exit status 1
+[Container] 2025/12/27 03:18:28.637912 Phase complete: BUILD State: FAILED
+[Container] 2025/12/27 03:18:28.637931 Phase context status code: COMMAND_EXECUTION_ERROR Message: Error while executing command: set -e
+if [ "$TEST_TYPE" = "oracle" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent oracle --key oracle "$TASK"
+elif [ "$TEST_TYPE" = "nop" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent nop --key nop "$TASK"
+elif [ "$TEST_TYPE" = "codex" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent codex --model openai/gpt-5 --run "$RUN_NUM" --key codex-gpt5 "$TASK"
+elif [ "$TEST_TYPE" = "claude" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_agent_run.py --agent claude-code --model anthropic/claude-sonnet-4-5-20250929 --run "$RUN_NUM" --key claude-code-4-5-sonnet "$TASK"
+elif [ "$TEST_TYPE" = "consolidate" ]; then
+  python $CODEBUILD_SRC_DIR_helper/harbor_batch_difficulty_check.py "$TASK"
+  $CODEBUILD_SRC_DIR_helper/harbor-print-agent-logs.sh jobs
+fi
+. Reason: exit status 1
+[Container] 2025/12/27 03:18:28.676170 Entering phase POST_BUILD
+[Container] 2025/12/27 03:18:28.678722 Phase complete: POST_BUILD State: SUCCEEDED
+[Container] 2025/12/27 03:18:28.678738 Phase context status code:  Message: 
+[Container] 2025/12/27 03:18:28.728500 Set report auto-discover timeout to 5 seconds
+[Container] 2025/12/27 03:18:28.728579 Expanding base directory path:  .
+[Container] 2025/12/27 03:18:28.731777 Assembling file list
+[Container] 2025/12/27 03:18:28.731791 Expanding .
+[Container] 2025/12/27 03:18:28.735008 Expanding file paths for base directory .
+[Container] 2025/12/27 03:18:28.735022 Assembling file list
+[Container] 2025/12/27 03:18:28.735024 Expanding **/*
+[Container] 2025/12/27 03:18:28.738330 No matching auto-discover report paths found
+[Container] 2025/12/27 03:18:28.738348 Report auto-discover file discovery took 0.009848 seconds
+[Container] 2025/12/27 03:18:28.738359 Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED
+[Container] 2025/12/27 03:18:28.738370 Phase context status code:  Message: 
+
+
+=== Build CodeExecutionEnvironment:7ffaa34a-b1b1-4786-b26c-dcea2ca0f917 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:6f7e94ac-bb4a-4d4c-9441-af8ea3d59b7d ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:40063073-f228-4736-8ed0-550189d49b61 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:e5e6e13f-49cf-431b-b176-83ca4d024240 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:284167b1-e044-4f13-9fba-75db8ac22f40 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:d43ec68b-cd44-480d-a39c-6e7e4bd13fb2 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:672ef480-096f-4b4c-a1a5-c594f2f2dfeb ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:e5f57b19-65d5-4fed-bcd0-05acbc2de370 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:f2096121-b257-4847-81b5-29b7fcba55a0 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:6c6a5184-80c3-4ab0-8df0-4b478ac2a345 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+
+=== Build CodeExecutionEnvironment:05accb1c-d7da-4f2e-a2c8-4703ee79ba73 ===
+Error retrieving logs: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.

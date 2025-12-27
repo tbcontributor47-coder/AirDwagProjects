@@ -29,8 +29,9 @@ def _cli_path() -> str:
 @pytest.fixture
 def test_env(tmp_path):
     base_dir = Path(__file__).parent.parent
-    schema_src = base_dir / 'schema.json'
-    clearing_src = base_dir / 'clearing_accounts.txt'
+    # prefer files mounted at container root (some CI runs place fixtures at /)
+    schema_src = Path('/schema.json') if Path('/schema.json').exists() else base_dir / 'schema.json'
+    clearing_src = Path('/clearing_accounts.txt') if Path('/clearing_accounts.txt').exists() else base_dir / 'clearing_accounts.txt'
 
     schema_dest = tmp_path / 'schema.json'
     clearing_dest = tmp_path / 'clearing_accounts.txt'
@@ -614,8 +615,6 @@ def test_empty_lines_at_end(test_env):
 
 def test_record_too_short(test_env):
     """Records shorter than 296 characters should be rejected."""
-    schema = _load_schema(test_env["schema"])
-
     short_line = "SHORT"  # Much shorter
     f = Path(test_env["tmp_path"]) / "short_record.txt"
     _write_text(f, short_line + "\n")
