@@ -6,6 +6,7 @@ Tests call `python /app/drift_audit.py` to match the runtime contract.
 import json
 import subprocess
 import tempfile
+import copy
 from pathlib import Path
 
 
@@ -1351,7 +1352,7 @@ def test_extreme_nesting_50_levels() -> None:
                 }
             ]
         }
-        current_obj = ideal_obj.copy()
+        current_obj = copy.deepcopy(ideal_obj)
         # Change the deepest value
         deep = current_obj["resources"][0]["attributes"]["config"]
         for _ in range(49):
