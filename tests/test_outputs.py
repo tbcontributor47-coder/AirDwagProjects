@@ -9,7 +9,6 @@ Important:
 import json
 import os
 import random
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -22,23 +21,93 @@ import pytest
 CLI_DEFAULT = "/app/validate_eft.py"
 
 
+_EFT_SCHEMA: dict = {
+    "record_length": 296,
+    "fields": [
+        {"name": "eftno", "start": 0, "length": 12, "type": "string", "required": True},
+        {
+            "name": "payee_name",
+            "start": 12,
+            "length": 40,
+            "type": "string",
+            "required": True,
+        },
+        {
+            "name": "account_no",
+            "start": 52,
+            "length": 20,
+            "type": "string",
+            "required": True,
+            "pattern": "^\\d{8,20}$",
+        },
+        {
+            "name": "bank_name",
+            "start": 72,
+            "length": 30,
+            "type": "string",
+            "required": True,
+        },
+        {
+            "name": "bank_code",
+            "start": 102,
+            "length": 12,
+            "type": "string",
+            "required": True,
+        },
+        {
+            "name": "amount",
+            "start": 114,
+            "length": 12,
+            "type": "decimal",
+            "required": True,
+        },
+        {
+            "name": "address",
+            "start": 126,
+            "length": 60,
+            "type": "string",
+            "required": False,
+        },
+        {
+            "name": "clearance_date",
+            "start": 186,
+            "length": 10,
+            "type": "date",
+            "required": True,
+            "format": "%Y-%m-%d",
+        },
+        {
+            "name": "last_transaction_details",
+            "start": 196,
+            "length": 80,
+            "type": "string",
+            "required": False,
+        },
+        {
+            "name": "clearing_account",
+            "start": 276,
+            "length": 20,
+            "type": "string",
+            "required": True,
+        },
+    ],
+}
+
+_EFT_CLEARING_ACCOUNTS_TEXT = "12345678901234567890\n98765432109876543210\n"
+
+
 def _cli_path() -> str:
     return os.environ.get("EFT_VALIDATOR_CLI", CLI_DEFAULT)
 
 
 @pytest.fixture
 def test_env(tmp_path):
-    base_dir = Path(__file__).parent.parent
-    # prefer files mounted at container root (some CI runs place fixtures at /)
-    schema_src = Path('/schema.json') if Path('/schema.json').exists() else base_dir / 'schema.json'
-    clearing_src = Path('/clearing_accounts.txt') if Path('/clearing_accounts.txt').exists() else base_dir / 'clearing_accounts.txt'
-
     schema_dest = tmp_path / 'schema.json'
     clearing_dest = tmp_path / 'clearing_accounts.txt'
     db_path = tmp_path / '.eft_index.db'
 
-    shutil.copy(schema_src, schema_dest)
-    shutil.copy(clearing_src, clearing_dest)
+    schema_dest.write_text(json.dumps(_EFT_SCHEMA, indent=2) + "\n", encoding="utf-8")
+    clearing_dest.write_text(_EFT_CLEARING_ACCOUNTS_TEXT, encoding="utf-8")
 
     return {
         'schema': str(schema_dest),
