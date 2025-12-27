@@ -259,28 +259,100 @@ if [ -z "$RESULT_JSON" ] || [ ! -f "$RESULT_JSON" ]; then
 fi
 
 echo ""
+JOB_DIR="$(dirname "$RESULT_JSON")"
+
 echo "========== Harbor Oracle result.json =========="
-cat "$RESULT_JSON"
-echo "========== job.log =========="
-cat "$(dirname "$RESULT_JSON")/job.log" 2>/dev/null || true
+cat "$RESULT_JSON" || true
+echo ""
+
+echo "========== Harbor Oracle job dir listing =========="
+ls -la "$JOB_DIR" 2>/dev/null || true
+echo ""
+
+echo "========== Harbor Oracle job.log =========="
+if [ -f "$JOB_DIR/job.log" ]; then
+  cat "$JOB_DIR/job.log" || true
+else
+  echo "(no job.log)"
+fi
+echo ""
+
+echo "========== Harbor Oracle trial directory =========="
+TRIAL_DIR="$(find "$JOB_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n1 || true)"
+if [ -z "$TRIAL_DIR" ]; then
+  echo "(no trial directory found under $JOB_DIR)"
+else
+  echo "Trial dir: ${TRIAL_DIR}"
+  ls -la "$TRIAL_DIR" 2>/dev/null || true
+  echo ""
+
+  if [ -d "$TRIAL_DIR/agent" ]; then
+    echo "${TRIAL_DIR}/agent:"
+    ls -la "$TRIAL_DIR/agent" 2>/dev/null || true
+    echo ""
+  fi
+
+  if [ -d "$TRIAL_DIR/verifier" ]; then
+    echo "${TRIAL_DIR}/verifier:"
+    ls -la "$TRIAL_DIR/verifier" 2>/dev/null || true
+    echo ""
+  fi
+
+  echo "--- Trial config.json ---"
+  if [ -f "$TRIAL_DIR/config.json" ]; then
+    cat "$TRIAL_DIR/config.json" || true
+  else
+    echo "(no config.json)"
+  fi
+
+  echo "--- Agent oracle.txt ---"
+  if [ -f "$TRIAL_DIR/agent/oracle.txt" ]; then
+    cat "$TRIAL_DIR/agent/oracle.txt" || true
+  else
+    echo "(no oracle.txt)"
+  fi
+
+  echo "--- Trial stdout ---"
+  TRIAL_STDOUT=""
+  for f in "$TRIAL_DIR/stdout.txt" "$TRIAL_DIR/trial-stdout.txt" "$TRIAL_DIR/agent/stdout.txt"; do
+    if [ -f "$f" ]; then TRIAL_STDOUT="$f"; break; fi
+  done
+  if [ -n "$TRIAL_STDOUT" ]; then
+    cat "$TRIAL_STDOUT" || true
+  else
+    echo "(no stdout)"
+  fi
+
+  echo "--- Trial stderr ---"
+  TRIAL_STDERR=""
+  for f in "$TRIAL_DIR/stderr.txt" "$TRIAL_DIR/trial-stderr.txt" "$TRIAL_DIR/agent/stderr.txt"; do
+    if [ -f "$f" ]; then TRIAL_STDERR="$f"; break; fi
+  done
+  if [ -n "$TRIAL_STDERR" ]; then
+    cat "$TRIAL_STDERR" || true
+  else
+    echo "(no stderr)"
+  fi
+
+  echo "--- Test stdout (verifier/test-stdout.txt) ---"
+  if [ -f "$TRIAL_DIR/verifier/test-stdout.txt" ]; then
+    cat "$TRIAL_DIR/verifier/test-stdout.txt" || true
+  else
+    echo "(no verifier/test-stdout.txt)"
+  fi
+
+  echo "--- Test stderr (verifier/test-stderr.txt) ---"
+  if [ -f "$TRIAL_DIR/verifier/test-stderr.txt" ]; then
+    cat "$TRIAL_DIR/verifier/test-stderr.txt" || true
+  else
+    echo "(no verifier/test-stderr.txt)"
+  fi
+fi
+
 echo "================================================="
 
 # Cleanup
 [ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
-
-# Extract and display verifier test results from oracle run
-echo ""
-echo "===== Oracle Test Results (with solution applied) ====="
-VERIFIER_LOG="$(dirname "$RESULT_JSON")/verifier/test-stdout.txt"
-if [ -f "$VERIFIER_LOG" ]; then
-  grep -E "(PASSED|FAILED|passed|failed)" "$VERIFIER_LOG" | tail -1 || echo "No test summary in verifier log"
-  echo ""
-  echo "Detailed verifier output:"
-  tail -30 "$VERIFIER_LOG" || true
-else
-  echo "Verifier log not found at: $VERIFIER_LOG"
-fi
-echo "================================================="
 
 # Validate no errors
 python3 - "$RESULT_JSON" <<'PY'
