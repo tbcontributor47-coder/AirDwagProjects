@@ -211,21 +211,25 @@ def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
     if not ignore_prefixes:
         return False
 
-    # Two modes, driven by whether the rendered path includes any escaping.
-    # - Escaped paths (containing '\\' or '\.') use plain prefix matching on the *unescaped* string.
-    #   This is needed for the edge-case tests where keys intentionally contain dots.
-    # - Unescaped paths use a component-aware match with a word-boundary rule for the final component.
-    is_escaped_path = ("\\" in path)
+    # Split the rendered path into components by unescaped dots.
+    # Escaped dots ("\\.") stay within a component.
+    path_components = split_components(path)
     unescaped_path = unescape_path(path)
 
-    if is_escaped_path:
-        for prefix in ignore_prefixes:
-            if unescaped_path.startswith(unescape_path(prefix)):
-                return True
-        return False
-
-    path_components = split_components(path)
     for prefix in ignore_prefixes:
+        if not prefix:
+            continue
+
+        # 1) If the rendered attribute is effectively a single component (i.e., any dots are literal/escaped),
+        # treat ignore as a simple string-prefix on the unescaped representation.
+        # This is required for the edge-case where keys are literal strings like "tags.Environment".
+        if len(path_components) == 1:
+            unescaped_prefix = unescape_path(prefix)
+            if unescaped_path == unescaped_prefix or unescaped_path.startswith(unescaped_prefix):
+                return True
+            continue
+
+        # 2) Otherwise, do component-aware matching.
         prefix_components = split_components(prefix)
         if not prefix_components:
             continue
@@ -237,12 +241,16 @@ def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
         path_last = path_components[len(prefix_components) - 1]
         prefix_last = prefix_components[-1]
 
+        # Exact component match
         if path_last == prefix_last:
             return True
+
+        # Partial match for the final component with word-boundary rule
         if path_last.startswith(prefix_last):
             remaining = path_last[len(prefix_last) :]
             if remaining and (remaining[0].isupper() or not remaining[0].isalpha()):
                 return True
+
     return False
 
 
