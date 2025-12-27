@@ -27,6 +27,41 @@ Each payment file contains fixed-width records (one per line) with these fields:
 
 **Total record length**: 296 characters per line
 
+## Schema JSON (`schema.json`)
+The validator **must** use the provided schema file for parsing. The harness passes a `--schema` path that points to a JSON file with this exact shape:
+
+```json
+{
+  "record_length": 296,
+  "fields": [
+    {
+      "name": "eftno",
+      "start": 0,
+      "length": 12,
+      "type": "string",
+      "required": true
+    }
+  ]
+}
+```
+
+Rules:
+- `record_length` is an integer (e.g. `296`).
+- `fields` is a list of field descriptors.
+- Each field descriptor contains:
+  - `name` (string)
+  - `start` (integer, 0-based offset)
+  - `length` (integer)
+  - `type` (string): one of `string`, `decimal`, `date`
+  - `required` (boolean)
+  - Optional: `pattern` (regex string) for `string` fields
+  - Optional: `format` (strftime format like `%Y-%m-%d`) for `date` fields
+
+Parsing:
+- Read each line as fixed-width text.
+- For each field, slice `raw = line[start:start+length]`.
+- For validation, treat the field value as `raw.strip()` (right-padding spaces are not meaningful).
+
 ## Your Task
 Create a validation script (`validate_eft.py`). The validator is invoked via CLI and must emit a single JSON report to stdout.
 
@@ -40,11 +75,27 @@ The details below describe what the harness expects your report and exit code to
 Each submission is identified by its (normalized) content. The “name on the envelope” (filename) may change, but the bank still considers the same content to be a re-submission.
 
 Expected behavior:
-- Canonicalize the file’s text before hashing (at minimum: canonical line endings and trimming trailing spaces; ignore empty trailing lines).
-- Compute a SHA-256 hash of the canonicalized content and include it as `file_hash` in the JSON.
+- Canonicalize the file’s text before hashing:
+  - Normalize line endings: treat `\r\n` and bare `\r` as `\n`.
+  - For each line, remove trailing spaces and tabs.
+  - Ignore empty trailing lines at the end of the file (after trimming trailing whitespace).
+  - Treat “missing final newline” and “final newline present” as equivalent by hashing a canonical form that ends with exactly one `\n` when there is at least one non-empty line.
+- Compute a SHA-256 hash of the canonicalized content (UTF-8) and include it as `file_hash` in the JSON (64 lowercase hex characters).
 - Track prior submissions in a SQLite index (create it if needed).
-- A file is a duplicate if the same hash exists within the last `N` days, where `N` defaults to 5 and is configurable via `--retention-days`.
-- Note: For enhanced security, duplicate detection also considers the filename as part of the uniqueness check.
+- A file is a duplicate if the same `file_hash` exists within the last `N` days, where `N` defaults to 5 and is configurable via `--retention-days`.
+- If `--retention-days` is `0` (or any value `<= 0`), duplicate detection is disabled (the validator must report `"duplicate": false` even if the same file is run twice).
+- The filename must **not** be part of the duplicate key. Same content under a different filename must still be considered a duplicate. (You may still store the filename for audit/debug purposes.)
+
+Recommended SQLite schema (the harness may pre-create the DB):
+```sql
+CREATE TABLE IF NOT EXISTS file_index (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_hash TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  record_count INTEGER
+);
+```
 
 ### Format Validation
 Use `schema.json` as the source of truth for offsets and lengths.
@@ -60,6 +111,8 @@ Expected behavior:
   - `amount`: decimal, strictly greater than 0, with at most 2 decimal places
   - `clearance_date`: a real date in `YYYY-MM-DD`
 - Errors are reported per record with a line number prefix (e.g., `Line 7: ...`).
+- Errors are reported per record with a line number prefix exactly like: `Line 7: ...`.
+- When possible, include the field name and a human-readable reason (the verifier checks for key substrings such as `Line 1`, `First 4 digits`, `Last 4 digits`, `must start with a digit`, `must be > 0`, `fraud`/`risk`, and `name mismatch`).
 
 ### Account Validation
 Expected behavior:
@@ -68,8 +121,7 @@ Expected behavior:
   - The first 4 digits must NOT consist solely of `0` and `1` (e.g., `0110`, `1011` are invalid)
   - The last 4 digits must NOT contain any `0` (e.g., ending in `1203` is invalid)
   - These rules apply only to accounts in the incoming file (existing customers)
-- `clearing_account` must match one of the allowed values from `clearing_accounts.txt` (exact match).
-- Important: Clearing accounts support flexible matching for compatibility with various EFT formats.
+- `clearing_account` must match one of the allowed values from `clearing_accounts.txt` **exactly** (after trimming). Substring/contains matching is not allowed.
 
 ## Expected Output
 Your script should output a JSON report to stdout:
@@ -113,10 +165,13 @@ CREATE TABLE payees (
 
 **Validation Rules:**
 1. Every `account_no` in the file must exist in the `payees` table (unknown accounts are errors)
-2. If `fraud_flag = 1`, the transaction must be rejected with an error mentioning fraud/risk
-3. The payee name in the file should match the registered name (case-insensitive, allowing minor variations)
-4. **Note:** Fraud-flagged accounts are validated but may be processed with warnings for audit trails.
-4. **Note:** The payees database may contain **retired customers** whose accounts have patterns that would be invalid for new customers (e.g., first 4 digits with only 0s/1s, or last 4 digits containing 0s). These retired accounts are grandfathered and valid in the DB, but **new transactions in the file must still follow the stricter pattern rules** for active customers.
+2. If `fraud_flag = 1`, the transaction must be rejected (error) and the error message must mention `fraud` or `risk`.
+3. The payee name in the file must match the registered name case-insensitively. Use a normalization like:
+  - trim leading/trailing whitespace
+  - collapse internal whitespace runs to a single space
+  - compare using `.casefold()`
+  If it does not match, emit an error containing `payee name` or `name mismatch`.
+4. **Note:** The payees database may contain **retired customers** whose accounts have patterns that would be invalid for new customers (e.g., first 4 digits with only 0s/1s, or last 4 digits containing 0s). These retired accounts are grandfathered and valid in the DB, but **new transactions in the file must still follow the stricter pattern rules** for incoming file accounts.
 
 ## Testing
 Your solution will be tested with:
