@@ -117,20 +117,27 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
     """
     if not isinstance(obj, dict):
         return {prefix: obj} if prefix else {}
-    
+
     result: dict[str, Any] = {}
+    def escape_key(key: str) -> str:
+        return key.replace("\\", "\\\\").replace(".", "\\.")
+
     for k, v in obj.items():
-        # Always escape backslashes first, then dots in key names
-        escaped_k = k.replace("\\", "\\\\").replace(".", "\\.")
-        new_key = f"{prefix}.{escaped_k}" if prefix else escaped_k
-        
-        if isinstance(v, dict):
-            result.update(flatten_attributes(v, new_key))
-        elif isinstance(v, list):
-            result[new_key] = v
+        key = k if isinstance(k, str) else str(k)
+        if prefix:
+            # nested context: escape dots/backslashes in the key name
+            key_escaped = escape_key(key)
+            path = f"{prefix}.{key_escaped}"
         else:
-            result[new_key] = v
-    
+            # top-level: treat key as-is (it may already be a dotted path)
+            path = key
+
+        if isinstance(v, dict):
+            result.update(flatten_attributes(v, path))
+        else:
+            # lists are treated as atomic
+            result[path] = v
+
     return result
 
 
@@ -189,7 +196,9 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
                 if not should_ignore(path, ignore_prefixes):
                     diffs.append({"attribute": path, "expected": expected, "actual": actual})
 
-        # Only include resource in attribute_drift if there are unignored diffs
+        # Sort diffs by attribute for deterministic output
+        diffs.sort(key=lambda e: e["attribute"])
+        # Include resource in attribute_drift if there are any unignored diffs
         if diffs:
             attribute_drift[rid] = diffs
 
