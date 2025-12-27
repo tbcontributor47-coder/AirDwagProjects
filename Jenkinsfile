@@ -142,6 +142,7 @@ echo ""
 echo "===== Running tests against BUGGY baseline (should have failures) ====="
 docker run --rm \
     -v "$TASK_ABS/tests:/mnt/tests" \
+    -v "$TASK_ABS/schema.json:/mnt/schema.json:ro" \
     "$IMAGE_NAME" \
     /bin/bash -c "pip install -q pytest 2>&1 >/dev/null && pytest /mnt/tests/test_validator.py -v --tb=short" \
     2>&1 | tee logs/baseline-test.log || true
@@ -185,6 +186,7 @@ echo "===== Running solution/solve.sh inside container and re-testing ====="
 docker run --rm \
     -v "$TASK_ABS/tests:/mnt/tests" \
     -v "$TASK_ABS/solution:/mnt/solution:ro" \
+    -v "$TASK_ABS/schema.json:/mnt/schema.json:ro" \
     "$IMAGE_NAME" \
     /bin/bash -c "
         set -euo pipefail
