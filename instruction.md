@@ -8,6 +8,18 @@ The program is **buggy**. Fix it.
 
 The tool compares an **ideal** Terraform state snapshot against a **current** snapshot and emits a deterministic drift report.
 
+## What You Must Implement (no guessing)
+
+Implement `/app/drift_audit.py` so that:
+
+- It accepts two JSON snapshot files and optional repeated `--ignore PREFIX` arguments.
+- It parses both snapshot formats described below and produces a single drift report JSON on stdout.
+- It is fully deterministic (ordering + fixed timestamp).
+- It has strict, test-checked error handling:
+  - No Python traceback is allowed.
+  - On any non-zero exit, **stdout must be empty** and a human-readable message must be printed to stderr.
+  - Usage errors and parse errors exit `2`; file I/O errors exit `1`.
+
 ## CLI
 
 The CLI must be invoked as:
@@ -32,11 +44,19 @@ Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <curre
 
 No Python traceback may be printed.
 
+Additionally:
+- On usage errors, stdout must be empty.
+
 ## Input
 
 Both inputs are UTF-8 JSON files.
 
 If either input cannot be parsed as JSON due to invalid JSON syntax, that is a **parse error** and the program must exit `2`.
+
+On parse errors:
+- stdout must be empty
+- stderr must be non-empty
+- no traceback
 
 ### Supported snapshot formats
 
@@ -87,6 +107,10 @@ Example: `aws_instance.web`.
 
 If a snapshot contains duplicate identifiers, treat it as a **parse error**.
 
+Required keys (parse errors if missing):
+- Simplified format: top-level `resources` must be a list of objects each containing `type`, `name`, and `attributes`.
+- Terraform-like format: top-level `values.root_module` must exist; `resources` are under `root_module.resources` and recursively under each `child_modules[*]`.
+
 ### Attribute comparison
 
 All attributes present in either snapshot must be compared.
@@ -109,6 +133,10 @@ When rendering a *key name* into a path segment, escape characters in this order
 Example: key `Environment.Name` under `tags` becomes `tags.Environment\.Name`.
 
 Example (backslash + dot): key `path\to.file` under `meta` becomes `meta.path\\to\.file`.
+
+Concrete example (matches the verifier):
+- Input attributes: `{ "meta": { "path\\to.file": "B" } }`
+- Rendered drift attribute path: `meta.path\\to\.file`
 
 Algorithm (precise):
 
@@ -134,6 +162,9 @@ Clarification (already-rendered vs literal):
 - “Literal key” means the key string is treated as a single key name, so any `.` inside it must be escaped to `\.` and any `\` must be escaped to `\\`.
 
 Example (tags exception): if the top-level attributes contain both `tags.Env` and `tags.Environment`, then both are treated as *literal keys* and their rendered paths are `tags\.Env` and `tags\.Environment`.
+
+Concrete example (matches the verifier):
+- If attributes include `{ "tags.Env": "prod", "tags.Environment": "prod" }` then the rendered keys are `tags\.Env` and `tags\.Environment` (dots escaped) because `tags.Env` exists.
 
 For nested objects (i.e., when prefix is non-empty), key names are always treated as literal and must be escaped.
 
@@ -177,6 +208,11 @@ Notes (to avoid substring ambiguity):
 - The “partial match” rule applies **only** to the final component, and only with the uppercase/digit lookahead. Otherwise, components must match exactly at component boundaries.
 - Example: `--ignore tags.Env` matches `tags.EnvName` (next char after `Env` is `N`) but does **not** match `tags.Environment` (next char after `Env` is `i`).
 
+Concrete example (matches the verifier):
+- If drift contains both `tags.Environment` and `tags.EnvName`, and you run:
+  `python /app/drift_audit.py --ignore tags.Env <ideal> <current>`
+  then only `tags.EnvName` is ignored; `tags.Environment` remains.
+
 This component-aware behavior is required so that, for example, `--ignore config.network` ignores `config.network.ip` but does **not** ignore `config.network\.ip` (where the dot is literal/escaped).
 
 ### Unicode handling for `--ignore` prefixes (clarification)
@@ -216,6 +252,11 @@ The output must be fully deterministic:
 - `attribute_drift` keys must be sorted.
 - Each resource's drift entries must be sorted by `attribute`.
   - Sorting is lexicographic on the rendered `attribute` string, with a special case: treat spaces as sorting *after* all other characters (i.e., as if `' '` were a very large character) so that keys with spaces come last.
+
+Concrete example (matches the verifier):
+- If a resource has drift attributes `key\.with\.dots` and `key with spaces`, the output order must be:
+  1) `key\.with\.dots`
+  2) `key with spaces`
 
 ### Output schema
 
@@ -258,4 +299,6 @@ Treat each of the following as a **parse error** (exit code `2`):
 On any error:
 
 - Print a human-readable message to stderr.
+- Do not print a Python traceback.
+- Do not print anything to stdout.
 - Do not print a Python traceback.
