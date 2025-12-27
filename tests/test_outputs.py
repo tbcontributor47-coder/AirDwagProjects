@@ -385,6 +385,48 @@ def test_attribute_paths_escape_dots_in_keys() -> None:
         ]
 
 
+def test_attribute_paths_escape_backslashes_then_dots() -> None:
+    """Keys containing '\\' must escape backslashes first, then escape '.' as '\\.'."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        # Key includes both a backslash and a dot.
+        key = "path\\to.file"
+        ideal_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"meta": {key: "A"}},
+                }
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {
+                    "type": "aws_instance",
+                    "name": "web",
+                    "attributes": {"meta": {key: "B"}},
+                }
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.web"]
+        assert diffs == [
+            {
+                "attribute": "meta.path\\\\to\\.file",
+                "expected": "A",
+                "actual": "B",
+            }
+        ]
+
+
 def test_ignore_prefix_matches_escaped_attribute_paths() -> None:
     """--ignore prefixes are matched against the rendered (escaped) attribute paths."""
     with tempfile.TemporaryDirectory() as td:
@@ -1493,3 +1535,104 @@ def test_large_inputs_1000_attributes() -> None:
         assert diffs == [
             {"attribute": "attr_500", "expected": "value_500", "actual": "changed"}
         ]
+
+
+def test_seeded_generated_nested_drift_and_ignore_is_not_trivially_hardcoded() -> None:
+    """Uses deterministic generated inputs to discourage hardcoded solutions."""
+    import random
+
+    rnd = random.Random(20251227)
+
+    def rkey() -> str:
+        # Include tricky characters (dot, backslash, space, unicode) but avoid config./tags.
+        parts = [
+            "alpha",
+            "beta.gamma",
+            "path\\to.file",
+            "has space",
+            "café",
+            "Z9",
+        ]
+        return parts[rnd.randrange(len(parts))] + str(rnd.randrange(1000))
+
+    def rvalue() -> object:
+        choice = rnd.randrange(4)
+        if choice == 0:
+            return rnd.randrange(10_000)
+        if choice == 1:
+            return "v" + str(rnd.randrange(10_000))
+        if choice == 2:
+            return rnd.choice([True, False])
+        return [rnd.randrange(10), rnd.randrange(10)]
+
+    # Build a nested object with known, countable mutations.
+    base_obj: dict[str, object] = {}
+    while len(base_obj) < 8:
+        base_obj[rkey()] = rvalue()
+
+    ideal_attrs = {"obj": copy.deepcopy(base_obj)}
+    current_attrs = {"obj": copy.deepcopy(base_obj)}
+
+    # Mutate 3 existing keys, delete 1, add 2.
+    keys = sorted(list(base_obj.keys()))
+    mutate_keys = keys[:3]
+    delete_key = keys[3]
+
+    for k in mutate_keys:
+        current_attrs["obj"][k] = rvalue()
+        # Ensure a change even if rvalue() coincidentally equals.
+        if current_attrs["obj"][k] == ideal_attrs["obj"][k]:
+            current_attrs["obj"][k] = "forced_change_" + str(rnd.randrange(10_000))
+
+    del current_attrs["obj"][delete_key]
+    current_attrs["obj"][rkey()] = rvalue()
+    current_attrs["obj"][rkey()] = rvalue()
+
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "gen", "attributes": ideal_attrs}
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "gen", "attributes": current_attrs}
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.gen"]
+        # Expect exactly 3 modified + 1 deleted + 2 added = 6 drift entries.
+        assert len(diffs) == 6
+
+        # Verify the three known modified keys are present with correct expected/actual.
+        for k in mutate_keys:
+            rendered = "obj." + k.replace("\\", "\\\\").replace(".", "\\.")
+            match = [d for d in diffs if d["attribute"] == rendered]
+            assert len(match) == 1
+            assert match[0]["expected"] == ideal_attrs["obj"][k]
+            assert match[0]["actual"] == current_attrs["obj"][k]
+
+        # Verify delete is present as actual=None.
+        rendered_del = "obj." + delete_key.replace("\\", "\\\\").replace(".", "\\.")
+        match_del = [d for d in diffs if d["attribute"] == rendered_del]
+        assert len(match_del) == 1
+        assert match_del[0]["expected"] == ideal_attrs["obj"][delete_key]
+        assert match_del[0]["actual"] is None
+
+        # Now ignore the café-prefixed key family using ASCII 'cafe' (diacritic-insensitive).
+        code2, out2, err2 = run_audit(["--ignore", "obj.cafe", str(ideal), str(current)])
+        assert code2 == 0, err2
+        report2 = parse_report(out2)
+        diffs2 = report2["attribute_drift"]["aws_instance.gen"]
+
+        # All drift entries whose rendered path starts with obj.café... should be removed.
+        for d in diffs2:
+            assert not d["attribute"].startswith("obj.café")
