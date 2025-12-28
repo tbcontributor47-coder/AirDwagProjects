@@ -39,6 +39,7 @@ cat > /app/main.cob <<'COBOL'
 
        01  ws-line-no           pic 9(9) value 0.
        01  ws-line-no-z         pic 9(9) value 0.
+    01  ws-line-no-disp      pic z(9).
 
        01  ws-records           pic 9(9) value 0.
     01  ws-records-z         pic 9(9) value 0.
@@ -284,9 +285,10 @@ cat > /app/main.cob <<'COBOL'
            if ws-err-count < ws-err-max
                add 1 to ws-err-count
                move ws-line-no to ws-line-no-z
+               move ws-line-no-z to ws-line-no-disp
                move spaces to ws-err-line(ws-err-count)
                string 'Line ' delimited by size
-                      function trim(ws-line-no-z) delimited by size
+                      function trim(ws-line-no-disp) delimited by size
                       ': ' delimited by size
                       function trim(ws-err-msg) delimited by size
                       into ws-err-line(ws-err-count)
@@ -303,6 +305,17 @@ cat > /app/main.cob <<'COBOL'
             move ws-records-z to ws-records-disp
             move ws-errors-z to ws-errors-disp
             move ws-total-z to ws-total-disp
+
+            *> Ensure zero values render as '0' (PIC Z yields spaces for zero)
+            if ws-records-z = 0
+                move '0' to ws-records-disp
+            end-if
+            if ws-errors-z = 0
+                move '0' to ws-errors-disp
+            end-if
+            if ws-total-z = 0
+                move '0' to ws-total-disp
+            end-if
 
             move spaces to ws-json
             move 1 to ws-json-ptr
