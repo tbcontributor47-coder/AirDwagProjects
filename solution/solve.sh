@@ -355,7 +355,6 @@ cat > /app/main.cob <<'COBOL'
             move ws-errors to ws-errors-z
             move ws-total-cents to ws-total-z
 
-            *> prepare edited-display fields (Z -> suppress leading zeros)
             move ws-records-z to ws-records-disp
             move ws-errors-z to ws-errors-disp
             move ws-total-z to ws-total-disp
@@ -375,40 +374,13 @@ cat > /app/main.cob <<'COBOL'
             move 1 to ws-json-ptr
 
             string '{"records_processed":' delimited by size
-                into ws-json with pointer ws-json-ptr
-            end-string
-
-            if ws-records-z = 0
-                string '0' delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            else
-                string function numval-c(ws-records-z) delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            end-if
-
-            string ',"n_errors":' delimited by size into ws-json with pointer ws-json-ptr
-            end-string
-
-            if ws-errors-z = 0
-                string '0' delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            else
-                string function numval-c(ws-errors-z) delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            end-if
-
-            string ',"total_cents":' delimited by size into ws-json with pointer ws-json-ptr
-            end-string
-
-            if ws-total-z = 0
-                string '0' delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            else
-                string function numval-c(ws-total-z) delimited by size into ws-json with pointer ws-json-ptr
-                end-string
-            end-if
-
-            string ',"errors":[' delimited by size into ws-json with pointer ws-json-ptr
+                   function trim(ws-records-disp) delimited by size
+                   ',"n_errors":' delimited by size
+                   function trim(ws-errors-disp) delimited by size
+                   ',"total_cents":' delimited by size
+                   function trim(ws-total-disp) delimited by size
+                   ',"errors":[' delimited by size
+                   into ws-json with pointer ws-json-ptr
             end-string
 
            if ws-err-count > 0
