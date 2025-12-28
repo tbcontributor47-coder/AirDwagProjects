@@ -30,7 +30,7 @@ def _first_diff(expected: Any, actual: Any, pointer: str, ignores: list[str]) ->
     if _top_level_ignore(pointer, ignores):
         return None
 
-    if type(expected) != type(actual):
+    if type(expected) is not type(actual):
         return pointer, expected, actual
 
     if isinstance(expected, dict):
