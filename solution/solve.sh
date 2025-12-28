@@ -41,13 +41,16 @@ cat > /app/main.cob <<'COBOL'
        01  ws-line-no-z         pic 9(9) value 0.
 
        01  ws-records           pic 9(9) value 0.
-       01  ws-records-z         pic 9(9) value 0.
+    01  ws-records-z         pic 9(9) value 0.
+    01  ws-records-disp      pic z(9).
 
        01  ws-errors            pic 9(9) value 0.
-       01  ws-errors-z          pic 9(9) value 0.
+    01  ws-errors-z          pic 9(9) value 0.
+    01  ws-errors-disp       pic z(9).
 
        01  ws-total-cents       pic 9(12) value 0.
-       01  ws-total-z           pic 9(12) value 0.
+    01  ws-total-z           pic 9(12) value 0.
+    01  ws-total-disp        pic z(12).
 
        01  ws-numval            pic s9(9)v99 comp-3 value 0.
        01  ws-cents             pic s9(12) comp-3 value 0.
@@ -292,19 +295,24 @@ cat > /app/main.cob <<'COBOL'
            .
 
        emit-json.
-           move ws-records to ws-records-z
-           move ws-errors to ws-errors-z
-           move ws-total-cents to ws-total-z
+            move ws-records to ws-records-z
+            move ws-errors to ws-errors-z
+            move ws-total-cents to ws-total-z
 
-           move spaces to ws-json
-           move 1 to ws-json-ptr
+            *> prepare edited-display fields (Z -> suppress leading zeros)
+            move ws-records-z to ws-records-disp
+            move ws-errors-z to ws-errors-disp
+            move ws-total-z to ws-total-disp
+
+            move spaces to ws-json
+            move 1 to ws-json-ptr
 
             string '{"records_processed":' delimited by size
-                function numval-c(ws-records-z) delimited by size
+                function trim(ws-records-disp) delimited by size
                 ',"n_errors":' delimited by size
-                function numval-c(ws-errors-z) delimited by size
+                function trim(ws-errors-disp) delimited by size
                 ',"total_cents":' delimited by size
-                function numval-c(ws-total-z) delimited by size
+                function trim(ws-total-disp) delimited by size
                 ',"errors":[' delimited by size
                 into ws-json with pointer ws-json-ptr
             end-string
