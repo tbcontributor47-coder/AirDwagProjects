@@ -91,6 +91,11 @@ cat > /app/main.cob <<'COBOL'
     01  ws-errors-disp       pic x(12) value spaces.
     01  ws-total-disp        pic x(12) value spaces.
 
+     *> Edited display (suppresses leading zeros) for JSON numbers
+     01  ws-records-edit      pic z(9) value spaces.
+     01  ws-errors-edit       pic z(9) value spaces.
+     01  ws-total-edit        pic z(12) value spaces.
+
        procedure division.
        main-para.
            accept ws-arg-num from argument-number
@@ -135,6 +140,12 @@ cat > /app/main.cob <<'COBOL'
            unstring ws-line delimited by '|'
                into ws-acc ws-date ws-amt ws-desc
            end-unstring
+
+           *> Normalize CRLF inputs: remove any stray carriage returns
+           inspect ws-acc replacing all x'0D' by space
+           inspect ws-date replacing all x'0D' by space
+           inspect ws-amt replacing all x'0D' by space
+           inspect ws-desc replacing all x'0D' by space
            .
 
        validate-line.
@@ -355,9 +366,14 @@ cat > /app/main.cob <<'COBOL'
             move ws-errors to ws-errors-z
             move ws-total-cents to ws-total-z
 
-            move ws-records-z to ws-records-disp
-            move ws-errors-z to ws-errors-disp
-            move ws-total-z to ws-total-disp
+            *> Format numbers as ASCII digits with no leading zeros
+            move ws-records-z to ws-records-edit
+            move ws-errors-z to ws-errors-edit
+            move ws-total-z to ws-total-edit
+
+            move ws-records-edit to ws-records-disp
+            move ws-errors-edit to ws-errors-disp
+            move ws-total-edit to ws-total-disp
 
             *> Ensure zero values render as '0' (PIC Z yields spaces for zero)
             if ws-records-z = 0
@@ -374,11 +390,11 @@ cat > /app/main.cob <<'COBOL'
             move 1 to ws-json-ptr
 
                  string '{"records_processed":' delimited by size
-                     function numval-c(ws-records-disp) delimited by size
+                     function trim(ws-records-disp) delimited by size
                      ',"n_errors":' delimited by size
-                     function numval-c(ws-errors-disp) delimited by size
+                     function trim(ws-errors-disp) delimited by size
                      ',"total_cents":' delimited by size
-                     function numval-c(ws-total-disp) delimited by size
+                     function trim(ws-total-disp) delimited by size
                      ',"errors":[' delimited by size
                      into ws-json with pointer ws-json-ptr
                  end-string
