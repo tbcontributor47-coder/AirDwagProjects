@@ -134,7 +134,7 @@ echo "Task absolute path: $TASK_ABS"
 
 echo "Workspace git HEAD: $(git -C \"$TASK_ABS\" rev-parse HEAD 2>/dev/null || echo '<not-a-git-repo>')"
 if [ -f "$TASK_ABS/solution/solve.sh" ]; then
-    echo "solve.sh sha256: $(sha256sum "$TASK_ABS/solution/solve.sh" | awk '{print $1}')"
+    echo "solve.sh sha256: $(sha256sum \"$TASK_ABS/solution/solve.sh\" | cut -d\" \" -f1)"
     echo "solve.sh contains ws-dot-count? $(grep -q "ws-dot-count" "$TASK_ABS/solution/solve.sh" && echo yes || echo no)"
 fi
 
@@ -189,7 +189,7 @@ docker run --rm \
         set -euo pipefail
         echo "Applying solution fixer to /app/main.cob"
         if [ -f /mnt/solution/solve.sh ]; then
-            echo "Mounted solve.sh sha256: $(sha256sum /mnt/solution/solve.sh | awk '{print $1}')"
+            echo "Mounted solve.sh sha256: $(sha256sum /mnt/solution/solve.sh | cut -d" " -f1)"
             if grep -q "ws-dot-count" /mnt/solution/solve.sh; then
                 echo "Mounted solve.sh contains ws-dot-count? yes"
             else
