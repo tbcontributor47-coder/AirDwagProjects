@@ -4,7 +4,7 @@ version = "1.0.0"
 difficulty = "hard"
 author_name = "Manoj Kumar Selvaraj"
 author_email = "manoj@example.com"
-category = "programming"
+category = "software-engineering"
 tags = ["cobol", "mainframe", "compilers", "deterministic"]
 
 [verifier]
