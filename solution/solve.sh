@@ -124,6 +124,7 @@ cat > /app/main.cob <<'COBOL'
 
                move ws-line to ws-line-trim
                inspect ws-line-trim replacing all x'0D' by space
+               inspect ws-line-trim replacing all x'0A' by space
                move function trim(ws-line-trim) to ws-line-trim
 
                if ws-line-trim = spaces
@@ -152,9 +153,13 @@ cat > /app/main.cob <<'COBOL'
 
            *> Normalize CRLF inputs: remove any stray carriage returns
            inspect ws-acc replacing all x'0D' by space
+           inspect ws-acc replacing all x'0A' by space
            inspect ws-date replacing all x'0D' by space
+           inspect ws-date replacing all x'0A' by space
            inspect ws-amt replacing all x'0D' by space
+           inspect ws-amt replacing all x'0A' by space
            inspect ws-desc replacing all x'0D' by space
+           inspect ws-desc replacing all x'0A' by space
            .
 
        validate-line.
