@@ -10,6 +10,205 @@ The tool compares an **ideal** Terraform state snapshot against a **current** sn
 
 This document is the full runtime contract. Do not guess; implement exactly what is specified.
 
+## Step-by-step implementation checklist (required)
+
+Implement `/app/drift_audit.py` exactly as the following pipeline. This section is intentionally redundant and procedural to remove ambiguity.
+
+### Step 0: constants
+
+- Define `USAGE_LINE` exactly:
+  `Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>`
+- Define `AUDIT_TIMESTAMP` exactly: `STATIC`
+
+### Step 1: parse CLI args
+
+Input: `sys.argv[1:]`.
+
+Output: `(ignore_prefixes: list[str], ideal_path: str, current_path: str)`.
+
+Algorithm:
+
+1) Initialize `ignore_prefixes = []`.
+2) While the next token is `--ignore`:
+   - Consume `--ignore`.
+   - If no next token exists: usage error.
+   - Consume the next token as `prefix` and append it to `ignore_prefixes`.
+3) After processing `--ignore`, there must be exactly 2 remaining tokens: `ideal_path` then `current_path`.
+   - Otherwise: usage error.
+4) If any unknown flag is present anywhere: usage error.
+
+Usage error behavior (must match tests):
+
+- Exit `2`
+- stdout empty
+- stderr equals `USAGE_LINE + "\n"`
+
+### Step 2: read and JSON-decode both files
+
+For each file path:
+
+1) Read the file as UTF-8 text.
+   - If the file cannot be opened/read: I/O error (exit `1`), stdout empty, stderr non-empty.
+2) Parse JSON.
+   - If JSON parsing fails: parse error (exit `2`), stdout empty, stderr non-empty.
+
+Never print a Python traceback.
+
+### Step 3: normalize each snapshot into a resource map
+
+Goal: convert both snapshots into a dict:
+
+`resources: dict[str, dict]` mapping `resource_id` → `attributes_obj`
+
+Where:
+
+- `resource_id = f"{type}.{name}"`
+- `attributes_obj` is a JSON object (dict) containing the resource attributes
+
+Algorithm `parse_snapshot(obj) -> dict[str, dict]`:
+
+1) If `obj` has key `resources`:
+   - Validate `obj["resources"]` is a list.
+   - For each element `r` in the list:
+     - Validate `r` is an object.
+     - Validate `r["type"]` and `r["name"]` are strings.
+     - Validate `r["attributes"]` is an object.
+     - Compute `rid = type + "." + name`.
+     - If `rid` already exists in the output: parse error.
+     - Set `out[rid] = r["attributes"]`.
+   - Return `out`.
+
+2) Else if `obj` has nested keys `values.root_module`:
+   - Validate `obj["values"]` is an object and `obj["values"]["root_module"]` is an object.
+   - Define recursive walk `walk_module(m)`:
+     - If `m` has `resources`:
+       - Validate it is a list.
+       - For each resource `r`:
+         - Validate `r["type"]` and `r["name"]` are strings.
+         - Validate `r["values"]` is an object.
+         - `rid = type + "." + name`.
+         - If `rid` already exists: parse error.
+         - `out[rid] = r["values"]`.
+     - If `m` has `child_modules`:
+       - Validate it is a list.
+       - For each child module object `c` in the list: call `walk_module(c)`.
+   - Call `walk_module(obj["values"]["root_module"])`.
+   - Return `out`.
+
+3) Otherwise: parse error.
+
+### Step 4: compute missing/extra resources
+
+Let `ideal_ids = set(ideal_map.keys())` and `current_ids = set(current_map.keys())`.
+
+- `missing_resources = sorted(ideal_ids - current_ids)`
+- `extra_resources = sorted(current_ids - ideal_ids)`
+
+### Step 5: compute attribute drift for shared resources
+
+For each resource id in `sorted(ideal_ids ∩ current_ids)`:
+
+1) Flatten both attribute objects into `path -> value` maps (see Step 6).
+2) Let `all_paths = set(ideal_paths) ∪ set(current_paths)`.
+3) For each path in `all_paths`:
+   - `expected = ideal_map.get(path, None)`
+   - `actual = current_map.get(path, None)`
+   - If `expected != actual`, create a drift entry:
+     `{ "attribute": path, "expected": expected_or_null, "actual": actual_or_null }`
+     Where missing side uses JSON `null`.
+
+### Step 6: flatten attribute objects (exact)
+
+Flattening produces a mapping from rendered attribute path string → JSON value.
+
+Rules:
+
+- Only JSON objects (dicts) are flattened recursively.
+- Lists are atomic values.
+- Scalars are atomic values.
+
+Pseudocode:
+
+```
+def escape_literal_key(k: str) -> str:
+    # order is required
+    return k.replace('\\', '\\\\').replace('.', '\\.')
+
+def flatten(obj: dict, prefix: str) -> dict[str, object]:
+    out = {}
+    for key, value in obj.items():
+        if prefix == "":
+            rendered_key = render_top_level_key(key)
+        else:
+            rendered_key = escape_literal_key(key)
+
+        new_prefix = rendered_key if prefix == "" else prefix + "." + rendered_key
+
+        if isinstance(value, dict):
+            out.update(flatten(value, new_prefix))
+        else:
+            out[new_prefix] = value
+    return out
+```
+
+Top-level key rendering `render_top_level_key(key)`:
+
+- If `key` starts with `config.`: return `key` unchanged.
+- Else if `key` starts with `tags.`: return `key` unchanged.
+- Else: return `escape_literal_key(key)`.
+
+Concrete flattening examples (must match verifier expectations):
+
+- Input attributes: `{ "tags": { "Environment.Name": "prod" } }`
+  - Drift path: `tags.Environment\\.Name`
+
+- Input attributes: `{ "meta": { "path\\to.file": "B" } }`
+  - Drift path: `meta.path\\\\to\\.file`
+
+- Input attributes: `{ "key.with.dots": "x" }`
+  - Drift path: `key\\.with\\.dots`
+
+- Input attributes: `{ "tags.Environment": "prod" }` (top-level already-rendered)
+  - Drift path: `tags.Environment`
+
+### Step 7: apply ignore filtering
+
+Apply ignores after drift entries are created and paths are rendered.
+
+For each drift entry with `attribute = path`, remove it if ANY ignore prefix matches using the matching rules below.
+
+Also remove any `attribute_drift[resource_id]` list if it becomes empty.
+
+### Step 8: deterministic sorting
+
+After ignore filtering:
+
+- Sort drift entries for each resource by `attribute` using the special ordering where space `' '` sorts after all other characters.
+- Sort `attribute_drift` keys (resource ids) lexicographically.
+- Ensure `missing_resources` and `extra_resources` are sorted.
+
+Special ordering rule for attributes:
+
+- Compare strings lexicographically, but treat `' '` as a character greater than every other character.
+
+### Step 9: build and print the report
+
+Build:
+
+```
+report = {
+  "audit_timestamp": "STATIC",
+  "drift_detected": <computed>,
+  "missing_resources": [...],
+  "extra_resources": [...],
+  "attribute_drift": { ... }
+}
+```
+
+Print JSON to stdout followed by a newline.
+
+`drift_detected` must be `true` iff any drift exists.
+
 ## CLI contract
 
 The CLI must be invoked as:
@@ -273,3 +472,25 @@ The output must be fully deterministic:
   - special-case: treat a space character `' '` as sorting *after* all other characters
 
 Resources with zero drift entries after ignore filtering must not appear in `attribute_drift`.
+
+## Quick verifier-aligned examples
+
+These are intended as sanity checks for your implementation.
+
+### Example 1: partial ignore (`tags.Env`)
+
+If drift contains `tags.Environment` and `tags.EnvName`, then:
+
+```
+python /app/drift_audit.py --ignore tags.Env <ideal> <current>
+```
+
+must ignore `tags.EnvName` but must NOT ignore `tags.Environment`.
+
+### Example 2: escaped dot is literal
+
+If a drift path is `config.network\\.ip` (meaning the dot is literal inside the last component), then:
+
+- `--ignore config.network` must match `config.network.ip`
+- `--ignore config.network` must NOT match `config.network\\.ip`
+

@@ -1,7 +1,7 @@
 version = "1.0.0"
 
 [metadata]
-difficulty = "medium"
+difficulty = "hard"
 author_name = "TerminalBench Contributors"
 author_email = "tbench@example.com"
 category = "system-administration"
