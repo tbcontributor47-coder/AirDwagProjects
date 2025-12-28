@@ -62,7 +62,7 @@ cat > /app/main.cob <<'COBOL'
     01  ws-amt-whole2        pic x(64).
     01  ws-amt-dec2          pic x(2).
     01  ws-dot-count         pic 9 value 0.
-    01  ws-dec-len           pic 9(4) comp value 0.
+    01  ws-dec-len           pic 9(4) value 0.
     01  ws-dec-trim          pic x(64).
 
        01  ws-year-x            pic x(4).
@@ -132,11 +132,11 @@ cat > /app/main.cob <<'COBOL'
                if ws-line-trim = spaces
                    *> blank line: ignored but still counts for line numbering
                    continue
+               else
+                   add 1 to ws-records
+                   perform parse-line
+                   perform validate-line
                end-if
-
-               add 1 to ws-records
-               perform parse-line
-               perform validate-line
            end-perform
 
            close infile
