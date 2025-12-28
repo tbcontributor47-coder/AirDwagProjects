@@ -419,26 +419,89 @@ This makes `café` match `cafe`.
 
 #### Matching rule
 
-Let `P = PREFIX components` and `A = attribute components` (after splitting). Compare using the normalized forms, but keep the original (pre-normalized) final component around for the lookahead rule.
+Let `P = PREFIX components` and `A = attribute components` (after splitting). Matching MUST use the canonical "matching normalization" for comparison, but the lookahead rule that distinguishes `tags.EnvName` from `tags.Environment` operates on the attribute's original (un-normalized) visible characters after unescaping. The algorithm below is authoritative and must be followed exactly.
 
-Single-component special case (required):
+Canonical matching algorithm (authoritative):
 
-- If the rendered attribute path has exactly one component (i.e., it contains **no unescaped dots**), then ignore matching is a plain string prefix match on that single component:
-  1) Unescape both strings by converting `\\` → `\` and then `\.` → `.`.
-  2) Apply the matching normalization (NFC → casefold → NFKD + strip `Mn`) to the entire unescaped strings.
-  3) Treat `PREFIX` as matching if the normalized attribute string starts with the normalized prefix string.
+1) Split `PREFIX` and `attribute` into components using the component splitting rules above (respecting `\.` and `\\`).
+2) For every component produce two forms:
+   - `unescaped`: the component with `\\` → `\` and `\.` → `.` applied (do not interpret any other `\X`).
+   - `normalized`: take the `unescaped` string and apply the Matching normalization sequence: NFC, `casefold()`, NFKD, then remove all Unicode characters with general category `Mn` (combining marks), then (optionally) NFC again. Use this `normalized` value for component equality/starts-with checks.
+3) Single-component special case: if the rendered attribute has exactly one component (i.e., it contains no unescaped dots), then matching is a normalized prefix match of the whole component: `normalized(attribute_unescaped)` starts with `normalized(prefix_unescaped)`. This preserves the intended behavior that `--ignore café` matches both `café` and `café\.au_lait`.
+4) Multi-component matching (general case): let `Pn` be the list of `normalized` components for `PREFIX`, and `An` the list for `attribute`.
+   - If len(Pn) > len(An): NO MATCH.
+   - For i in [0 .. len(Pn)-2] (all but last component of `P`): require `Pn[i] == An[i]`.
+   - For the final component index j = len(Pn)-1, allow match if either:
+   a) `Pn[j] == An[j]` (exact match on normalized component), OR
+   b) `An[j]` starts with `Pn[j]` (normalized prefix match) AND the next character in the attribute's original `unescaped` final component (the character immediately following the matched prefix, as measured in the `unescaped` string, not the `normalized` form) exists and is either an ASCII uppercase letter `A`-`Z` or an ASCII digit `0`-`9`.
 
-This is required so `--ignore café` matches both `café` and `café\.au_lait`.
+Notes about the lookahead check:
 
-`PREFIX` matches `attribute` if:
+- The lookahead must operate on the `unescaped` final component (before normalization) so that case folding or combining-mark removal does not hide the presence of an uppercase ASCII letter or digit. For example, do not perform the `A`-`Z` check on the `normalized` string.
+- If the matched prefix consumes the entire `unescaped` final component, there is no lookahead character and therefore partial-match condition (b) does not apply; only exact matches succeed in that case.
 
-- `P` is longer than `A`: no match.
-- For all components except the last component of `P`: they must match exactly.
-- For the final component of `P`, allow either:
-  - exact match, OR
-  - a partial match where the attribute final component starts with the prefix final component and the next character in the **original rendered attribute final component** (right after the matched prefix) is an uppercase letter (`A`-`Z`) or a digit (`0`-`9`).
+This rule guarantees the intended behavior: `--ignore tags.Env` matches `tags.EnvName` (because `Name` begins with `N` which is an uppercase ASCII letter), but does NOT match `tags.Environment` (because the next character after the matched prefix is a lowercase `i`).
 
-This rule is required so `--ignore tags.Env` ignores `tags.EnvName` but does not ignore `tags.Environment`.
+Pseudocode (Python-like) for matching a single `PREFIX` against an `attribute` string:
+
+```
+def normalize_for_match(s):
+  # apply NFC, casefold, NFKD, strip Mn, then NFC
+  t = unicodedata.normalize('NFC', s)
+  t = t.casefold()
+  t = unicodedata.normalize('NFKD', t)
+  # remove combining marks
+  t = ''.join(ch for ch in t if unicodedata.category(ch) != 'Mn')
+  t = unicodedata.normalize('NFC', t)
+  return t
+
+def unescape_component(comp):
+  # only convert \\ -> \ and \. -> . ; leave any other backslash sequences as-is
+  return comp.replace('\\\\', '\\').replace('\\.', '.')
+
+def split_components(rendered_path):
+  # implement the same scanner used by your renderer: split on unescaped '.'
+  ...
+
+def prefix_matches(prefix, attribute):
+  P = split_components(prefix)
+  A = split_components(attribute)
+  P_un = [unescape_component(x) for x in P]
+  A_un = [unescape_component(x) for x in A]
+  Pn = [normalize_for_match(x) for x in P_un]
+  An = [normalize_for_match(x) for x in A_un]
+
+  # single-component special-case
+  if len(A_un) == 1:
+    return An[0].startswith(Pn[0])
+
+  if len(Pn) > len(An):
+    return False
+
+  for i in range(len(Pn)-1):
+    if Pn[i] != An[i]:
+      return False
+
+  j = len(Pn)-1
+  # exact normalized match
+  if Pn[j] == An[j]:
+    return True
+
+  # normalized prefix + lookahead on unescaped attribute final component
+  if An[j].startswith(Pn[j]):
+    # length of the matched prefix in characters as measured on unescaped prefix
+    prefix_len = len(P_un[j])
+    if prefix_len < len(A_un[j]):
+      next_ch = A_un[j][prefix_len]
+      return ('A' <= next_ch <= 'Z') or ('0' <= next_ch <= '9')
+  return False
+```
+
+Additional examples demonstrating Unicode interaction:
+
+- `--ignore café` should match an attribute whose final component is `café` (composed U+00E9) and also match `cafe\u0301Env` (decomposed `e` + combining acute + `Env`) because normalization + strip-Mn makes `café` and `cafe\u0301` equivalent for matching purposes.
+- `--ignore cafe` will match `café` after normalization (so a user may choose to ignore accent variants by supplying the unaccented prefix), but the lookahead rule still inspects the original unescaped final component: `--ignore cafe` will ignore `tags.cafeName` (next char `N` uppercase) but will not ignore `tags.cafee` if the next character is lowercase.
+- Escaped-dot example: if the attribute is `config.network\\.ip` (rendered component contains a literal dot), then `--ignore config.network` must NOT match `config.network\\.ip` because the final component is `network.ip` as a single component only if the dot is unescaped; the escape prevents component splitting and the matching semantics behave accordingly.
 
 ### Output JSON schema
 
