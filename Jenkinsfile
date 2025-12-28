@@ -185,21 +185,27 @@ docker run --rm \
     -v "$TASK_ABS/tests:/mnt/tests" \
     -v "$TASK_ABS/solution:/mnt/solution:ro" \
     "$IMAGE_NAME" \
-    /bin/bash -c "
+    /bin/bash -c '
         set -euo pipefail
-        echo 'Applying solution fixer to /app/main.cob'
+        echo "Applying solution fixer to /app/main.cob"
         if [ -f /mnt/solution/solve.sh ]; then
             echo "Mounted solve.sh sha256: $(sha256sum /mnt/solution/solve.sh | awk '{print $1}')"
-            echo "Mounted solve.sh contains ws-dot-count? $(grep -q "ws-dot-count" /mnt/solution/solve.sh && echo yes || echo no)"
+            if grep -q "ws-dot-count" /mnt/solution/solve.sh; then
+                echo "Mounted solve.sh contains ws-dot-count? yes"
+            else
+                echo "Mounted solve.sh contains ws-dot-count? no"
+            fi
             bash /mnt/solution/solve.sh
         else
-            echo 'ERROR: /mnt/solution/solve.sh not found in container'
+            echo "ERROR: /mnt/solution/solve.sh not found in container"
+            echo "Contents of /mnt:"; ls -la /mnt || true
+            echo "Contents of /mnt/solution:"; ls -la /mnt/solution || true
             exit 1
         fi
-        echo 'Re-running tests after fixer'
+        echo "Re-running tests after fixer"
         pip install -q pytest 2>&1 >/dev/null
         pytest /mnt/tests/test_outputs.py -vv --tb=short --junitxml=/mnt/tests/fix-report.xml || true
-    " \
+    ' \
     2>&1 | tee logs/fix-and-verify.log || true
 
 # Copy the junit xml from the mounted volume if it exists
