@@ -373,15 +373,15 @@ cat > /app/main.cob <<'COBOL'
             move spaces to ws-json
             move 1 to ws-json-ptr
 
-            string '{"records_processed":' delimited by size
-                   function trim(ws-records-disp) delimited by size
-                   ',"n_errors":' delimited by size
-                   function trim(ws-errors-disp) delimited by size
-                   ',"total_cents":' delimited by size
-                   function trim(ws-total-disp) delimited by size
-                   ',"errors":[' delimited by size
-                   into ws-json with pointer ws-json-ptr
-            end-string
+                 string '{"records_processed":' delimited by size
+                     function numval-c(ws-records-disp) delimited by size
+                     ',"n_errors":' delimited by size
+                     function numval-c(ws-errors-disp) delimited by size
+                     ',"total_cents":' delimited by size
+                     function numval-c(ws-total-disp) delimited by size
+                     ',"errors":[' delimited by size
+                     into ws-json with pointer ws-json-ptr
+                 end-string
 
            if ws-err-count > 0
                perform varying idx from 1 by 1 until idx > ws-err-count
