@@ -1,7 +1,7 @@
 version = "1.0.0"
 
 [metadata]
-difficulty = "easy"
+difficulty = "hard"
 author_name = "Manoj Kumar Selvaraj"
 author_email = "manoj@example.com"
 category = "programming"
