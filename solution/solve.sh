@@ -63,6 +63,7 @@ cat > /app/main.cob <<'COBOL'
     01  ws-amt-dec2          pic x(2).
     01  ws-dot-count         pic 9 value 0.
     01  ws-dec3              pic x(3).
+     01  ws-whole-scan        pic x(64).
 
        01  ws-year-x            pic x(4).
        01  ws-mon-x             pic x(2).
@@ -353,7 +354,19 @@ cat > /app/main.cob <<'COBOL'
                perform add-error
                exit paragraph
            end-if
-           if ws-amt-whole2 is not numeric
+           move ws-amt-whole2 to ws-whole-scan
+           inspect ws-whole-scan replacing all '0' by space
+           inspect ws-whole-scan replacing all '1' by space
+           inspect ws-whole-scan replacing all '2' by space
+           inspect ws-whole-scan replacing all '3' by space
+           inspect ws-whole-scan replacing all '4' by space
+           inspect ws-whole-scan replacing all '5' by space
+           inspect ws-whole-scan replacing all '6' by space
+           inspect ws-whole-scan replacing all '7' by space
+           inspect ws-whole-scan replacing all '8' by space
+           inspect ws-whole-scan replacing all '9' by space
+           move function trim(ws-whole-scan) to ws-whole-scan
+           if ws-whole-scan not = spaces
                move 'AMOUNT must have exactly 2 decimals' to ws-err-msg
                perform add-error
                exit paragraph
