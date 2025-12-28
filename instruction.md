@@ -1,35 +1,73 @@
-# COBOL Buggy Task
+# COBOL Buggy Task: Transaction Summarizer (Mainframe-style)
 
-You are given a small COBOL program in the container at `/app/main.cob`. It contains an intentional bug.
+You are given a small legacy COBOL program at `/app/main.cob`.
 
-Your job is to fix the program so that the verifier test (which compiles and runs it) produces the exact required output.
+The program is intended to read a pipe-delimited transaction file and print a single-line JSON summary to stdout.
+The baseline program contains **multiple intentional bugs** (logic + validation + formatting).
 
-## What you must do
+Your job is to fix `/app/main.cob` so it matches the exact contract below.
 
-- Fix `/app/main.cob` so that running `/app/run_cobol.sh` prints exactly:
+## CLI
+
+The verifier runs:
 
 ```
-COBOL: Hello, world
+/bin/bash /app/run_cobol.sh /tmp/input.txt
 ```
 
-...followed by a single newline (`\n`), and exits with code `0`.
+Where `/tmp/input.txt` is created by the tests.
 
-## How the verifier works
+## Input format
 
-- The verifier runs the script `/tests/test.sh`.
-- `/tests/test.sh` runs `pytest /tests/test_outputs.py`.
-- `test_outputs.py` invokes `/bin/bash /app/run_cobol.sh`.
-- The baseline container is intentionally buggy, so tests should fail until the fix is applied.
+The input file is UTF-8 text. Each non-empty line is a record:
 
-Reward file
-- The verifier writes the reward to `/logs/verifier/reward.txt` (1 for pass, 0 for fail) and always exits 0.
+```
+ACCOUNT|DATE|AMOUNT|DESCRIPTION
+```
+
+- `ACCOUNT`: exactly 10 digits (0-9)
+- `DATE`: exactly `YYYY-MM-DD`
+- `AMOUNT`: decimal with exactly 2 digits after the dot, e.g. `10.50`
+- `DESCRIPTION`: any text (may include spaces). It is not used for calculations.
+
+Blank lines (including lines containing only spaces/tabs) must be ignored.
+
+## Output contract
+
+Print exactly one JSON object on stdout, followed by a single newline.
+
+Schema:
+
+- `records_processed` (integer): number of **non-blank** lines processed
+- `n_errors` (integer): number of validation errors
+- `total_cents` (integer): sum of all **valid** amounts converted to cents
+- `errors` (array of strings): each error message must be prefixed with `Line N:` where N is the 1-based line number in the file (including blank lines)
+
+Validation rules:
+
+- If `ACCOUNT` is not exactly 10 digits: error
+- If `DATE` is not a valid calendar date in `YYYY-MM-DD`:
+	- month must be 01-12
+	- day must be 01-31
+	- month/day `00` is invalid
+- If `AMOUNT` does not have exactly 2 decimals: error
+- If `AMOUNT` is negative or zero: error
+
+Only valid records contribute to `total_cents`.
+
+Exit codes:
+
+- `0` if `n_errors == 0`
+- `2` if `n_errors > 0`
+
+## Verifier behavior
+
+- `/tests/test.sh` runs `pytest /tests/test_outputs.py` and writes `/logs/verifier/reward.txt`.
+- Baseline container should fail tests.
+- After applying the fixer `solution/solve.sh` (which overwrites `/app/main.cob`), tests should pass.
 
 ## Determinism requirements
 
-- The environment sets `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`.
-- Your fix must not depend on time, randomness, network, or external files.
-
-## Toolchain
-
-- GnuCOBOL (`cobc`) is installed in the container.
-- The runner `/app/run_cobol.sh` recompiles `/app/main.cob` and runs it.
+- Locale is fixed to `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`.
+- No network/time/random usage.
+- Output must be deterministic and stable.

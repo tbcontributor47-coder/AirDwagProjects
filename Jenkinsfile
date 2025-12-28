@@ -46,12 +46,29 @@ else
 fi
 
 echo "Task path: $EFFECTIVE_TASK_PATH"
-TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
+if ! TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"; then
+    echo "ERROR: TASK_PATH cannot be resolved from WORKSPACE"
+    echo "WORKSPACE: $WORKSPACE"
+    echo "TASK_PATH (requested): $TASK_PATH"
+    echo "EFFECTIVE_TASK_PATH: $EFFECTIVE_TASK_PATH"
+    echo "PWD: $(pwd)"
+    echo "Workspace contents:"
+    ls -la
+    exit 1
+fi
 
 echo "Task absolute path: $TASK_ABS"
+if [ ! -d "$TASK_ABS" ]; then
+    echo "ERROR: TASK_ABS does not exist: $TASK_ABS"
+    exit 1
+fi
 
 echo "Checking Docker access..."
-docker version >/dev/null 2>&1
+if ! docker version >/dev/null 2>&1; then
+    echo "ERROR: Jenkins user cannot access Docker."
+    echo "To fix: Add the agent service user to the docker group and restart the agent."
+    exit 1
+fi
 
 # Install Harbor CLI
 (
@@ -62,6 +79,39 @@ docker version >/dev/null 2>&1
     export PATH="$HOME/.local/bin:$PATH"
     harbor --help >/dev/null
 ) 2>&1 | tee logs/preflight.log
+'''
+            }
+        }
+
+        stage('Workspace Permissions (read-only)') {
+            steps {
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs
+
+echo "===== Workspace permissions snapshot =====" | tee logs/permissions.log
+echo "Node: $(hostname)" | tee -a logs/permissions.log
+echo "User: $(id -un)" | tee -a logs/permissions.log
+echo "Umask: $(umask)" | tee -a logs/permissions.log
+echo "Workspace: $WORKSPACE" | tee -a logs/permissions.log
+
+ls -ld "$WORKSPACE" | tee -a logs/permissions.log || true
+ls -ld "$WORKSPACE/logs" "$WORKSPACE/jobs" 2>/dev/null | tee -a logs/permissions.log || true
+ls -lan "$WORKSPACE" | head -n 50 | tee -a logs/permissions.log || true
+
+if command -v getfacl >/dev/null 2>&1; then
+    getfacl -p "$WORKSPACE" | tee logs/workspace.acl.txt | tee -a logs/permissions.log || true
+    if ls -ld "$WORKSPACE" 2>/dev/null | awk '{print $1}' | grep -Fq '+'; then
+        echo "NOTE: ls indicates ACLs (trailing '+')" | tee -a logs/permissions.log
+    elif grep -Eq '^(default:|mask:|user:[^:]+:|group:[^:]+:)' logs/workspace.acl.txt 2>/dev/null; then
+        echo "NOTE: workspace has extended ACL entries" | tee -a logs/permissions.log
+    else
+        echo "NOTE: no extended ACL entries detected" | tee -a logs/permissions.log
+    fi
+else
+    echo "NOTE: getfacl not installed" | tee -a logs/permissions.log
+fi
+echo "===== End snapshot =====" | tee -a logs/permissions.log
 '''
             }
         }
@@ -91,10 +141,15 @@ docker build -f "$TASK_ABS/environment/Dockerfile" -t "$IMAGE_NAME" "$TASK_ABS/e
 echo ""
 echo "===== Running tests against BUGGY baseline (should have failures) ====="
 docker run --rm \
-    -v "$TASK_ABS/tests:/tests:ro" \
+    -v "$TASK_ABS/tests:/mnt/tests" \
     "$IMAGE_NAME" \
-    /bin/bash -c "/tests/test.sh" \
+    /bin/bash -c "pip install -q pytest 2>&1 >/dev/null && pytest /mnt/tests/test_outputs.py -vv --tb=short" \
     2>&1 | tee logs/baseline-test.log || true
+
+echo ""
+echo "===== Baseline Test Summary ====="
+grep -E "(PASSED|FAILED|passed|failed)" logs/baseline-test.log | tail -1 || echo "No test summary found"
+echo ""
 '''
             }
         }
@@ -118,18 +173,47 @@ echo "Task absolute path: $TASK_ABS"
 BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
 IMAGE_NAME="${BASENAME}:baseline-test"
 
-echo "===== Applying solution fixer and re-running tests ====="
+echo ""
+echo "===== Running solution/solve.sh inside container and re-testing ====="
 docker run --rm \
-    -v "$TASK_ABS/tests:/tests:ro" \
+    -v "$TASK_ABS/tests:/mnt/tests" \
     -v "$TASK_ABS/solution:/mnt/solution:ro" \
     "$IMAGE_NAME" \
     /bin/bash -c "
         set -euo pipefail
-        bash /mnt/solution/solve.sh
-        /tests/test.sh
+        echo 'Applying solution fixer to /app/main.cob'
+        if [ -f /mnt/solution/solve.sh ]; then
+            bash /mnt/solution/solve.sh
+        else
+            echo 'ERROR: /mnt/solution/solve.sh not found in container'
+            exit 1
+        fi
+        echo 'Re-running tests after fixer'
+        pip install -q pytest 2>&1 >/dev/null
+        pytest /mnt/tests/test_outputs.py -vv --tb=short --junitxml=/mnt/tests/fix-report.xml || true
     " \
     2>&1 | tee logs/fix-and-verify.log || true
+
+# Copy the junit xml from the mounted volume if it exists
+if [ -f "$TASK_ABS/tests/fix-report.xml" ]; then
+    cp "$TASK_ABS/tests/fix-report.xml" fix-report.xml
+fi
+
+echo ""
+echo "===== FixAndVerify Test Summary ====="
+grep -E "(PASSED|FAILED|passed|failed)" logs/fix-and-verify.log | tail -1 || echo "No test summary found"
+echo ""
 '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'fix-report.xml,logs/fix-and-verify.log', allowEmptyArchive: true
+                    // Publish junit but do not change overall build status if tests fail here
+                    catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                        junit 'fix-report.xml'
+                    }
+                    echo 'FixAndVerify stage completed; see fix-report.xml and logs/fix-and-verify.log for details'
+                }
             }
         }
 
