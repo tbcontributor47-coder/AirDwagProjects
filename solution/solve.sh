@@ -43,15 +43,15 @@ cat > /app/main.cob <<'COBOL'
 
        01  ws-records           pic 9(9) value 0.
     01  ws-records-z         pic 9(9) value 0.
-    01  ws-records-disp      pic z(9).
+    01  ws-records-str       pic x(12).
 
        01  ws-errors            pic 9(9) value 0.
     01  ws-errors-z          pic 9(9) value 0.
-    01  ws-errors-disp       pic z(9).
+    01  ws-errors-str        pic x(12).
 
        01  ws-total-cents       pic 9(12) value 0.
     01  ws-total-z           pic 9(12) value 0.
-    01  ws-total-disp        pic z(12).
+    01  ws-total-str         pic x(20).
 
        01  ws-numval            pic s9(9)v99 comp-3 value 0.
        01  ws-cents             pic s9(12) comp-3 value 0.
@@ -164,60 +164,22 @@ cat > /app/main.cob <<'COBOL'
                exit paragraph
            end-if
 
-           move ws-date(1:4) to ws-year-x
-           move ws-date(6:2) to ws-mon-x
-           move ws-date(9:2) to ws-day-x
+            move ws-records-z to ws-records-str
+            move ws-errors-z to ws-errors-str
+            move ws-total-z to ws-total-str
 
-           if ws-year-x is not numeric or ws-mon-x is not numeric or ws-day-x is not numeric
-               move 'DATE must be a valid calendar date' to ws-err-msg
-               perform add-error
-               exit paragraph
-           end-if
+            move spaces to ws-json
+            move 1 to ws-json-ptr
 
-           compute ws-year = function numval(ws-year-x)
-           compute ws-mon  = function numval(ws-mon-x)
-           compute ws-day  = function numval(ws-day-x)
-
-           if ws-mon < 1 or ws-mon > 12
-               move 'DATE must be a valid calendar date' to ws-err-msg
-               perform add-error
-               exit paragraph
-           end-if
-           if ws-day < 1
-               move 'DATE must be a valid calendar date' to ws-err-msg
-               perform add-error
-               exit paragraph
-           end-if
-
-           perform compute-days-in-month
-           if ws-day > ws-dim
-               move 'DATE must be a valid calendar date' to ws-err-msg
-               perform add-error
-               exit paragraph
-           end-if
-           .
-
-       compute-days-in-month.
-           move 31 to ws-dim
-           evaluate ws-mon
-               when 4
-               when 6
-               when 9
-               when 11
-                   move 30 to ws-dim
-               when 2
-                   perform compute-leap
-                   if rem4 = 0
-                       if rem100 not = 0
-                           move 29 to ws-dim
-                       else
-                           if rem400 = 0
-                               move 29 to ws-dim
-                           else
-                               move 28 to ws-dim
-                           end-if
-                       end-if
-                   else
+            string '{"records_processed":' delimited by size
+                   function trim(ws-records-str) delimited by size
+                   ',"n_errors":' delimited by size
+                   function trim(ws-errors-str) delimited by size
+                   ',"total_cents":' delimited by size
+                   function trim(ws-total-str) delimited by size
+                   ',"errors":[' delimited by size
+                   into ws-json with pointer ws-json-ptr
+            end-string
                        move 28 to ws-dim
                    end-if
                when other
