@@ -8,6 +8,197 @@ The program is **buggy**. Fix it.
 
 This document is the full runtime contract. Implement exactly what is specified.
 
+## Step-by-step implementation checklist (required)
+
+Implement `/app/validate_eft.py` exactly as this pipeline. This section is intentionally procedural to reduce ambiguity for agents.
+
+### Step 0: parse CLI args
+
+The verifier supplies valid arguments, but your code must still be robust and must not print a Python traceback.
+
+Read:
+
+- `file_path`
+- `schema_path`
+- `clearing_accounts_path`
+- `index_db_path`
+- `retention_days` (default 5)
+- optional `payees_db_path`
+
+### Step 1: load schema JSON
+
+1) Read `schema_path` as UTF-8 JSON.
+2) Validate required keys:
+   - `record_length` is an integer `L`.
+   - `fields` is a list.
+3) For each field descriptor in `fields`, validate:
+   - `name` string
+   - `start` int
+   - `length` int
+   - `type` in `{string, decimal, date}`
+   - `required` boolean
+   - optional `pattern` string
+   - optional `format` string
+
+If schema cannot be loaded/parsed, treat it as a validation failure (non-zero) and still print exactly one JSON report.
+
+### Step 2: load clearing accounts
+
+1) Read the clearing accounts file as UTF-8 text.
+2) Split into lines.
+3) For each line, compute `acct = line.strip()`.
+4) Keep `acct` if it is non-empty.
+
+Result: `allowed_clearing_accounts: set[str]`.
+
+### Step 3: read payment file bytes and compute `file_hash`
+
+Compute `file_hash` before validation so it is always present.
+
+Use the canonicalization rules exactly as specified in the “Canonicalization (exact)” section below.
+
+### Step 4: duplicate detection (SQLite index)
+
+If `retention_days <= 0`:
+
+- Set `duplicate = false`.
+- Skip duplicate checks.
+
+Else:
+
+1) Open SQLite DB at `index_db_path` (create if missing).
+2) Ensure the table `file_index` exists (create if missing).
+3) Determine a cutoff timestamp `cutoff = now - retention_days`.
+   - Store timestamps in ISO-8601 (use `datetime.now().isoformat()` for insertion).
+  - For comparison, parse ISO timestamps into datetimes.
+4) Query for any prior submission with the same `file_hash` and a timestamp >= cutoff.
+   - If any exists: set `duplicate = true`.
+   - Else: `duplicate = false`.
+5) If `duplicate` is false, insert a new row with:
+   - `file_hash`
+   - `filename` (input filename or full path)
+   - `timestamp` (ISO-8601 now)
+   - `record_count` (records_processed)
+
+Important:
+
+- Duplicate is based on `file_hash` only (filename must not affect the duplicate decision).
+- Same content under different filenames must still be detected.
+
+### Step 5: parse records and validate
+
+Let `L = record_length` from schema.
+
+5.1) Split records
+
+- Read the payment file as UTF-8 text.
+- Normalize line endings (`\r\n` and `\r` to `\n`).
+- Split on `\n`.
+- Remove empty trailing lines at the end (lines that are `""` after removing the line ending).
+
+Let the remaining list be `records`.
+
+Set:
+
+- `records_processed = len(records)`
+
+5.2) For each record line `records[i]` (1-based line number `line_no = i+1`)
+
+Record length rules (must match verifier):
+
+- If `len(line) < L`: error.
+- Else if `len(line) == L`: ok.
+- Else (`len(line) > L`):
+  - If `line[L:].strip() == ""` (only spaces/tabs): accept, and use `line = line[:L]` for parsing.
+  - Otherwise: error.
+
+Field extraction:
+
+- For each field descriptor:
+  - `raw = line[start:start+length]`
+  - `value = raw.strip()`
+
+Collect all field values into a dict `row` keyed by field name.
+
+5.3) Required-field validation
+
+For each schema field with `required == true`:
+
+- If `row[name] == ""`: add error `Line N: <field> is required`.
+
+5.4) Field-specific validation (verifier-checked)
+
+Validate these names if present in schema:
+
+- `eftno`:
+  - must be non-empty
+  - must be alphanumeric (letters/digits only)
+
+- `bank_code`:
+  - must start with a digit (`0`-`9`) (include substring `must start with a digit` in the error)
+  - must contain only uppercase letters and digits
+  - lowercase letters are invalid
+  - special chars (including spaces or punctuation) are invalid
+
+- `account_no`:
+  - must be all digits
+  - must be length 8..20 (inclusive)
+  - forbidden prefixes (must error): `0000`, `0001`, `0010`, `0100`
+  - first 4 digits must not consist solely of `0` and `1` (error text must contain `First 4 digits` or `0 and 1`)
+  - last 4 digits must not contain `0` (error text must contain `Last 4 digits` or `cannot contain 0`)
+
+- `amount`:
+  - parse as decimal
+  - must be strictly greater than 0 (error text must contain `must be > 0` or `greater than 0`)
+  - must have at most 2 digits after the decimal point
+
+- `clearance_date`:
+  - parse using schema `format` if present (verifier uses `%Y-%m-%d`)
+  - invalid date is an error
+
+- `clearing_account`:
+  - after trimming, must be contained in `allowed_clearing_accounts` exactly
+  - substring matches must NOT be accepted
+
+5.5) Schema regex validation (optional)
+
+If a field descriptor includes `pattern`, enforce it as a full regex match against the trimmed value.
+
+5.6) Payees DB checks (only when `--payees-db` is provided)
+
+For each record, after `account_no` and `payee_name` are parsed:
+
+1) Query `payees` table by `account_no`.
+   - If no row: error containing `not found in payee database` or `Account`.
+2) If `fraud_flag == 1`: error containing `fraud` or `risk`.
+3) Compare payee names case-insensitively:
+   - Normalize both:
+     - `strip()`
+     - collapse internal whitespace runs to one space
+     - compare with `.casefold()`
+   - If mismatch: error containing `name mismatch` or `payee name`.
+
+Important note:
+
+- The verifier expects payee name comparison to be case-insensitive (e.g., `john doe` must match `JOHN DOE`).
+
+### Step 6: build the JSON report
+
+Always print one JSON object with the required keys.
+
+Compute:
+
+- `n_errors = len(errors)`
+- `n_warnings = 0`
+
+Set `duplicate` based on Step 4.
+
+### Step 7: choose exit code
+
+- If `duplicate == true`: exit non-zero.
+- Else if `n_errors > 0`: exit non-zero.
+- Else: exit `0`.
+
 ## CLI contract
 
 The verifier invokes the program as:
@@ -292,3 +483,17 @@ Rules:
 
 - Must handle at least 1,000 records per file.
 - Must not be quadratic in number of records.
+
+## Verifier-aligned sanity examples
+
+These are examples of situations the verifier tests.
+
+### Example: CRLF + trailing spaces hash the same
+
+If one file ends with `"...<line>   \r\n\r\n"` and another ends with `"...<line>\n"`, they must produce the same `file_hash` and be treated as duplicates (unless `--retention-days <= 0`).
+
+### Example: extra padding beyond record length
+
+If `record_length == 296`, a line with length 306 containing only spaces after position 296 must be accepted.
+
+If the extra suffix contains any non-whitespace character (e.g., `X`), it must be rejected.
