@@ -61,6 +61,8 @@ cat > /app/main.cob <<'COBOL'
        01  ws-amt-dec           pic x(64).
     01  ws-amt-whole2        pic x(64).
     01  ws-amt-dec2          pic x(2).
+     01  ws-dot-count         pic 9 value 0.
+     01  ws-dec-len           pic 9(4) comp value 0.
 
        01  ws-year-x            pic x(4).
        01  ws-mon-x             pic x(2).
@@ -123,7 +125,7 @@ cat > /app/main.cob <<'COBOL'
                inspect ws-line-trim replacing all x'0D' by space
                move function trim(ws-line-trim) to ws-line-trim
 
-               if function length(ws-line-trim) = 0
+               if function stored-char-length(ws-line-trim) = 0
                    *> blank line: ignored but still counts for line numbering
                    continue
                end-if
@@ -312,6 +314,15 @@ cat > /app/main.cob <<'COBOL'
 
            move function trim(ws-amt) to ws-amt-trim
 
+           *> Require exactly one decimal point.
+           move 0 to ws-dot-count
+           inspect ws-amt-trim tallying ws-dot-count for all '.'
+           if ws-dot-count not = 1
+               move 'AMOUNT must have exactly 2 decimals' to ws-err-msg
+               perform add-error
+               exit paragraph
+           end-if
+
            unstring ws-amt-trim delimited by '.'
                into ws-amt-whole ws-amt-dec
            end-unstring
@@ -329,7 +340,8 @@ cat > /app/main.cob <<'COBOL'
                perform add-error
                exit paragraph
            end-if
-           if function length(function trim(ws-amt-dec)) not = 2
+           compute ws-dec-len = function stored-char-length(function trim(ws-amt-dec))
+           if ws-dec-len not = 2
                move 'AMOUNT must have exactly 2 decimals' to ws-err-msg
                perform add-error
                exit paragraph
