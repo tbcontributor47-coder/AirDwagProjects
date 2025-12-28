@@ -83,8 +83,13 @@ cat > /app/main.cob <<'COBOL'
 
        01  idx                  pic 9(2) value 0.
 
-       01  ws-json              pic x(4000).
-       01  ws-json-ptr          pic 9(4) comp value 1.
+    01  ws-json              pic x(4000).
+    01  ws-json-ptr          pic 9(4) comp value 1.
+
+    *> Display fields for JSON output (fix for missing definitions)
+    01  ws-records-disp      pic x(12) value spaces.
+    01  ws-errors-disp       pic x(12) value spaces.
+    01  ws-total-disp        pic x(12) value spaces.
 
        procedure division.
        main-para.
@@ -187,13 +192,67 @@ cat > /app/main.cob <<'COBOL'
            perform compute-leap
 
            evaluate ws-mon
-               when 1 3 5 7 8 10 12
+               when 1
                    if ws-day < 1 or ws-day > 31
                        move 'DATE must be a valid calendar date' to ws-err-msg
                        perform add-error
                        exit paragraph
                    end-if
-               when 4 6 9 11
+               when 3
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 5
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 7
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 8
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 10
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 12
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 4
+                   if ws-day < 1 or ws-day > 30
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 6
+                   if ws-day < 1 or ws-day > 30
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 9
+                   if ws-day < 1 or ws-day > 30
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 11
                    if ws-day < 1 or ws-day > 30
                        move 'DATE must be a valid calendar date' to ws-err-msg
                        perform add-error
