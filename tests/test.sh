@@ -28,7 +28,7 @@ python3 -m pip install --no-cache-dir -q "pytest==8.4.1" "pytest-json-ctrf==0.3.
 PIP_INSTALL_EXIT=$?
 
 if [ $PIP_INSTALL_EXIT -eq 0 ]; then
-  python3 -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_compare.py -rA
+  python3 -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_output.py -rA
   PYTEST_EXIT=$?
 else
   echo "pip install failed (exit=$PIP_INSTALL_EXIT); falling back to uvx" >&2
