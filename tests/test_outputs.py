@@ -118,3 +118,35 @@ def test_ignore_pointer_nested_subtree():
     rc2, out2, _ = _run(expected, actual2, ["--ignore", "/meta/generated_at"])
     lines = _assert_not_equal(rc2, out2)
     assert lines[1] == "FIRST_DIFF /meta/version"
+
+
+def test_type_mismatch_fails():
+    rc, out, _ = _run({"n": 1}, {"n": "1"})
+    lines = _assert_not_equal(rc, out)
+    assert lines[1] == "FIRST_DIFF /n"
+
+
+def test_boolean_vs_string_fails():
+    rc, out, _ = _run({"ok": True}, {"ok": "True"})
+    lines = _assert_not_equal(rc, out)
+    assert lines[1] == "FIRST_DIFF /ok"
+
+
+def test_unicode_and_whitespace_handling():
+    # Unicode content should be preserved and trailing whitespace ignored
+    rc, out, _ = _run({"msg": "café \n"}, {"msg": "café\n"})
+    _assert_equal(rc, out)
+
+
+def test_ignore_pointer_in_array():
+    expected = {"items": [{"id": 1, "time": "t1"}, {"id": 2, "time": "t2"}]}
+    actual = {"items": [{"id": 1, "time": "x"}, {"id": 2, "time": "y"}]}
+    # Ignore the time fields by specifying each pointer explicitly
+    rc, out, _ = _run(expected, actual, ["--ignore", "/items/0/time", "--ignore", "/items/1/time"])
+    _assert_equal(rc, out)
+
+
+def test_large_integer_equality():
+    # Large ints should compare exactly
+    rc, out, _ = _run({"v": 1234567890123456789}, {"v": 1234567890123456789})
+    _assert_equal(rc, out)

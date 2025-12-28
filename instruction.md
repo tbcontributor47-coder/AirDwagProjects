@@ -51,6 +51,8 @@ Implement the comparison as a deterministic, depth-first traversal that reports 
    - When comparing, treat an ignored pointer as: skip any difference that occurs at that pointer or inside the subtree rooted at that pointer.
    - Implementation rule: when you are about to report a difference at pointer `p`, first canonicalize `p` and all ignore pointers; if `p` is equal to one of the ignore pointers, or `p` is a descendant of an ignore pointer (i.e., it begins with `<ignore> + '/'`), then treat this difference as non-existent and continue searching for the next difference.
 
+Note: `--ignore` accepts exact JSON Pointer strings and descendant matching only. Wildcard patterns (e.g. `/items/*/time`) are not required by the verifier; if you need to ignore multiple sibling elements, pass multiple `--ignore` arguments (one per pointer).
+
 4) String normalization
    - For string values, ignore *trailing* whitespace when comparing. Concretely, compare `expected.rstrip()` to `actual.rstrip()`. Internal whitespace (spaces within the string) must be preserved and compared exactly.
 
