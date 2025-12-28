@@ -387,6 +387,65 @@ Required behavior:
   - `timestamp` in ISO-8601 (any `datetime.now().isoformat()`-style string is acceptable)
   - `record_count` equal to `records_processed`
 
+### Ignore-prefix matching and Unicode normalization (optional `--ignore` semantics)
+
+Some tests (and implementers) expect an optional ignore-style matching feature when comparing identifiers, paths, or other componentized strings. If your implementation supports an `--ignore`-style list of JSON Pointer-like prefixes (or any component-path prefixes used when comparing values), it MUST follow the precise Unicode normalization and matching semantics described here. Even if you do not expose `--ignore`, these rules clarify how to implement any component-aware matching used by the validator.
+
+Canonicalization steps for each path component
+- For any component string used in prefix matching, apply these transformations in this exact order:
+  1. Normalize to NFC (Unicode Normalization Form C).
+  2. Apply Unicode case-folding (use `str.casefold()` or equivalent).
+  3. Normalize to NFKD (Compatibility Decomposition).
+  4. Remove all combining marks (Unicode category `Mn`).
+  5. Normalize back to NFC.
+
+Rationale: this sequence (NFC → casefold → NFKD → strip `Mn` → NFC) ensures composed/decomposed forms, case differences, and common accent/diacritic variations are handled consistently (for example, `café`, `café` (decomposed), and `CAFE` all canonicalize to the same token `cafe`).
+
+Component-aware prefix matching rules
+- When matching a candidate component path against an ignore prefix, first split both into components (for JSON Pointer-style paths: unescape per RFC6901, then split on `/`; for dotted or other separator-based paths, split on the separator after applying the same unescape rules used by your code).
+- Normalize every component using the canonicalization steps above and then compare component-by-component.
+- Standard prefix match: the ignore prefix `I = [i0..iM]` matches candidate path `P = [p0..pN]` if `M <= N` and for all k in 0..M-1, `normalize(i_k) == normalize(p_k)`.
+
+Single-component special-case
+- If the ignore prefix has exactly one non-empty component (i.e., length 1 after splitting), treat it as a component-level match that succeeds if any component of the candidate path, after normalization, equals that single normalized component. For example, an ignore `/café` should match `/users/café/id` and `/users/cafe/id` and `/users/CAFE/id`.
+
+Edge cases and implementation notes
+- The root prefix (`/` or empty components list) matches all paths.
+- Always apply identical normalization to both the ignore prefixes and the candidate paths.
+- Implementations must not treat the matching as a simple substring search — it must be component-aware unless a single-component special-case applies as above.
+
+Pseudocode (Python-style) for component normalization and matching
+
+```
+import unicodedata
+
+def normalize_component(s: str) -> str:
+  s = unicodedata.normalize('NFC', s)
+  s = s.casefold()
+  s = unicodedata.normalize('NFKD', s)
+  s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
+  return unicodedata.normalize('NFC', s)
+
+def matches_ignore(ignore_components: list[str], candidate_components: list[str]) -> bool:
+  I = [normalize_component(c) for c in ignore_components]
+  P = [normalize_component(c) for c in candidate_components]
+  if len(I) == 0:
+    return True
+  if len(I) == 1:
+    return any(pc == I[0] for pc in P)
+  if len(I) > len(P):
+    return False
+  return all(I[k] == P[k] for k in range(len(I)))
+```
+
+Examples
+- Ignore `/meta/generated_at` matches `/meta/generated_at` and `/meta/generated_at/2025`.
+- Ignore `/café` (single-component) matches `/users/café/id`, `/users/cafe/id`, and `/users/CAFE/id`.
+
+Testing
+- If you add or rely on ignore behavior in your implementation, include unit tests that verify composed and decomposed Unicode forms, case differences, and the single-component special-case.
+
+
 ## Validation rules
 
 Validation is performed per record line. All errors for all records must be collected.
