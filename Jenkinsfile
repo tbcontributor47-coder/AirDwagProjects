@@ -132,6 +132,12 @@ fi
 TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
 echo "Task absolute path: $TASK_ABS"
 
+echo "Workspace git HEAD: $(git -C \"$TASK_ABS\" rev-parse HEAD 2>/dev/null || echo '<not-a-git-repo>')"
+if [ -f "$TASK_ABS/solution/solve.sh" ]; then
+    echo "solve.sh sha256: $(sha256sum "$TASK_ABS/solution/solve.sh" | awk '{print $1}')"
+    echo "solve.sh contains ws-dot-count? $(grep -q "ws-dot-count" "$TASK_ABS/solution/solve.sh" && echo yes || echo no)"
+fi
+
 BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
 IMAGE_NAME="${BASENAME}:baseline-test"
 
@@ -183,6 +189,8 @@ docker run --rm \
         set -euo pipefail
         echo 'Applying solution fixer to /app/main.cob'
         if [ -f /mnt/solution/solve.sh ]; then
+            echo "Mounted solve.sh sha256: $(sha256sum /mnt/solution/solve.sh | awk '{print $1}')"
+            echo "Mounted solve.sh contains ws-dot-count? $(grep -q "ws-dot-count" /mnt/solution/solve.sh && echo yes || echo no)"
             bash /mnt/solution/solve.sh
         else
             echo 'ERROR: /mnt/solution/solve.sh not found in container'
