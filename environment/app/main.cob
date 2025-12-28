@@ -47,6 +47,11 @@
        01  ws-numval            pic s9(9)v99 comp-3 value 0.
        01  ws-cents             pic s9(12) comp-3 value 0.
 
+    *> Display fields for JSON output (fix for missing definitions)
+    01  ws-records-disp      pic x(12) value spaces.
+    01  ws-errors-disp       pic x(12) value spaces.
+    01  ws-total-disp        pic x(12) value spaces.
+
        01  ws-err-count         pic 9(2) value 0.
        01  ws-err-max           pic 9(2) value 20.
        01  ws-err-msg           pic x(120).

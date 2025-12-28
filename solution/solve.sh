@@ -164,26 +164,59 @@ cat > /app/main.cob <<'COBOL'
                exit paragraph
            end-if
 
-            move ws-records-z to ws-records-str
-            move ws-errors-z to ws-errors-str
-            move ws-total-z to ws-total-str
+           move ws-date(1:4) to ws-year-x
+           move ws-date(6:2) to ws-mon-x
+           move ws-date(9:2) to ws-day-x
 
-            move spaces to ws-json
-            move 1 to ws-json-ptr
+           if ws-year-x is not numeric or ws-mon-x is not numeric or ws-day-x is not numeric
+               move 'DATE must be a valid calendar date' to ws-err-msg
+               perform add-error
+               exit paragraph
+           end-if
 
-            string '{"records_processed":' delimited by size
-                   function trim(ws-records-str) delimited by size
-                   ',"n_errors":' delimited by size
-                   function trim(ws-errors-str) delimited by size
-                   ',"total_cents":' delimited by size
-                   function trim(ws-total-str) delimited by size
-                   ',"errors":[' delimited by size
-                   into ws-json with pointer ws-json-ptr
-            end-string
-                       move 28 to ws-dim
+           move function numval(ws-year-x) to ws-year
+           move function numval(ws-mon-x) to ws-mon
+           move function numval(ws-day-x) to ws-day
+
+           if ws-mon < 1 or ws-mon > 12
+               move 'DATE must be a valid calendar date' to ws-err-msg
+               perform add-error
+               exit paragraph
+           end-if
+
+           perform compute-leap
+
+           evaluate ws-mon
+               when 1 3 5 7 8 10 12
+                   if ws-day < 1 or ws-day > 31
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 4 6 9 11
+                   if ws-day < 1 or ws-day > 30
+                       move 'DATE must be a valid calendar date' to ws-err-msg
+                       perform add-error
+                       exit paragraph
+                   end-if
+               when 2
+                   if rem4 = 0
+                       if ws-day < 1 or ws-day > 29
+                           move 'DATE must be a valid calendar date' to ws-err-msg
+                           perform add-error
+                           exit paragraph
+                       end-if
+                   else
+                       if ws-day < 1 or ws-day > 28
+                           move 'DATE must be a valid calendar date' to ws-err-msg
+                           perform add-error
+                           exit paragraph
+                       end-if
                    end-if
                when other
-                   continue
+                   move 'DATE must be a valid calendar date' to ws-err-msg
+                   perform add-error
+                   exit paragraph
            end-evaluate
            .
 
