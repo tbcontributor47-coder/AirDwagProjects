@@ -50,7 +50,7 @@ PY
       -p 3.13 \
       -w pytest==8.4.1 \
       -w pytest-json-ctrf==0.3.5 \
-      pytest --ctrf /logs/verifier/ctrf.json /tests/test_compare.py -rA
+      pytest --ctrf /logs/verifier/ctrf.json /tests/test_output.py -rA
     PYTEST_EXIT=$?
   else
     echo "uvx is not available; cannot run tests" >&2
