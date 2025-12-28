@@ -111,12 +111,18 @@ cat > /app/main.cob <<'COBOL'
            open input infile
 
            perform until 1 = 2
+               move spaces to ws-line
+               move spaces to ws-line-trim
                read infile into ws-line
                    at end exit perform
                end-read
 
                add 1 to ws-line-no
-               move function trim(ws-line) to ws-line-trim
+
+               move ws-line to ws-line-trim
+               inspect ws-line-trim replacing all x'0D' by space
+               move function trim(ws-line-trim) to ws-line-trim
+
                if function length(ws-line-trim) = 0
                    *> blank line: ignored but still counts for line numbering
                    continue
@@ -137,7 +143,7 @@ cat > /app/main.cob <<'COBOL'
 
        parse-line.
            move spaces to ws-acc ws-date ws-amt ws-desc
-           unstring ws-line delimited by '|'
+           unstring ws-line-trim delimited by '|'
                into ws-acc ws-date ws-amt ws-desc
            end-unstring
 
