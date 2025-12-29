@@ -141,7 +141,7 @@ If a schema field is `required: true` and its trimmed value is empty, add an err
   - must be digits only, length 8..20
   - forbidden prefixes: starts with one of `0000`, `0001`, `0010`, `0100`
   - first-4 rule: first 4 digits must not consist solely of `0` and `1` (error should include `First 4 digits` or `0 and 1`)
-  - last-4 rule: the last 4 digits must not contain `0` (error should include `cannot contain 0`)
+  - last-4 rule: the last 4 digits must not contain the digit `0` (i.e. none of the last four characters may be `0`). Error messages for violations should include either `Last 4 digits` or `cannot contain 0` and must include the `Line N:` prefix.
 - `amount`: 
   - decimal, strictly > 0
   - at most 2 decimal places
@@ -227,7 +227,7 @@ All tests must pass:
 - `test_required_fields_empty_are_reported` — Required empty fields report errors with line numbers
 - `test_account_forbidden_prefixes` — Account numbers with forbidden prefixes rejected
 - `test_account_first_four_only_zeros_and_ones` — First 4 digits validation works
-- `test_account_last_four_cannot_have_zeros` — Last 2 digits validation works
+- `test_account_last_four_cannot_have_zeros` — Last 4 digits validation works
 - `test_bank_code_must_start_with_digit` — Bank code must start with digit
 - `test_bank_code_no_lowercase_or_special_chars` — Bank code format validation
 - `test_payee_database_unknown_account` — Unknown accounts in payees DB report errors
