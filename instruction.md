@@ -15,6 +15,23 @@ The verifier runs:
 /bin/bash /app/run_cobol.sh /tmp/input.txt
 ```
 
+# COBOL Buggy Task: Transaction Summarizer (Mainframe-style)
+
+You are given a small legacy COBOL program at `/app/main.cob`.
+
+The program is intended to read a pipe-delimited transaction file and print a single-line JSON summary to stdout.
+The baseline program contains **multiple intentional bugs** (logic + validation + formatting).
+
+Your job is to fix `/app/main.cob` so it matches the exact contract below.
+
+## CLI
+
+The verifier runs:
+
+```
+/bin/bash /app/run_cobol.sh /tmp/input.txt
+```
+
 Where `/tmp/input.txt` is created by the tests.
 
 ## Input format
@@ -27,7 +44,7 @@ ACCOUNT|DATE|AMOUNT|DESCRIPTION
 
 - `ACCOUNT`: exactly 10 digits (0-9)
 - `DATE`: exactly `YYYY-MM-DD`
-- `AMOUNT`: decimal with exactly 2 digits after the dot, e.g. `10.50`
+- `AMOUNT`: decimal with exactly 2 digits after the dot.
 - `DESCRIPTION`: any text (may include spaces). It is not used for calculations.
 
 Blank lines (including lines containing only spaces/tabs) must be ignored.
@@ -45,103 +62,99 @@ Schema:
 
 Validation rules:
 
-- If `ACCOUNT` is not exactly 10 digits: error
-- If `DATE` is not a valid calendar date in `YYYY-MM-DD`:
-	- month must be 01-12
-	- day must be 01-31
-	# COBOL Buggy Task: Transaction Summarizer (Mainframe-style)
+- If `ACCOUNT` is not exactly 10 digits: error (see exact messages below)
+- If `DATE` is not a valid calendar date in `YYYY-MM-DD`: error (see exact messages below)
+- If `AMOUNT` does not have exactly 2 decimals: error (see exact messages below)
+- If `AMOUNT` is negative or zero: error (see exact messages below)
 
-	You are given a small legacy COBOL program at `/app/main.cob`.
+Only valid records contribute to `total_cents`.
 
-	The program is intended to read a pipe-delimited transaction file and print a single-line JSON summary to stdout.
-	The baseline program contains **multiple intentional bugs** (logic + validation + formatting).
+Exit codes:
 
-	Your job is to fix `/app/main.cob` so it matches the exact contract below.
+- `0` if `n_errors == 0`
+- `2` if `n_errors > 0`
 
-	## CLI
+## Exact error message strings
 
-	The verifier runs:
+The verifier asserts exact error message text. Your program must use these messages (prefixed by the 1-based `Line N:`) when reporting validation failures:
 
-	```
-	/bin/bash /app/run_cobol.sh /tmp/input.txt
-	```
+- `ACCOUNT must be exactly 10 digits`
+- `DATE must be a valid calendar date`
+- `AMOUNT must have exactly 2 decimals`
+- `AMOUNT must be > 0`
+- `unexpected field count`
 
-	Where `/tmp/input.txt` is created by the tests.
+Examples (exact formatting):
 
-	## Input format
+- `Line 3: ACCOUNT must be exactly 10 digits`
+- `Line 2: DATE must be a valid calendar date`
 
-	The input file is UTF-8 text. Each non-empty line is a record:
+Note: error strings must be human-readable and must match the phrases above after the `Line N: ` prefix.
 
-	```
-	ACCOUNT|DATE|AMOUNT|DESCRIPTION
-	```
+## Verifier behavior
 
-	- `ACCOUNT`: exactly 10 digits (0-9)
-	- `DATE`: exactly `YYYY-MM-DD`
-	- `AMOUNT`: decimal with exactly 2 digits after the dot.
-	- `DESCRIPTION`: any text (may include spaces). It is not used for calculations.
+- `/tests/test.sh` runs `pytest /tests/test_outputs.py` and writes `/logs/verifier/reward.txt`.
+- Baseline container should fail tests.
+- After applying the fixer `solution/solve.sh` (which overwrites `/app/main.cob`), tests should pass.
 
-	Blank lines (including lines containing only spaces/tabs) must be ignored.
+## Determinism requirements
 
-	## Output contract
+- Locale is fixed to `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`.
+- No network/time/random usage.
+- Output must be deterministic and stable.
 
-	Print exactly one JSON object on stdout, followed by a single newline.
+## Verifier tests (required coverage)
 
-	Schema:
+The verifier uses `pytest` and executes the program through `/bin/bash /app/run_cobol.sh <input>`.
 
-	- `records_processed` (integer): number of **non-blank** lines processed
-	- `n_errors` (integer): number of validation errors
-	- `total_cents` (integer): sum of all **valid** amounts converted to cents
-	- `errors` (array of strings): each error message must be prefixed with `Line N:` where N is the 1-based line number in the file (including blank lines)
+### How the verifier runs (step-by-step)
 
-	Validation rules:
+1) Writes an input file.
+2) Runs `/bin/bash /app/run_cobol.sh <input_path>`.
+3) Parses stdout as JSON (exactly one line + trailing newline).
+4) Validates `records_processed`, `n_errors`, `total_cents`, and `errors`.
+5) Validates exit code: `0` iff `n_errors == 0`, else `2`.
 
-	- If `ACCOUNT` is not exactly 10 digits: error
-	- If `DATE` is not a valid calendar date in `YYYY-MM-DD`:
-		- month must be 01-12
-		- day must be 01-31
-		- month/day `00` is invalid
-	- If `AMOUNT` does not have exactly 2 decimals: error
-	- If `AMOUNT` is negative or zero: error
+### Complete test list (all tests must pass)
 
-	Only valid records contribute to `total_cents`.
+- `test_valid_single_record` — One valid record produces correct totals and exit `0`.
+- `test_blank_lines_ignored_but_line_numbers_count` — Blank lines don’t increment `records_processed` but still affect `Line N:` numbering.
+- `test_amount_zero_is_error_and_excludes_from_total` — `0.00` is an error and is excluded from the cents total.
+- `test_trim_fields_are_allowed` — Leading/trailing whitespace on fields must be trimmed before validation.
+- `test_unexpected_field_count_is_error` — Lines containing more than three `|` separators must produce `Line N: unexpected field count` and be treated as errors.
+- `test_amount_rejects_commas_and_symbols` — `AMOUNT` values containing commas, currency symbols, or embedded spaces must be rejected as malformed.
+- `test_leap_year_date_validation` — Enforce calendar validation including leap years (`2024-02-29` accepted; `2023-02-29` rejected).
+- `test_empty_fields_are_errors` — Missing required fields (empty after trimming) are validation errors and excluded from totals.
+- `test_description_pipe_causes_unexpected_field_count` — An extra unescaped `|` in the description must be treated as an unexpected field count error.
+- `test_accept_windows_line_endings` — Files using CRLF (`\r\n`) line endings are accepted.
 
-	Exit codes:
+Note: the verifier enforces the behaviors listed here. Other rules mentioned elsewhere in this file (for example, optional escape mechanisms for `|` in descriptions or accepting leading `+` on amounts) are advisory and are not covered by the current test suite unless explicitly listed above.
 
-	- `0` if `n_errors == 0`
-	- `2` if `n_errors > 0`
+## Test formatting and agent timeout notes (reviewer feedback)
 
-	## Verifier behavior
+- The verifier expects the program to print exactly one JSON object on stdout followed by a single trailing newline character ("one-line JSON"). Any extra characters, progress text, or multiple lines will cause the verifier to fail parsing. If you must log diagnostics, write them to stderr only.
+- Tests in `tests/test_outputs.py` include docstrings that describe the behavior being validated. Implementations should follow those contracts exactly.
+- Agents have been observed to time out under heavier workloads. The reviewer requested increasing the agent runtime budget; the task metadata sets the agent timeout to `900` seconds. Ensure any long-running operations are necessary and avoid network I/O or sleeps.
 
-	- `/tests/test.sh` runs `pytest /tests/test_outputs.py` and writes `/logs/verifier/reward.txt`.
-	- Baseline container should fail tests.
-	- After applying the fixer `solution/solve.sh` (which overwrites `/app/main.cob`), tests should pass.
+## Additional edge cases (increase difficulty)
 
-	## Determinism requirements
+Add the following edge cases to make implementations more robust and the task harder. These are intended to be clear, deterministic rules; include them in your validator logic if you want to increase difficulty for solvers.
 
-	- Locale is fixed to `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`.
-	- No network/time/random usage.
-	- Output must be deterministic and stable.
+- **Trim fields:** Trim leading and trailing whitespace (including non-ASCII spaces) from every field before validation.
+- **Empty fields:** Multiple consecutive pipes indicate empty fields. Missing `ACCOUNT`, `DATE`, or `AMOUNT` (empty after trimming) is a validation error.
+- **Unexpected field count:** Lines with more than four fields (more than 3 pipe separators) must be rejected with an error message `Line N: unexpected field count`.
+- **Amount format:** Reject `AMOUNT` values that include thousands separators (commas), currency symbols, or embedded spaces. `AMOUNT` must otherwise be a numeric value with exactly two decimals after trimming (e.g. `10.50`).
+- **Zero/negative amounts:** `0.00` and negative amounts are errors and excluded from totals.
+- **Date validation:** Enforce full calendar validation including leap years (accept `YYYY-02-29` only on leap years). Reject `0000-00-00` and any month/day out of range.
+- **Account validation:** After trimming, `ACCOUNT` must be exactly 10 ASCII digits. Internal spaces or any non-digit characters are errors.
+- **Description rules:** `DESCRIPTION` may be empty and may contain spaces and other printable characters, but not the field separator `|`. If a line contains literal extra `|` characters that are intended as part of the description, they must be escaped (implementations may treat such lines as invalid unless an escape is provided).
+- **Line endings:** Accept both Unix (`\n`) and Windows (`\r\n`) line endings.
 
-	## Verifier tests (required coverage)
+### Quick checklist for formatting
 
-	The verifier uses `pytest` and executes the program through `/bin/bash /app/run_cobol.sh <input>`.
-
-	### How the verifier runs (step-by-step)
-
-	1) Writes an input file.
-	2) Runs `/bin/bash /app/run_cobol.sh <input_path>`.
-	3) Parses stdout as JSON (exactly one line + trailing newline).
-	4) Validates `records_processed`, `n_errors`, `total_cents`, and `errors`.
-	5) Validates exit code: `0` iff `n_errors == 0`, else `2`.
-
-	### Complete test list (all tests must pass)
-
-	- `test_valid_single_record` — One valid record produces correct totals and exit `0`.
-	- `test_blank_lines_ignored_but_line_numbers_count` — Blank lines don’t increment `records_processed` but still affect `Line N:` numbering.
-	- `test_amount_zero_is_error_and_excludes_from_total` — `0.00` is an error and is excluded from the cents total.
-	- `test_trim_fields_are_allowed` — Leading/trailing whitespace on fields must be trimmed before validation.
-	- `test_unexpected_field_count_is_error` — Lines containing more than three `|` separators must produce `Line N: unexpected field count` and be treated as errors.
+- Output: single JSON object + trailing `\n` only on stdout.
+- Error messages: must be human-readable strings and prefixed with `Line N:` where N is the original 1-based line number in the file (count blank lines).
+- Exit codes: `0` when `n_errors == 0`, `2` otherwise.
 	- `test_amount_rejects_commas_and_symbols` — `AMOUNT` values containing commas, currency symbols, or embedded spaces must be rejected as malformed.
 	- `test_leap_year_date_validation` — Enforce calendar validation including leap years (`2024-02-29` accepted; `2023-02-29` rejected).
 	- `test_empty_fields_are_errors` — Missing required fields (empty after trimming) are validation errors and excluded from totals.
