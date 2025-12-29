@@ -64,6 +64,8 @@ cat > /app/main.cob <<'COBOL'
     01  ws-dot-count         pic 9 value 0.
     01  ws-dec3              pic x(3).
      01  ws-whole-scan        pic x(64).
+    01  ws-pipe-count        pic 9 value 0.
+    01  ws-skip-validate     pic 9 value 0.
 
        01  ws-year-x            pic x(4).
        01  ws-mon-x             pic x(2).
@@ -72,6 +74,7 @@ cat > /app/main.cob <<'COBOL'
        01  ws-mon               pic 9(2) value 0.
        01  ws-day               pic 9(2) value 0.
        01  ws-dim               pic 9(2) value 0.
+    01  ws-is-leap           pic 9 value 0.
 
        01  rem4                pic 9 value 0.
        01  rem100              pic 99 value 0.
@@ -149,26 +152,49 @@ cat > /app/main.cob <<'COBOL'
 
        parse-line.
            move spaces to ws-acc ws-date ws-amt ws-desc
+           move 0 to ws-skip-validate
+
+           *> Count pipe separators to detect unexpected field counts
+           move 0 to ws-pipe-count
+           inspect ws-line-trim tallying ws-pipe-count for all '|'
+           if ws-pipe-count > 3
+               move 'unexpected field count' to ws-err-msg
+               perform add-error
+               move 1 to ws-skip-validate
+               exit paragraph
+           end-if
+
            unstring ws-line-trim delimited by '|'
                into ws-acc ws-date ws-amt ws-desc
            end-unstring
 
-           *> Normalize CRLF inputs: remove any stray carriage returns
+           *> Normalize CRLF inputs and trim each field
            inspect ws-acc replacing all x'0D' by space
            inspect ws-acc replacing all x'0A' by space
            inspect ws-acc replacing all low-values by space
+           move function trim(ws-acc) to ws-acc
+
            inspect ws-date replacing all x'0D' by space
            inspect ws-date replacing all x'0A' by space
            inspect ws-date replacing all low-values by space
+           move function trim(ws-date) to ws-date
+
            inspect ws-amt replacing all x'0D' by space
            inspect ws-amt replacing all x'0A' by space
            inspect ws-amt replacing all low-values by space
+           move function trim(ws-amt) to ws-amt
+
            inspect ws-desc replacing all x'0D' by space
            inspect ws-desc replacing all x'0A' by space
            inspect ws-desc replacing all low-values by space
+           move function trim(ws-desc) to ws-desc
            .
 
        validate-line.
+           if ws-skip-validate = 1
+               move 0 to ws-skip-validate
+               exit paragraph
+           end-if
            perform validate-account
            perform validate-date
            perform validate-amount
@@ -221,6 +247,18 @@ cat > /app/main.cob <<'COBOL'
            end-if
 
            perform compute-leap
+
+           *> Determine leap-year correctly: leap if (divisible by 4 AND (not divisible by 100 OR divisible by 400))
+           move 0 to ws-is-leap
+           if rem4 = 0
+               if rem100 = 0
+                   if rem400 = 0
+                       move 1 to ws-is-leap
+                   end-if
+               else
+                   move 1 to ws-is-leap
+               end-if
+           end-if
 
            evaluate ws-mon
                when 1
@@ -290,7 +328,7 @@ cat > /app/main.cob <<'COBOL'
                        exit paragraph
                    end-if
                when 2
-                   if rem4 = 0
+                   if ws-is-leap = 1
                        if ws-day < 1 or ws-day > 29
                            move 'DATE must be a valid calendar date' to ws-err-msg
                            perform add-error
