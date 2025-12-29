@@ -89,3 +89,16 @@ The verifier uses `pytest` and executes the program through `/bin/bash /app/run_
 - `test_valid_single_record` — One valid record produces correct totals and exit `0`.
 - `test_blank_lines_ignored_but_line_numbers_count` — Blank lines don’t increment `records_processed` but still affect `Line N:` numbering.
 - `test_amount_zero_is_error_and_excludes_from_total` — `0.00` is an error and is excluded from the cents total.
+
+## Test formatting and agent timeout notes (reviewer feedback)
+
+- The verifier expects the program to print exactly one JSON object on stdout followed by a single trailing newline character ("one-line JSON"). Any extra characters, progress text, or multiple lines will cause the verifier to fail parsing. If you must log diagnostics, write them to stderr only.
+- Tests in `tests/test_outputs.py` include docstrings that describe the behavior being validated. Implementations should follow those contracts exactly.
+- Agents have been observed to time out under heavier workloads. The reviewer requested increasing the agent runtime budget; the task metadata sets the agent timeout to `900` seconds. Ensure any long-running operations are necessary and avoid network I/O or sleeps.
+
+### Quick checklist for formatting
+
+- Output: single JSON object + trailing `\n` only on stdout.
+- Error messages: must be human-readable strings and prefixed with `Line N:` where N is the original 1-based line number in the file (count blank lines).
+- Exit codes: `0` when `n_errors == 0`, `2` otherwise.
+

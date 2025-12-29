@@ -11,7 +11,7 @@ tags = ["cobol", "mainframe", "compilers", "deterministic"]
 timeout_sec = 120
 
 [agent]
-timeout_sec = 300
+timeout_sec = 900
 
 [environment]
 build_timeout_sec = 300

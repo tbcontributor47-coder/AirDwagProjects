@@ -23,6 +23,7 @@ def _parse_json_line(stdout: str):
 
 
 def test_valid_single_record():
+    """One valid record: program returns records_processed=1, no errors, and correct cents total."""
     proc = _run_with_input("1234567890|2024-01-31|10.50|Coffee\n")
     assert proc.returncode == 0, f"Expected 0; got {proc.returncode}; stderr: {proc.stderr}"
     out = _parse_json_line(proc.stdout)
@@ -36,6 +37,7 @@ def test_valid_single_record():
 
 
 def test_blank_lines_ignored_but_line_numbers_count():
+    """Blank lines should be ignored for processing count but included in reported line numbers."""
     # Two blank lines (one empty, one spaces) before the invalid record.
     proc = _run_with_input("\n   \n123|2024-00-10|1.0|Bad\n")
     assert proc.returncode == 2, f"Expected 2; got {proc.returncode}; stderr: {proc.stderr}"
@@ -54,6 +56,7 @@ def test_blank_lines_ignored_but_line_numbers_count():
 
 
 def test_amount_zero_is_error_and_excludes_from_total():
+    """Zero amounts are validation errors and are not included in the monetary total."""
     proc = _run_with_input(
         "1234567890|2024-01-01|0.00|Zero\n"
         "1234567890|2024-01-02|1.00|Ok\n"
