@@ -669,6 +669,57 @@ dump_harbor_run_from_log logs/agent-claude.log "Agent Run: Claude Sonnet 4.5"
 echo "" | tee -a logs/consolidate.log
 echo "Expected: Baseline should have test failures, Oracle should have 0 failures" | tee -a logs/consolidate.log
 
+# Analyze agent verifier outputs and surface failing-test excerpts and submitted artifacts
+analyze_agent_failures() {
+    echo "" | tee -a logs/consolidate.log
+    echo "--- Agent Failure Analysis ---" | tee -a logs/consolidate.log
+    found=0
+    while IFS= read -r f; do
+        found=1
+        echo "\nFound verifier output: $f" | tee -a logs/consolidate.log
+        job_dir="$(dirname "$(dirname "$f")")" # go up from verifier/ to trial/
+        trial_dir="$(dirname "$f")/.."
+        trial_dir="$(cd "$job_dir" && pwd -P)" || trial_dir="$job_dir"
+        echo "Job dir: $job_dir" | tee -a logs/consolidate.log
+        echo "--- Failing tests (grep FAILED) ---" | tee -a logs/consolidate.log
+        grep -E "FAILED|ERROR" "$f" -n -A5 -B2 2>/dev/null | sed -n '1,200p' | tee -a logs/consolidate.log || echo "(no FAILED lines found)" | tee -a logs/consolidate.log
+
+        echo "--- First failure excerpts (context) ---" | tee -a logs/consolidate.log
+        # Print first block that contains FAILED and following error lines
+        awk '/FAILED/{p=1} p{print; if(/FAILED/){c=50} if(c-->0 && p){next}}' "$f" 2>/dev/null | sed -n '1,200p' | tee -a logs/consolidate.log || true
+
+        echo "--- Agent submission directory listing (if present) ---" | tee -a logs/consolidate.log
+        agent_dir="$(dirname "$f")/../agent"
+        if [ -d "$agent_dir" ]; then
+            ls -la "$agent_dir" | tee -a logs/consolidate.log || true
+            # Print candidate solution files if present
+            for candidate in "$agent_dir"/solution* "$agent_dir"/submission* "$agent_dir"/*.py "$agent_dir"/*.sh "$agent_dir"/*.patch; do
+                if [ -f "$candidate" ]; then
+                    echo "--- $candidate (first 500 lines) ---" | tee -a logs/consolidate.log
+                    sed -n '1,500p' "$candidate" | sed -n '1,500p' | tee -a logs/consolidate.log || true
+                fi
+            done
+        else
+            echo "(no agent dir found: $agent_dir)" | tee -a logs/consolidate.log
+        fi
+
+        echo "--- Verifier stderr/test-stderr.txt (if present) ---" | tee -a logs/consolidate.log
+        if [ -f "$(dirname "$f")/test-stderr.txt" ]; then
+            sed -n '1,200p' "$(dirname "$f")/test-stderr.txt" | tee -a logs/consolidate.log || true
+        else
+            echo "(no verifier test-stderr.txt)" | tee -a logs/consolidate.log
+        fi
+
+        echo "" | tee -a logs/consolidate.log
+    done < <(find jobs -name test-stdout.txt -type f 2>/dev/null || true)
+
+    if [ "$found" -eq 0 ]; then
+        echo "No verifier outputs (test-stdout.txt) found under jobs/" | tee -a logs/consolidate.log
+    fi
+}
+
+analyze_agent_failures
+
 if [ -d jobs ]; then
     echo "" | tee -a logs/consolidate.log
     echo "--- jobs/ tree ---" | tee -a logs/consolidate.log
