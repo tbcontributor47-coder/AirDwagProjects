@@ -1,5 +1,138 @@
 # EFT File Validation (Fixed-Width Payments)
 
+You are given a CLI program inside the container at:
+
+- `/app/validate_eft.py`
+
+The program is **buggy**. Fix it.
+
+This document is the contract expected by the verifier.
+
+## CLI
+
+The verifier invokes:
+
+```
+python /app/validate_eft.py \
+  --file <payment_file.txt> \
+  --schema <schema.json> \
+  --clearing-accounts <clearing_accounts.txt> \
+  --index <index.db> \
+  [--retention-days N] \
+  [--payees-db payees.db]
+```
+
+Requirements:
+
+- Do not print a Python traceback.
+- Stdout must contain **only** one JSON object (no extra text). Diagnostics may go to stderr.
+
+## Output
+
+Always print exactly one JSON object to stdout with at least:
+
+- `duplicate`: boolean
+- `n_errors`: int
+- `n_warnings`: int (use `0`)
+- `errors`: list[str]
+- `warnings`: list[str] (use `[]`)
+- `file_hash`: 64 lowercase hex chars
+- `records_processed`: int
+
+Exit code:
+
+- Exit `0` only if `duplicate == false` AND `n_errors == 0`.
+- Otherwise exit non-zero.
+
+## Schema
+
+The schema JSON contains:
+
+- `record_length`: integer `L`
+- `fields`: list of field descriptors with:
+  - `name`, `start` (0-based), `length`, `type` (`string|decimal|date`), `required`
+  - optional `format` for dates (verifier schema uses `%Y-%m-%d`)
+
+Field parsing:
+
+- `raw = line[start : start + length]`
+- `value = raw.strip()`
+
+## Records and `records_processed`
+
+Read the payment file as UTF-8 text.
+
+- Normalize line endings: treat `\r\n` and bare `\r` as `\n`.
+- Split on `\n`.
+- Drop only empty trailing lines at the end of the file.
+
+`records_processed = number of remaining lines`.
+
+## Record length handling
+
+Let `L = record_length`.
+
+For each record line:
+
+- If `len(line) < L`: add an error.
+- If `len(line) == L`: OK.
+- If `len(line) > L`: error.
+
+## Hashing and duplicate detection
+
+### `file_hash`
+
+Compute `file_hash` as SHA-256 of canonicalized content:
+
+1) Normalize line endings (`\r\n`→`\n`, then `\r`→`\n`).
+2) Split into lines on `\n`.
+3) For each line, `rstrip(" \t")`.
+4) Remove empty trailing lines.
+5) Hash the resulting UTF-8 bytes with SHA-256 (lowercase hex).
+
+### Duplicate detection
+
+- Duplicate detection is based on `file_hash` only.
+- Retention window is `--retention-days` (default 5).
+- If `retention_days <= 0`, duplicate detection is disabled and you must report `duplicate: false`.
+- Otherwise, use the SQLite index DB at `--index` to detect duplicates within the retention window.
+
+## Validation rules
+
+Validate every record and collect all errors.
+
+Error formatting:
+
+- Every error string must include `Line N` (1-based).
+
+### Required fields
+
+If a schema field is `required: true` and its trimmed value is empty, add an error.
+
+### Field checks (verifier expects these)
+
+- `eftno`: non-empty and alphanumeric.
+- `bank_code`:
+  - must start with a digit (`0`-`9`) and the error must include `must start with a digit` when violated
+  - must contain only uppercase letters and digits (no lowercase, no punctuation)
+- `account_no`:
+  - must be digits only, length 8..20
+  - forbidden prefixes (error): starts with one of `0000`, `0001`, `0010`, `0100`
+  - first-4 rule (error): first 4 digits must not consist solely of `0` and `1` (error should include `First 4 digits` or `0 and 1`)
+  - trailing-zero rule (error): the last 2 digits must not contain `0` (error should include `cannot contain 0`)
+- `amount`: decimal, strictly > 0, and at most 2 decimal places (error should include `must be > 0` or `greater than 0`).
+- `clearance_date`: parse using schema `format` (verifier uses `%Y-%m-%d`).
+- `clearing_account`: must match one allowed clearing account exactly after trimming (no substring match).
+
+## Payees DB (`--payees-db`)
+
+Only when `--payees-db` is provided:
+
+- If `account_no` is not found in the `payees` table, add an error containing `not found in payee database` or `Account`.
+- If `fraud_flag == 1`, add an error mentioning `fraud` or `risk`.
+- Compare payee names case-insensitively after trimming and collapsing internal whitespace; mismatches must include `name mismatch` or `payee name`.
+# EFT File Validation (Fixed-Width Payments)
+
 You are given a small CLI program inside the container at:
 
 - `/app/validate_eft.py`
