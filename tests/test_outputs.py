@@ -11,6 +11,7 @@ These tests cover the essential behaviors the concise instruction requires:
 import json
 import subprocess
 import tempfile
+import copy
 from pathlib import Path
 
 
@@ -26,6 +27,11 @@ def write_json(tmpdir: Path, name: str, obj) -> Path:
     p = tmpdir / name
     p.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
     return p
+
+
+def parse_report(out: str):
+    """Helper used by tests to parse stdout JSON reports."""
+    return json.loads(out)
 
 
 def test_usage_message_exact():

@@ -81,6 +81,8 @@ def main(argv: list[str]) -> int:
                     continue
                 diffs.append({"attribute": k.replace('.', '_'), "expected": None, "actual": actual})
         if diffs:
+            # Deterministic ordering: treat space as sorting after other characters.
+            diffs.sort(key=lambda d: d["attribute"].replace(" ", "\uffff"))
             attribute_drift[rid] = diffs
 
     drift_detected = bool(missing or extra or attribute_drift)
