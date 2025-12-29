@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
+set -eu
+if [ -n "${BASH_VERSION-}" ]; then
+  set -o pipefail
+fi
 cat > /app/compare_json.py <<'PY'
 #!/usr/bin/env python3
 
