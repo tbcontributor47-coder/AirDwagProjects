@@ -183,3 +183,32 @@ bash /tests/test.sh
 If all tests pass, your implementation matches the required contract.
 
 Good luck — implement the comparator exactly as specified and avoid guessing behavior not covered above.
+
+## Verifier tests (required coverage)
+
+The verifier uses `pytest` and executes `/app/compare_json.py` as a subprocess. It asserts exact stdout lines and specific exit codes for equal vs not-equal.
+
+### Complete test list (all tests must pass)
+
+- `test_equal_simple` — Equal objects print `EQUAL` and exit `0`.
+- `test_extra_key_fails` — Extra keys in actual are reported as the first diff.
+- `test_missing_key_fails` — Missing keys in actual are reported as the first diff.
+- `test_null_not_missing` — Missing and `null` are different.
+
+- `test_trailing_whitespace_ignored` — Trailing whitespace in strings is ignored.
+- `test_internal_whitespace_not_ignored` — Internal whitespace differences are not ignored.
+- `test_unicode_and_whitespace_handling` — Unicode is preserved; trailing whitespace still ignored.
+
+- `test_number_tolerance_equal` — Numeric values can be equal within `--tolerance`.
+- `test_number_tolerance_not_equal` — Numeric values differ when outside tolerance.
+
+- `test_array_order_sensitive_by_default` — Arrays are order-sensitive unless the special case applies.
+- `test_items_array_order_insensitive` — Arrays under key `items` are order-insensitive.
+- `test_items_multiset_duplicates` — `items` arrays compare as multisets (multiplicity matters).
+
+- `test_ignore_pointer_nested_subtree` — `--ignore` skips differences at/under a JSON Pointer but does not mask other mismatches.
+- `test_ignore_pointer_in_array` — Array-element pointer ignores work when specified explicitly.
+
+- `test_type_mismatch_fails` — Type mismatches report the correct pointer.
+- `test_boolean_vs_string_fails` — Boolean vs string mismatch reports the correct pointer.
+- `test_large_integer_equality` — Large integers compare exactly.
