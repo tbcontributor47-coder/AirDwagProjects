@@ -619,51 +619,47 @@ python /app/validate_eft.py --file <payment_file.txt> --schema <schema.json> --c
   - Non-zero otherwise.
 7) Checks key edge cases: record length handling, hashing canonicalization, duplicate retention window logic, strict field validations, and optional payees DB behavior.
 
-### Complete test list (all tests must pass)
+## Tests To Pass (explicit expectations)
 
-- `test_env` — Pytest fixture that sets up a temp schema file, clearing-accounts file, and SQLite index DB path used by all tests.
-- `test_valid_file_validation` — Valid input returns `rc=0`, emits a JSON report with required keys, `records_processed==3`, and a 64-hex `file_hash`.
-- `test_duplicate_detection` — Submitting identical content twice triggers `duplicate: true` and a non-zero exit on the second run.
-- `test_duplicate_detection_across_filenames` — Same content under different filenames must still be detected as duplicate.
-- `test_invalid_file_validation` — Invalid input produces non-zero exit and `n_errors > 0`.
-- `test_errors_include_line_numbers_and_multiple_issues` — Errors include a `Line N` prefix and can include multiple issues per record.
-- `test_retention_window` — Duplicate checks only consider rows inside the retention window.
-- `test_retention_days_flag_affects_duplicate_detection` — `--retention-days` changes the duplicate decision as specified.
-- `test_retention_window` / `test_retention_days_flag_affects_duplicate_detection` — Duplicate window comparison is inclusive: prior timestamp is considered in-window if `timestamp >= (now - retention_days)`.
-- `test_hash_normalization_crlf_and_trailing_spaces` — `file_hash` must canonicalize CRLF/bare-CR and trailing spaces/tabs per spec.
-- `test_clearing_account_requires_exact_match_not_substring` — Clearing account must match allowed accounts exactly after trimming (no substring acceptance).
-- `test_randomized_record_not_hardcoded` — Validator must not be hardcoded to specific sample values.
-- `test_randomized_record_not_hardcoded` — The verifier generates randomized-but-valid records; validation must be schema-driven and data-driven (no assumptions about fixed account numbers, names, file names, or record contents).
-- `test_exact_record_length_enforced` — Enforces `record_length` rules including allowed padding-only suffix and rejection of non-whitespace suffix.
-- `test_required_fields_empty_are_reported` — Required fields missing/empty are reported as errors.
-- `test_eftno_and_bank_code_alphanumeric_constraints` — `eftno`/`bank_code` enforce the specified character constraints.
-- `test_account_forbidden_prefixes` — Rejects forbidden `account_no` prefixes (`0000`, `0001`, `0010`, `0100`).
-- `test_account_first_four_only_zeros_and_ones` — Rejects first 4 digits consisting only of `0` and `1`.
-- `test_account_last_four_cannot_have_zeros` — Rejects `account_no` where last 4 digits contain `0`.
-- `test_bank_code_must_start_with_digit` — `bank_code` must start with a digit (error must include `must start with a digit`).
-- `test_bank_code_no_lowercase_or_special_chars` — Rejects lowercase and special characters in `bank_code`.
-- `test_payee_database_unknown_account` — With `--payees-db`, unknown `account_no` triggers an error.
-- `test_payee_fraud_flag_rejection` — With `--payees-db`, `fraud_flag==1` triggers an error mentioning `fraud`/`risk`.
-- `test_payee_name_mismatch` — With `--payees-db`, payee name mismatches are errors (case-insensitive comparison required).
-- `test_valid_active_customer_account` — With `--payees-db`, known good account + matching payee name passes.
-- `test_account_no_length_validation` — Enforces `account_no` length 8..20 and digits-only.
-- `test_amount_must_be_positive` — Enforces `amount > 0`.
-- `test_unicode_in_payee_name` — Handles Unicode in names correctly (including in report JSON).
-- `test_crlf_line_endings_with_trailing_spaces` — Robustness for CRLF and trailing spaces in the payment file.
-- `test_empty_lines_at_end` — Trailing empty lines are ignored for both hashing and `records_processed`.
-- `test_record_too_short` — Record shorter than `record_length` is an error.
-- `test_record_too_long` — Record longer than `record_length` is an error unless suffix is padding-only.
-- `test_invalid_date_format` — Invalid date (per schema `format`) is an error.
+The verifier runs a suite of `pytest` tests that invoke the CLI as an external process. Implement the behaviors below exactly; each named test is machine-checked and must pass.
+
+- `test_env` — Test harness fixture: your code must accept the standard CLI arguments and work with temp files and an index DB path supplied by the verifier.
+- `test_valid_file_validation` — Valid input must print exactly one JSON object to stdout with keys: `duplicate` (bool), `n_errors` (int), `n_warnings` (int), `errors` (list), `warnings` (list), `file_hash` (64 lowercase hex string), and `records_processed` (int). Process must exit `0`.
+- `test_duplicate_detection` / `test_duplicate_detection_across_filenames` — Duplicate detection is based solely on the canonical `file_hash`. Submitting identical canonical content twice within the retention window must set `"duplicate": true` on the second run and exit non-zero. When `--retention-days <= 0`, duplicate detection is disabled: always report `"duplicate": false` and do not insert index rows.
+- `test_retention_window` / `test_retention_days_flag_affects_duplicate_detection` — Use `datetime.now().isoformat()` for inserted timestamps. A stored row is considered in-window when its ISO timestamp is **>=** (`now - retention_days`). Ignore rows with unparseable timestamps.
+- `test_invalid_file_validation` — Invalid input must exit non-zero and `n_errors > 0` in the reported JSON.
+- `test_errors_include_line_numbers_and_multiple_issues` — Every reported error string must include the `Line N` prefix and multiple independent issues for the same record must all appear as separate error entries.
+- `test_hash_normalization_crlf_and_trailing_spaces` — `file_hash` must follow the canonicalization rules: normalize CRLF/bare-CR to `\n`, `rstrip(" \t")` per line, drop trailing empty lines, then join with `\n` and append a single final `\n` before SHA-256.
+- `test_crlf_line_endings_with_trailing_spaces` — Robustness for mixtures of CRLF, bare CR, trailing spaces/tabs; canonical hash must be identical as specified.
+- `test_empty_lines_at_end` — Trailing empty lines are ignored for hashing and for `records_processed`.
+- `test_randomized_record_not_hardcoded` — Implementation must be schema-driven and data-driven; do not hardcode sample values.
+- `test_exact_record_length_enforced` / `test_exact_length_with_padding` — Enforce `record_length` rules: `len(line) < L` → error; `len(line) == L` → OK; `len(line) > L` → accept only if suffix `line[L:].strip() == ""` (then parse `line[:L]`), else error.
+- `test_record_too_short` — Short records are errors.
+- `test_record_too_long` — Long records with non-whitespace suffix are errors.
+- `test_required_fields_empty_are_reported` — Fields with `required: true` that are empty after trimming must be reported as errors.
+- `test_eftno_and_bank_code_alphanumeric_constraints` / `test_eftno_with_special_chars` — `eftno` must be non-empty and alphanumeric; special characters cause errors.
+- `test_bank_code_must_start_with_digit` / `test_bank_code_starting_with_letter` — `bank_code` must start with a digit; error text must include `must start with a digit` when violated.
+- `test_bank_code_no_lowercase_or_special_chars` / `test_bank_code_with_lowercase` — `bank_code` must contain only uppercase letters and digits; lowercase or special characters are rejected.
+- `test_account_no_length_validation` / `test_amount_must_be_positive` — `account_no` must be 8..20 digits only; `amount` must parse as decimal, be > 0, and have at most 2 decimals (errors must reference `must be > 0` or `greater than 0`).
+- `test_account_forbidden_prefixes` / `test_account_forbidden_first_four_zeros_ones` — Reject `account_no` prefixes `0000`, `0001`, `0010`, `0100`. First 4 digits must not be only `0` and `1` (error should include `First 4 digits` or `0 and 1`).
+- `test_account_last_four_cannot_have_zeros` — Last 4 digits must not contain `0` (error should include `Last 4 digits` or `cannot contain 0`).
+- `test_invalid_date_format` — `clearance_date` parsed by schema `format` (verifier uses `%Y-%m-%d`) and invalid dates are errors.
 - `test_amount_with_more_than_two_decimals` — Amounts with >2 decimal places are rejected.
-- `test_account_forbidden_first_four_zeros_ones` — Additional coverage for the “first 4 digits not only 0/1” rule.
-- `test_clearing_account_substring_match_bug` — Regression test ensuring substring matching is not accepted.
-- `test_duplicate_different_filename_bug` — Regression test ensuring filename does not affect duplicate detection.
-- `test_retention_days_ignored_bug` — Regression test ensuring `--retention-days` is actually honored.
-- `test_payee_name_case_insensitive_match` — Payee name must match case-insensitively after normalization.
-- `test_multiple_errors_in_one_record` — Multiple independent validation errors are all reported.
-- `test_very_large_file` — Performance/robustness on large inputs.
-- `test_special_characters_in_address` — Address field may contain special characters and should not crash the validator.
-- `test_bank_code_starting_with_letter` — Bank code starting with a letter is rejected.
-- `test_bank_code_with_lowercase` — Bank code with lowercase is rejected.
-- `test_exact_length_with_padding` — Exactly `record_length` (or padding-only suffix) is accepted.
-- `test_eftno_with_special_chars` — `eftno` containing special characters is rejected.
+- `test_clearing_account_requires_exact_match_not_substring` / `test_clearing_account_substring_match_bug` — `clearing_account` must match one of the allowed clearing accounts exactly after trimming; substring matches are not accepted.
+- `test_payee_database_unknown_account` — With `--payees-db`, unknown `account_no` must report an error (message containing `not found in payee database` or `Account`).
+- `test_payee_fraud_flag_rejection` — With `--payees-db`, `fraud_flag == 1` must trigger an error mentioning `fraud` or `risk`.
+- `test_payee_name_mismatch` / `test_payee_name_case_insensitive_match` — With `--payees-db`, payee name comparison must be case-insensitive after trimming and collapsing whitespace (use Unicode `casefold()`); mismatches must report `name mismatch` or `payee name`.
+- `test_valid_active_customer_account` — With `--payees-db`, a known good account and matching payee name must pass.
+- `test_unicode_in_payee_name` — Unicode in payee names must be handled correctly in parsing and in the JSON report.
+- `test_multiple_errors_in_one_record` — Multiple independent errors for the same record must all be present in `errors`, each prefixed `Line N`.
+- `test_special_characters_in_address` — Address fields may contain special characters; they must not crash the validator.
+- `test_duplicate_different_filename_bug` — Duplicate detection must be filename-independent (same canonical content under any filename is detected).
+- `test_retention_days_ignored_bug` — Regression: `--retention-days <= 0` disables duplicate detection: report `duplicate: false` and do not insert DB rows.
+- `test_very_large_file` — Performance: handle >=1000 records efficiently (no quadratic behavior).
+
+Implementation reminders (verifier-aligned):
+
+- Always compute `file_hash` using the canonicalization rules in this document and include it in the reported JSON even on failures.
+- Stdout must contain exactly one JSON object (no extra logs). Send diagnostics to stderr only.
+- Exit-code rules (authoritative): if `duplicate == true` → non-zero; else if `n_errors > 0` → non-zero; else `0`.
+
