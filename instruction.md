@@ -141,7 +141,7 @@ If a schema field is `required: true` and its trimmed value is empty, add an err
   - must be digits only, length 8..20
   - forbidden prefixes: starts with one of `0000`, `0001`, `0010`, `0100`
   - first-4 rule: first 4 digits must not consist solely of `0` and `1` (error should include `First 4 digits` or `0 and 1`)
-  - last-2 rule: the last 2 digits must not contain `0` (error should include `cannot contain 0`)
+  - last-4 rule: the last 4 digits must not contain `0` (error should include `cannot contain 0`)
 - `amount`: 
   - decimal, strictly > 0
   - at most 2 decimal places
