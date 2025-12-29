@@ -672,7 +672,7 @@ dump_harbor_run_from_log() {
             [ -f "$vf" ] || continue
             echo "--- $vf (first 400 lines) ---" | tee -a logs/consolidate.log
             (sed -n '1,400p' "$vf" 2>/dev/null | tee -a logs/consolidate.log) || true
-        done < <(find "$trial_dir/verifier" -maxdepth 3 -type f \( -iname '*stdout*' -o -iname '*stderr*' -o -iname '*.json' -o -iname '*report*' \) 2>/dev/null || true)
+        done < <(find "$trial_dir/verifier" -maxdepth 3 -type f \\( -iname '*stdout*' -o -iname '*stderr*' -o -iname '*.json' -o -iname '*report*' \\) 2>/dev/null || true)
     fi
 }
 
