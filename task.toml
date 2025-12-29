@@ -2,8 +2,8 @@ version = "1.0.0"
 
 [metadata]
 difficulty = "hard"
-author_name = "Manoj Kumar Selvaraj"
-author_email = "manoj@example.com"
+author_name = "tbcontributor"
+author_email = "tb.contributor47@gmail.com"
 category = "system-administration"
 tags = ["validation", "banking", "eft", "file-processing", "data-integrity"]
 

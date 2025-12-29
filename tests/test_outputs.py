@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+import time
 
 
 CLI_DEFAULT = "/app/validate_eft.py"
@@ -924,4 +925,23 @@ def test_eftno_with_special_chars(test_env):
     assert rc != 0
     rep = json.loads(out)
     assert rep['n_errors'] > 0
+
+
+def test_solution_runtime_within_limit(test_env):
+    """Fail if the canonical validator run exceeds `EFT_RUNTIME_LIMIT` seconds.
+
+    Default limit is 10 seconds. Override by setting the environment variable
+    `EFT_RUNTIME_LIMIT` (seconds) when running the tests or CI.
+    """
+    limit = float(os.environ.get("EFT_RUNTIME_LIMIT", "10"))
+    test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
+
+    start = time.perf_counter()
+    rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
+    elapsed = time.perf_counter() - start
+
+    assert elapsed <= limit, (
+        f"Solution too slow: {elapsed:.2f}s (limit {limit}s)\n"
+        f"rc={rc}\nstdout:\n{out}\nstderr:\n{err}"
+    )
 

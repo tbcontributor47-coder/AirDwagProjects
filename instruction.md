@@ -679,6 +679,9 @@ Rules:
 - Must handle at least 1,000 records per file.
 - Must not be quadratic in number of records.
 
+- Advisory: aim for solutions that process typical test files quickly (preferably under 10s).
+- The verifier may include a runtime assertion controlled by the environment variable `EFT_RUNTIME_LIMIT` (seconds); slow implementations may fail that test.
+
 ## Verifier-aligned sanity examples
 
 These are examples of situations the verifier tests.
