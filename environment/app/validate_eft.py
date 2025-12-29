@@ -100,9 +100,17 @@ class EFTValidator:
         errors: List[str] = []
         record: Dict[str, Any] = {}
 
-        # Intentional bug: allows short records to pass this check.
-        if len(line) <= self.schema["record_length"]:
-            pass
+        record_len = int(self.schema["record_length"])
+        # Enforce exact record length semantics (allow right-padding with spaces)
+        if len(line) < record_len:
+            errors.append(f"Line {line_num}: Record length expected {record_len} got {len(line)}")
+            return {}, errors
+        if len(line) > record_len:
+            extra = line[record_len:]
+            if extra.strip():
+                errors.append(f"Line {line_num}: Record length expected {record_len} got {len(line)}")
+                return {}, errors
+            line = line[:record_len]
 
         for field in self.schema["fields"]:
             name = field["name"]
@@ -116,8 +124,7 @@ class EFTValidator:
             record[name] = value
 
             if required and not value:
-                # Intentional bug: missing line number prefix.
-                errors.append(f"Field '{name}' is required but empty")
+                errors.append(f"Line {line_num}: Field '{name}' is required but empty")
                 continue
 
             if not value:
@@ -133,7 +140,9 @@ class EFTValidator:
                     amt = Decimal(value)
                     if amt <= 0:
                         errors.append(f"Field '{name}' must be > 0")
-                    # Intentional bug: no check for at most 2 decimal places
+                    # Enforce at most 2 decimal places
+                    if abs(amt.as_tuple().exponent) > 2:
+                        errors.append(f"Field '{name}' has more than 2 decimal places")
                 except (InvalidOperation, ValueError):
                     errors.append(f"Field '{name}' is not a valid decimal")
 
@@ -155,8 +164,8 @@ class EFTValidator:
 
         clearing = (record.get("clearing_account") or "").strip()
         if clearing and self.clearing_accounts:
-            # Flexible substring matching allows for partial account references in EFT files
-            if not any(clearing in allowed for allowed in self.clearing_accounts):
+            # Require exact match for clearing accounts
+            if clearing not in self.clearing_accounts:
                 errors.append(f"Line {line_num}: Invalid clearing account")
 
         # Payee database validation
@@ -197,18 +206,18 @@ class EFTValidator:
         filename = Path(file_path).name
         is_dup = self.check_duplicate(file_hash, filename)
 
-        # Normalize line endings and split into lines. Remove only trailing empty lines.
-        lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-        # Remove only trailing empty lines (do not drop empty/short lines in the middle)
-        while lines and lines[-1] == "":
-            lines.pop()
+        # Normalize line endings and split into lines.
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+        lines = normalized.split("\n")
+        # For parsing/validation we ignore empty lines anywhere in the file
+        data_lines = [ln for ln in lines if ln != ""]
 
         errors: List[str] = []
         warnings: List[str] = []
-        # records_processed must equal the number of remaining lines after trimming only trailing empties
-        processed = len(lines)
+        # records_processed is number of non-empty data lines
+        processed = len(data_lines)
 
-        for i, line in enumerate(lines, start=1):
+        for i, line in enumerate(data_lines, start=1):
             rec, rec_errors = self.parse_record(line, i)
             if rec_errors:
                 errors.extend(rec_errors)
@@ -224,8 +233,6 @@ class EFTValidator:
                 if payee_errors:
                     errors.extend(payee_errors)
                     continue
-
-            processed += 1
 
         if not is_dup:
             self.record_file(file_hash, filename, processed)
