@@ -347,6 +347,10 @@ You must compare all attributes present in either snapshot (union).
 - Lists are **atomic** values (no per-index flattening). If two lists differ, drift is reported at the list key path.
 - Do not coerce types. For example, `123` and `"123"` are different.
 
+Note about empty objects:
+
+- An empty JSON object `{}` produces no leaf paths when flattened. In other words, an attribute whose value is an empty object is equivalent (for the purposes of attribute-path comparison) to the attribute being absent, unless the other side contains nested leaf keys under that attribute. This avoids reporting spurious drift for structural container-only keys.
+
 ### Rendered attribute paths
 
 Flatten nested objects into dot-delimited paths.
@@ -395,9 +399,12 @@ If an already-rendered top-level key maps to a nested object, flatten that neste
 
 Each provided `--ignore PREFIX` removes any attribute drift entry whose rendered `attribute` path matches `PREFIX`.
 
-**Important (verifier-aligned):** The `PREFIX` values are written in the same *rendered attribute path* syntax that appears in the output (i.e., the dotted/escaped form produced by your flattening rules). Do not treat `PREFIX` as a raw JSON key.
+Matching semantics (clarified):
 
-Ignore matching is **segment-aware** (component-aware), not an arbitrary substring match.
+- `PREFIX` is written in the rendered attribute-path syntax (escaped dots and backslashes) and is matched against the start of the rendered attribute path.
+- Matching is component-aware: a `PREFIX` like `tags.Env` will match `tags.EnvName` only when the `PREFIX` components align with the rendered path components in a sensible way. Implementations should treat the rendered path as a dot-delimited sequence of components (respecting escapes) and perform a prefix match on those components. This prevents arbitrary substring matches that could accidentally ignore unrelated keys.
+
+**Important (verifier-aligned):** The `PREFIX` values are written in the same *rendered attribute path* syntax that appears in the output (i.e., the dotted/escaped form produced by your flattening rules). Do not treat `PREFIX` as a raw JSON key.
 
 #### Component splitting for matching
 

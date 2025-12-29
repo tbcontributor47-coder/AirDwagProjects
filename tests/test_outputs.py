@@ -1636,3 +1636,86 @@ def test_seeded_generated_nested_drift_and_ignore_is_not_trivially_hardcoded() -
         # All drift entries whose rendered path starts with obj.café... should be removed.
         for d in diffs2:
             assert not d["attribute"].startswith("obj.café")
+
+
+def test_space_character_sorting() -> None:
+    """Attributes containing a space sort after other attributes."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "spaces", "attributes": {"a": "1", "b": "2", "a ": "3"}}
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "spaces", "attributes": {"a": "X", "b": "Y", "a ": "Z"}}
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        diffs = report["attribute_drift"]["aws_instance.spaces"]
+        attrs = [d["attribute"] for d in diffs]
+        # Expect 'a' < 'b' < 'a ' because space sorts after other chars
+        assert attrs == ["a", "b", "a "]
+
+
+def test_ignore_with_escaped_backslash_prefix() -> None:
+    """--ignore with escaped backslash sequences matches rendered paths."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        key = "path\\to"
+        ideal_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "bs", "attributes": {"meta": {key: "A"}}}
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "bs", "attributes": {"meta": {key: "B"}}}
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        # The rendered path will escape backslashes as \\\\ in JSON string, so the prefix
+        # the user supplies should be the rendered form 'meta.path\\to'
+        code, out, err = run_audit(["--ignore", "meta.path\\\\to", str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        # Entire attribute should be ignored
+        assert report["attribute_drift"] == {}
+
+
+def test_empty_object_is_equivalent_to_absent_attribute() -> None:
+    """An empty object `{}` should not produce leaf attribute paths and is equivalent to absent."""
+    with tempfile.TemporaryDirectory() as td:
+        tmpdir = Path(td)
+        ideal_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "emptyobj", "attributes": {"meta": {}}}
+            ]
+        }
+        current_obj = {
+            "resources": [
+                {"type": "aws_instance", "name": "emptyobj", "attributes": {}}
+            ]
+        }
+
+        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
+        current = write_json(tmpdir, "current.json", current_obj)
+
+        code, out, err = run_audit([str(ideal), str(current)])
+        assert code == 0, err
+        report = parse_report(out)
+
+        # No attribute drift should be reported for the empty object
+        assert report["attribute_drift"] == {}
