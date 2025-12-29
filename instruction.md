@@ -62,6 +62,24 @@ Goal: convert both snapshots into a dict:
 
 Where:
 
+## Efficiency Hints (important for AI solvers)
+
+The verifier runs large and complex inputs; implementors should follow these performance-minded guidelines so AI agents and CI do not time out.
+
+- Work in streaming/one-pass stages: read, normalize, and flatten each snapshot into a resource->attributes map without holding multiple large intermediate copies.
+- Flatten attributes with an explicit stack (iterative DFS) rather than recursive calls to avoid recursion limits and excessive call overhead.
+- Treat lists as atomic values (no deep flattening) to reduce work.
+- Normalize and cache expensive operations per attribute component:
+  - Unicode normalization + removing combining marks should be computed once per component and memoized in a small LRU or dict.
+  - Unescape and split components once when rendering attribute paths; reuse the result for matching and sorting.
+- Apply `--ignore` filtering as early as possible: after rendering attribute paths for a resource, drop ignored attributes before adding them to the global comparison set.
+- Use set and dict operations to compute missing/extra resources and union of attribute paths; avoid nested O(N*M) loops where N and M are large.
+- When comparing attribute values, use short-circuits: first compare `is`/`==` cheaply, then fall back to deeper structural comparisons only when necessary.
+- Implement deterministic sorting with a single custom key function (avoid repeated comparisons); treat space `' '` specially by mapping it to a high codepoint in the key.
+- Bound work for pathological inputs: enforce a sensible recursion/flattening depth (for example 1000) and fail with parse error if exceeded.
+
+These hints are advisory but strongly recommended — they keep runtime small and predictable for the verifier and AI-based solvers.
+
 # Terraform Drift Audit — Concise Runtime Contract
 
 Implement the CLI `/app/drift_audit.py` to compare an **ideal** and **current** Terraform state snapshot and print a deterministic JSON drift report.

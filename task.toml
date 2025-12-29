@@ -8,13 +8,13 @@ category = "system-administration"
 tags = ["terraform", "infrastructure", "diff", "comparison", "json"]
 
 [verifier]
-timeout_sec = 60
+timeout_sec = 120
 
 [agent]
-timeout_sec = 300
+timeout_sec = 900
 
 [environment]
-build_timeout_sec = 300
-cpus = 1
-memory_mb = 1024
+build_timeout_sec = 600
+cpus = 2
+memory_mb = 2048
 storage_mb = 5120
