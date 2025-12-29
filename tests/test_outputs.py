@@ -173,7 +173,7 @@ def test_valid_file_validation(test_env):
     test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
 
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc == 0
+    assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
     report = json.loads(out)
     assert set(report.keys()) >= {
         "duplicate",
@@ -193,8 +193,8 @@ def test_valid_file_validation(test_env):
 def test_duplicate_detection(test_env):
     test_file = Path(__file__).parent / 'data' / 'duplicate_payment.txt'
 
-    rc1, out1, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc1 == 0
+    rc1, out1, err1 = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc1 == 0, f"expected first run rc=0 but got rc={rc1}\nstdout=\n{out1}\n\nstderr=\n{err1}\n"
     rep1 = json.loads(out1)
     assert rep1['duplicate'] is False
 
@@ -279,8 +279,8 @@ def test_retention_window(test_env):
 
     # call CLI check_duplicate via running validator on a different file; the old hash should not trigger duplicate
     test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
-    rc, out, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], db)
-    assert rc == 0
+    rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], db)
+    assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
     rep = json.loads(out)
     assert rep['duplicate'] is False
 
@@ -289,8 +289,8 @@ def test_retention_days_flag_affects_duplicate_detection(test_env):
     """--retention-days must be honored by the CLI."""
     test_file = Path(__file__).parent / 'data' / 'duplicate_payment.txt'
 
-    rc1, out1, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '5'])
-    assert rc1 == 0
+    rc1, out1, err1 = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '5'])
+    assert rc1 == 0, f"expected first run rc=0 but got rc={rc1}\nstdout=\n{out1}\n\nstderr=\n{err1}\n"
     assert json.loads(out1)["duplicate"] is False
 
     # With a 0-day window, a prior run moments ago should not count.
@@ -349,8 +349,8 @@ def test_randomized_record_not_hardcoded(test_env):
     f = Path(test_env["tmp_path"]) / "rand.txt"
     _write_text(f, line + "\n")
 
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc == 0
+    rc, out, err = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
+    assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
     rep = json.loads(out)
     assert rep["n_errors"] == 0
 
