@@ -395,6 +395,8 @@ If an already-rendered top-level key maps to a nested object, flatten that neste
 
 Each provided `--ignore PREFIX` removes any attribute drift entry whose rendered `attribute` path matches `PREFIX`.
 
+**Important (verifier-aligned):** The `PREFIX` values are written in the same *rendered attribute path* syntax that appears in the output (i.e., the dotted/escaped form produced by your flattening rules). Do not treat `PREFIX` as a raw JSON key.
+
 Ignore matching is **segment-aware** (component-aware), not an arbitrary substring match.
 
 #### Component splitting for matching
@@ -406,6 +408,8 @@ Split a rendered path string into components by scanning left-to-right:
   - `\.` (literal dot in current component)
   - `\\` (literal backslash in current component)
 - Any other `\X` is treated as a literal backslash followed by `X`.
+
+**Edge-case rule (verifier-aligned):** A path like `café\\.au_lait` contains an escaped dot and therefore has **one** component after splitting (the component unescapes to `café.au_lait`).
 
 #### Matching normalization (Unicode)
 
@@ -441,6 +445,32 @@ Notes about the lookahead check:
 - If the matched prefix consumes the entire `unescaped` final component, there is no lookahead character and therefore partial-match condition (b) does not apply; only exact matches succeed in that case.
 
 This rule guarantees the intended behavior: `--ignore tags.Env` matches `tags.EnvName` (because `Name` begins with `N` which is an uppercase ASCII letter), but does NOT match `tags.Environment` (because the next character after the matched prefix is a lowercase `i`).
+
+### Verifier-aligned examples (these are tested)
+
+These examples correspond to real verifier tests and should be used as “golden” behaviors.
+
+1) Unicode ignore prefix ignores accent variants and escaped-dot single-component paths
+
+- Drift contains both `café` and `café\\.au_lait` (escaped dot means the final component is `café.au_lait`).
+- Running:
+
+```
+python /app/drift_audit.py --ignore café <ideal> <current>
+```
+
+must ignore drift entries for **both** `café` and `café\\.au_lait`.
+
+2) Multi-prefix ignores + config rendered paths vs literal-dot component
+
+- Drift contains `config.network.ip` and `config.network\\.ip`.
+- Running:
+
+```
+python /app/drift_audit.py --ignore config.network <ideal> <current>
+```
+
+must ignore `config.network.ip` but must **not** ignore `config.network\\.ip` (because the second component unescapes to `network.ip`, and the lookahead character after the matched prefix is `.` which is not `[A-Z0-9]`).
 
 Pseudocode (Python-like) for matching a single `PREFIX` against an `attribute` string:
 
@@ -556,4 +586,61 @@ If a drift path is `config.network\\.ip` (meaning the dot is literal inside the 
 
 - `--ignore config.network` must match `config.network.ip`
 - `--ignore config.network` must NOT match `config.network\\.ip`
+
+## Verifier tests (required coverage)
+
+The verifier uses `pytest` and runs the CLI as a subprocess:
+
+```
+python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>
+```
+
+### How the verifier runs (step-by-step)
+
+1) Writes temporary JSON snapshots to disk (both supported formats are used).
+2) Calls the CLI with different argument combinations (including usage errors and `--ignore`).
+3) For exit `0`, parses stdout JSON and checks schema + determinism (ordering and static timestamp).
+4) For non-zero exits, asserts stdout is empty and stderr is non-empty (and for usage errors, stderr must be exactly the usage line).
+
+### Complete test list (all tests must pass)
+
+- `test_usage_message_is_exact` — Usage errors exit `2`, stdout empty, stderr is exactly `USAGE_LINE + "\n"`.
+- `test_missing_file_is_io_error_no_traceback` — Missing files are I/O errors (exit `1`) with no traceback.
+- `test_invalid_json_is_parse_error_no_traceback` — Invalid JSON is a parse error (exit `2`) with no traceback.
+- `test_simplified_format_drift_report_is_deterministic` — Format A drift detection + deterministic ordering and expected drift entries.
+- `test_nested_attributes_are_flattened_and_lists_are_atomic` — Nested dicts flatten to dot paths; lists compare atomically.
+- `test_attributes_present_only_on_one_side_are_reported_as_null` — Attributes missing on one side report `null` expected/actual.
+- `test_ignore_prefix_filters_attribute_drift_entries` — `--ignore` removes matching drift entries.
+- `test_terraform_like_format_is_supported_and_child_modules_are_walked` — Format B supported; walks child modules.
+- `test_duplicate_resource_ids_are_parse_errors` — Duplicate `<type>.<name>` ids in one snapshot are parse errors.
+- `test_attribute_paths_escape_dots_in_keys` — Escapes dots in literal keys using `\.`.
+- `test_attribute_paths_escape_backslashes_then_dots` — Escapes backslashes first, then dots.
+- `test_ignore_prefix_matches_escaped_attribute_paths` — Ignore matching works on rendered/escaped attribute paths.
+- `test_deeply_nested_attributes_flattened_correctly` — Deep nesting produces correct flattened paths.
+- `test_complex_lists_with_dicts_are_atomic` — Lists that contain dicts remain atomic (no flattening inside lists).
+- `test_unicode_and_special_chars_in_keys` — Handles Unicode/special characters in keys for both render and compare.
+- `test_multiple_child_modules_with_conflicts` — Multiple modules + conflicts are handled correctly.
+- `test_ignore_with_partial_prefix_matches` — Ignore matching is component-aware and respects partial match rules.
+- `test_mixed_formats_in_same_snapshot` — Mixed snapshot shapes are treated per spec (parse errors as applicable).
+- `test_very_deep_nesting` — Stress test for flattening/recursion depth.
+- `test_many_attributes` — Handles many attributes deterministically.
+- `test_unicode_in_values` — Unicode values compare properly (no coercion).
+- `test_special_chars_in_keys` — Special characters in keys render/compare properly.
+- `test_child_modules_deep` — Deep child-module traversal is correct.
+- `test_ignore_partial_matches` — Validates the lookahead rule for partial final-component matches.
+- `test_escaped_dots_complex` — Complex escaping scenarios behave as specified.
+- `test_lists_with_nested_dicts_atomic` — Additional list atomicity coverage.
+- `test_null_values` — Correct handling of `null` values.
+- `test_empty_strings` — Empty strings compare correctly and are not dropped.
+- `test_large_numbers` — Large numeric values compare correctly without type coercion.
+- `test_case_sensitivity` — Ensures case sensitivity is preserved for drift (no unintended normalization in rendering).
+- `test_mixed_formats_with_child_modules` — Mixed formats + child modules work together.
+- `test_ignore_with_unicode` — Ignore matching handles Unicode normalization rules.
+- `test_boolean_values` — Booleans compare correctly with no coercion to numbers.
+- `test_type_coercion_traps` — Ensures strings/numbers/bools aren’t coerced.
+- `test_extreme_nesting_50_levels` — Extreme nesting stress test.
+- `test_ignore_edge_cases` — Edge cases around ignore parsing and matching.
+- `test_unicode_bombs` — Robustness against tricky Unicode forms.
+- `test_large_inputs_1000_attributes` — Performance/determinism with very large attribute sets.
+- `test_seeded_generated_nested_drift_and_ignore_is_not_trivially_hardcoded` — Seeded randomized drift/ignore coverage to prevent hardcoding.
 
