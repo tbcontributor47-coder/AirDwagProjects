@@ -70,9 +70,17 @@ def init_index_db(path: str):
 
 def normalize_content(content: str) -> str:
     """Normalize file content for consistent hashing (strips trailing spaces, normalizes line endings)."""
-    lines = content.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-    normalized = '\n'.join(line.rstrip() for line in lines if line.strip())
-    return normalized
+    # Normalize line endings
+    s = content.replace('\r\n', '\n').replace('\r', '\n')
+    lines = s.split('\n')
+    # Strip trailing spaces/tabs from each line
+    lines = [ln.rstrip(' \t') for ln in lines]
+    # Remove only trailing empty lines
+    while lines and lines[-1] == '':
+        lines.pop()
+    if lines:
+        return '\n'.join(lines) + '\n'
+    return ''
 
 
 def compute_hash(content: str) -> str:
@@ -204,14 +212,12 @@ def parse_and_validate_lines(
     warnings: List[str] = []
     record_len = int(schema['record_length'])
     fields = schema['fields']
-    processed = 0
+    # records_processed is the number of remaining lines after removing only trailing empties
+    processed = len(lines)
 
     for i, raw in enumerate(lines, start=1):
-        if not raw.strip():
-            continue
-        # Preserve fixed-width padding. Only allow extra trailing whitespace beyond record length.
+        # Preserve fixed-width padding. Empty or short lines are validated like any other record.
         line = raw
-        processed += 1
         if len(line) < record_len:
             errors.append(f'Line {i}: Record length expected {record_len} got {len(line)}')
             continue

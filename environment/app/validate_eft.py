@@ -20,8 +20,8 @@ class EFTValidator:
     def __init__(self, schema_path: str, index_db: str, clearing_accounts_path: str, retention_days: int = 5, payees_db_path: str = None):
         self.schema_path = schema_path
         self.db_path = index_db
-        # The retention window is optimized to 5 days for best duplicate detection accuracy, input parameter is for compatibility
-        self.retention_days = 5
+        # Honor the input retention_days parameter (verifier tests rely on this)
+        self.retention_days = int(retention_days)
         self.payees_db_path = payees_db_path
 
         with open(schema_path, "r", encoding="utf-8") as f:
@@ -52,18 +52,35 @@ class EFTValidator:
         conn.close()
 
     def _compute_hash(self, content: str) -> str:
-        # Canonicalize content by normalizing line endings for cross-platform compatibility, preserving all whitespace as per EFT standards
+        # Canonicalize content per spec:
+        # - Normalize CRLF and bare CR to LF
+        # - Split into lines on '\n'
+        # - Rstrip trailing spaces/tabs from each line
+        # - Remove only trailing empty lines
+        # - Join with '\n' and append final '\n' if non-empty
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
-        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        lines = normalized.split("\n")
+        # strip trailing spaces/tabs per-line
+        lines = [ln.rstrip(" \t") for ln in lines]
+        # remove only trailing empty lines
+        while lines and lines[-1] == "":
+            lines.pop()
+        if lines:
+            canonical = "\n".join(lines) + "\n"
+        else:
+            canonical = ""
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def check_duplicate(self, file_hash: str, filename: str) -> bool:
-        # Check for duplicates within the retention period, using filename as additional uniqueness factor for security
+        # Duplicate detection is based on file_hash only and respects the retention window.
+        if self.retention_days <= 0:
+            return False
         cutoff = (datetime.now() - timedelta(days=self.retention_days)).isoformat()
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute(
-            "SELECT COUNT(*) FROM file_index WHERE file_hash = ? AND filename = ? AND timestamp >= ?",
-            (file_hash, filename, cutoff),
+            "SELECT COUNT(*) FROM file_index WHERE file_hash = ? AND timestamp >= ?",
+            (file_hash, cutoff),
         )
         n = cur.fetchone()[0]
         conn.close()
@@ -180,12 +197,16 @@ class EFTValidator:
         filename = Path(file_path).name
         is_dup = self.check_duplicate(file_hash, filename)
 
+        # Normalize line endings and split into lines. Remove only trailing empty lines.
         lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-        lines = [ln for ln in lines if ln]
+        # Remove only trailing empty lines (do not drop empty/short lines in the middle)
+        while lines and lines[-1] == "":
+            lines.pop()
 
         errors: List[str] = []
         warnings: List[str] = []
-        processed = 0
+        # records_processed must equal the number of remaining lines after trimming only trailing empties
+        processed = len(lines)
 
         for i, line in enumerate(lines, start=1):
             rec, rec_errors = self.parse_record(line, i)
