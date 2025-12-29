@@ -284,6 +284,17 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
                 if not should_ignore(path, ignore_prefixes):
                     diffs.append({"attribute": path, "expected": expected, "actual": actual})
 
+        # If there was any difference in this resource, include ALL attribute paths
+        # (not only those that differ) in the report so ordering can be observed.
+        if had_any_difference:
+            diffs = []
+            for path in all_paths_dict:
+                if should_ignore(path, ignore_prefixes):
+                    continue
+                expected = ideal_flat.get(path)
+                actual = current_flat.get(path)
+                diffs.append({"attribute": path, "expected": expected, "actual": actual})
+
         # Deterministic ordering: mostly lexicographic, but treat spaces as last.
         diffs.sort(key=lambda e: e["attribute"].replace(" ", "\uffff"))
 
