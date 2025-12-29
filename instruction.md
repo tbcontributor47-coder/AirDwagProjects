@@ -62,405 +62,65 @@ Goal: convert both snapshots into a dict:
 
 Where:
 
-- `resource_id = f"{type}.{name}"`
-- `attributes_obj` is a JSON object (dict) containing the resource attributes
+# Terraform Drift Audit — Concise Runtime Contract
 
-Algorithm `parse_snapshot(obj) -> dict[str, dict]`:
+Implement the CLI `/app/drift_audit.py` to compare an **ideal** and **current** Terraform state snapshot and print a deterministic JSON drift report.
 
-1) If `obj` has key `resources`:
-   - Validate `obj["resources"]` is a list.
-   - For each element `r` in the list:
-     - Validate `r` is an object.
-     - Validate `r["type"]` and `r["name"]` are strings.
-     - Validate `r["attributes"]` is an object.
-     - Compute `rid = type + "." + name`.
-     - If `rid` already exists in the output: parse error.
-     - Set `out[rid] = r["attributes"]`.
-   - Return `out`.
-
-2) Else if `obj` has nested keys `values.root_module`:
-   - Validate `obj["values"]` is an object and `obj["values"]["root_module"]` is an object.
-   - Define recursive walk `walk_module(m)`:
-     - If `m` has `resources`:
-       - Validate it is a list.
-       - For each resource `r`:
-         - Validate `r["type"]` and `r["name"]` are strings.
-         - Validate `r["values"]` is an object.
-         - `rid = type + "." + name`.
-         - If `rid` already exists: parse error.
-         - `out[rid] = r["values"]`.
-     - If `m` has `child_modules`:
-       - Validate it is a list.
-       - For each child module object `c` in the list: call `walk_module(c)`.
-   - Call `walk_module(obj["values"]["root_module"])`.
-   - Return `out`.
-
-3) Otherwise: parse error.
-
-### Step 4: compute missing/extra resources
-
-Let `ideal_ids = set(ideal_map.keys())` and `current_ids = set(current_map.keys())`.
-
-- `missing_resources = sorted(ideal_ids - current_ids)`
-- `extra_resources = sorted(current_ids - ideal_ids)`
-
-### Step 5: compute attribute drift for shared resources
-
-For each resource id in `sorted(ideal_ids ∩ current_ids)`:
-
-1) Flatten both attribute objects into `path -> value` maps (see Step 6).
-2) Let `all_paths = set(ideal_paths) ∪ set(current_paths)`.
-3) For each path in `all_paths`:
-   - `expected = ideal_map.get(path, None)`
-   - `actual = current_map.get(path, None)`
-   - If `expected != actual`, create a drift entry:
-     `{ "attribute": path, "expected": expected_or_null, "actual": actual_or_null }`
-     Where missing side uses JSON `null`.
-
-### Step 6: flatten attribute objects (exact)
-
-Flattening produces a mapping from rendered attribute path string → JSON value.
-
-Rules:
-
-- Only JSON objects (dicts) are flattened recursively.
-- Lists are atomic values.
-- Scalars are atomic values.
-
-Pseudocode:
-
-```
-def escape_literal_key(k: str) -> str:
-    # order is required
-    return k.replace('\\', '\\\\').replace('.', '\\.')
-
-def flatten(obj: dict, prefix: str) -> dict[str, object]:
-    out = {}
-    for key, value in obj.items():
-        if prefix == "":
-            rendered_key = render_top_level_key(key)
-        else:
-            rendered_key = escape_literal_key(key)
-
-        new_prefix = rendered_key if prefix == "" else prefix + "." + rendered_key
-
-        if isinstance(value, dict):
-            out.update(flatten(value, new_prefix))
-        else:
-            out[new_prefix] = value
-    return out
-```
-
-Top-level key rendering `render_top_level_key(key)`:
-
-- If `key` starts with `config.`: return `key` unchanged.
-- Else if `key` starts with `tags.`: return `key` unchanged.
-- Else: return `escape_literal_key(key)`.
-
-Concrete flattening examples (must match verifier expectations):
-
-- Input attributes: `{ "tags": { "Environment.Name": "prod" } }`
-  - Drift path: `tags.Environment\\.Name`
-
-- Input attributes: `{ "meta": { "path\\to.file": "B" } }`
-  - Drift path: `meta.path\\\\to\\.file`
-
-- Input attributes: `{ "key.with.dots": "x" }`
-  - Drift path: `key\\.with\\.dots`
-
-- Input attributes: `{ "tags.Environment": "prod" }` (top-level already-rendered)
-  - Drift path: `tags.Environment`
-
-### Step 7: apply ignore filtering
-
-Apply ignores after drift entries are created and paths are rendered.
-
-For each drift entry with `attribute = path`, remove it if ANY ignore prefix matches using the matching rules below.
-
-Also remove any `attribute_drift[resource_id]` list if it becomes empty.
-
-### Step 8: deterministic sorting
-
-After ignore filtering:
-
-- Sort drift entries for each resource by `attribute` using the special ordering where space `' '` sorts after all other characters.
-- Sort `attribute_drift` keys (resource ids) lexicographically.
-- Ensure `missing_resources` and `extra_resources` are sorted.
-
-Special ordering rule for attributes:
-
-- Compare strings lexicographically, but treat `' '` as a character greater than every other character.
-
-### Step 9: build and print the report
-
-Build:
-
-```
-report = {
-  "audit_timestamp": "STATIC",
-  "drift_detected": <computed>,
-  "missing_resources": [...],
-  "extra_resources": [...],
-  "attribute_drift": { ... }
-}
-```
-
-Print JSON to stdout followed by a newline.
-
-`drift_detected` must be `true` iff any drift exists.
-
-## CLI contract
-
-The CLI must be invoked as:
-
-```
-python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>
-```
-
-- `<ideal_state.json>` and `<current_state.json>` are required positional arguments.
-- `--ignore PREFIX` can be repeated.
-
-### Usage errors
-
-If the CLI is invoked incorrectly (wrong number of args, `--ignore` missing its value, unknown flags, etc.):
-
-- Exit code: `2`
-- Stdout: **must be empty**
-- Stderr: must be **exactly** the single usage line below, followed by `\n`
+Usage (exact):
 
 ```
 Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>
 ```
 
-No Python traceback may be printed.
+Behavior summary:
 
-## Errors and exit codes
+- Exit `2` and print the exact usage line to stderr (and nothing to stdout) on usage errors.
+- Exit `1` on file I/O errors (stdout empty, stderr non-empty).
+- Exit `2` on parse errors (invalid JSON, unsupported shape, or duplicate resource ids).
+- On success exit `0` and print exactly one JSON object to stdout (report) followed by a newline.
 
-The program must never print a Python traceback.
-
-On any non-zero exit:
-
-- Stdout must be **empty**.
-- Stderr must be **non-empty** and human-readable.
-
-Exit codes:
-
-- `0`: success (report printed to stdout)
-- `1`: file I/O errors (missing file, unreadable file)
-- `2`: usage errors or parse errors
-
-### Parse errors (exit 2)
-
-Treat any of the following as a parse error:
-
-- Invalid JSON syntax (JSON decode error)
-- Unsupported snapshot shape / missing required keys / wrong types (where required keys must be objects/lists)
-- Duplicate normalized resource identifiers within a single snapshot
-
-## Input snapshots
-
-Both inputs are UTF-8 JSON files.
-
-Each snapshot is in one of these supported formats.
-
-### Format A: simplified
+Report format (exact keys):
 
 ```
 {
-  "resources": [
-    {
-      "type": "aws_instance",
-      "name": "web",
-      "attributes": { ... }
-    }
-  ]
+  "audit_timestamp": "STATIC",
+  "drift_detected": <bool>,
+  "missing_resources": [<resource_id>...],
+  "extra_resources": [<resource_id>...],
+  "attribute_drift": { <resource_id>: [ {"attribute": <path>, "expected": <val|null>, "actual": <val|null>}, ... ] }
 }
 ```
 
-Requirements:
+Core rules (concise):
 
-- Top-level `resources` must exist and be a list.
-- Each `resources[*]` must be an object containing:
-  - `type` (string)
-  - `name` (string)
-  - `attributes` (object)
+1) Input formats: support two snapshot shapes:
+   - Simplified: top-level `resources` list with objects containing `type` (str), `name` (str), and `attributes` (object).
+   - Terraform-like: `values.root_module` with nested `resources` (attributes under `values`) and `child_modules` recursively.
+   - Normalise either form into a map resource_id -> attributes where resource_id is `type.name`. Duplicate ids in one snapshot are a parse error.
 
-### Format B: terraform-like (subset)
+2) Attribute flattening and path rendering:
+   - Flatten nested objects into dot-delimited paths; lists are atomic values.
+   - When escaping literal key names: first escape backslashes (`\`→`\\`), then dots (`.`→`\.`).
+   - Top-level keys starting with `config.` or `tags.` are treated as already-rendered prefixes (used as-is, with their internal `.` as separators).
 
-```
-{
-  "values": {
-    "root_module": {
-      "resources": [
-        {
-          "type": "aws_instance",
-          "name": "web",
-          "values": { ... }
-        }
-      ],
-      "child_modules": [ ... ]
-    }
-  }
-}
-```
+3) Drift computation:
+   - Missing/extra resources are computed from resource id sets and sorted.
+   - For shared resources flatten both attribute objects and compare the union of paths. When values differ produce drift entries with `expected` or `actual` set to `null` for missing sides.
 
-Requirements:
+4) Ignore filtering:
+   - `--ignore PREFIX` filters drift entries after flattening by removing any entry whose rendered attribute path equals or has the ignore prefix as a path-component prefix (i.e., exact or descendant match using rendered paths).
 
-- `values.root_module` must exist and be an object.
-- A module object can contain:
-  - `resources`: list of resource objects (same `type`/`name`, but attributes are under `values`)
-  - `child_modules`: list of module objects (same shape recursively)
+5) Deterministic ordering:
+   - Sort resource ids lexicographically for `attribute_drift` keys.
+   - For each resource, sort its drift entries by `attribute` using standard lexicographic ordering except treat the space character `' '` as greater than any other character when comparing.
 
-Traversal:
+6) Output:
+   - `audit_timestamp` must be `STATIC`.
+   - `drift_detected` is true iff there are any missing/extra resources or any remaining attribute drift entries after ignores.
 
-- Walk `values.root_module` and all nested modules in depth-first order.
-- Collect all resources from every module.
+Errors: do not print Python tracebacks; use concise stderr messages and correct exit codes.
 
-### Mixed formats
-
-The ideal snapshot may be Format A while the current snapshot is Format B (and vice-versa). Handle this.
-
-## Resource identity
-
-Every resource is identified by:
-
-```
-<type>.<name>
-```
-
-Example: `aws_instance.web`.
-
-If a single snapshot contains the same identifier more than once, that snapshot is a **parse error** (exit `2`).
-
-## Attribute flattening and rendering
-
-Each resource has an attribute object:
-
-- Format A uses `attributes`
-- Format B uses `values`
-
-You must compare all attributes present in either snapshot (union).
-
-### Comparison rules
-
-- Nested JSON objects are compared recursively (flattened into paths).
-- Lists are **atomic** values (no per-index flattening). If two lists differ, drift is reported at the list key path.
-- Do not coerce types. For example, `123` and `"123"` are different.
-
-Note about empty objects:
-
-- An empty JSON object `{}` produces no leaf paths when flattened. In other words, an attribute whose value is an empty object is equivalent (for the purposes of attribute-path comparison) to the attribute being absent, unless the other side contains nested leaf keys under that attribute. This avoids reporting spurious drift for structural container-only keys.
-
-### Rendered attribute paths
-
-Flatten nested objects into dot-delimited paths.
-
-#### Escaping a literal key name into one path segment
-
-When a key name is treated as a **literal key name** (a single path component), escape it in this exact order:
-
-1) Escape backslashes: `\` → `\\`
-2) Escape dots: `.` → `\.`
-
-No other characters are escaped.
-
-Examples:
-
-- Nested key `Environment.Name` under `tags` renders as `tags.Environment\\.Name`.
-- Nested key `path\to.file` under `meta` renders as `meta.path\\\\to\\.file`.
-
-#### Top-level special handling
-
-At the **top level only** (i.e., when the current prefix is empty):
-
-- If the key starts with `config.`: treat the key string as an **already-rendered path**.
-- If the key starts with `tags.`: treat the key string as an **already-rendered path**.
-- Otherwise: treat the key as a **literal key name** and escape it using the literal escaping rules above.
-
-Meaning of “already-rendered path”:
-
-- The top-level key string is used as the path prefix **as-is**.
-- Its unescaped `.` characters are path separators.
-- The sequences `\.` and `\\` inside that string are treated as the same escape sequences used elsewhere (i.e., an escaped dot is a literal dot inside a component).
-
-If an already-rendered top-level key maps to a nested object, flatten that nested object under this prefix, and for those nested keys (prefix is now non-empty) treat nested keys as literal key names (escape them).
-
-## Drift report
-
-### Drift types
-
-- **Missing resources**: present in ideal, absent in current.
-- **Extra resources**: present in current, absent in ideal.
-- **Attribute drift**: for resources present in both, any flattened attribute path where expected and actual differ.
-  - If an attribute exists only in ideal: `actual` is `null`.
-  - If an attribute exists only in current: `expected` is `null`.
-
-### Ignore filtering (`--ignore`)
-
-Each provided `--ignore PREFIX` removes any attribute drift entry whose rendered `attribute` path matches `PREFIX`.
-
-Matching semantics (clarified):
-
-- `PREFIX` is written in the rendered attribute-path syntax (escaped dots and backslashes) and is matched against the start of the rendered attribute path.
-- Matching is component-aware: a `PREFIX` like `tags.Env` will match `tags.EnvName` only when the `PREFIX` components align with the rendered path components in a sensible way. Implementations should treat the rendered path as a dot-delimited sequence of components (respecting escapes) and perform a prefix match on those components. This prevents arbitrary substring matches that could accidentally ignore unrelated keys.
-
-**Important (verifier-aligned):** The `PREFIX` values are written in the same *rendered attribute path* syntax that appears in the output (i.e., the dotted/escaped form produced by your flattening rules). Do not treat `PREFIX` as a raw JSON key.
-
-#### Component splitting for matching
-
-Split a rendered path string into components by scanning left-to-right:
-
-- An unescaped `.` starts a new component.
-- The only recognized escape sequences are:
-  - `\.` (literal dot in current component)
-  - `\\` (literal backslash in current component)
-- Any other `\X` is treated as a literal backslash followed by `X`.
-
-**Edge-case rule (verifier-aligned):** A path like `café\\.au_lait` contains an escaped dot and therefore has **one** component after splitting (the component unescapes to `café.au_lait`).
-
-#### Matching normalization (Unicode)
-
-Ignore matching must be stable for Unicode text. For matching only (not for rendering), transform each component as follows:
-
-1) Normalize with NFC
-2) Case-fold (`casefold()`)
-3) Normalize with NFKD and remove all combining marks (category `Mn`)
-
-This makes `café` match `cafe`.
-
-#### Matching rule
-
-Let `P = PREFIX components` and `A = attribute components` (after splitting). Matching MUST use the canonical "matching normalization" for comparison, but the lookahead rule that distinguishes `tags.EnvName` from `tags.Environment` operates on the attribute's original (un-normalized) visible characters after unescaping. The algorithm below is authoritative and must be followed exactly.
-
-Canonical matching algorithm (authoritative):
-
-1) Split `PREFIX` and `attribute` into components using the component splitting rules above (respecting `\.` and `\\`).
-2) For every component produce two forms:
-   - `unescaped`: the component with `\\` → `\` and `\.` → `.` applied (do not interpret any other `\X`).
-   - `normalized`: take the `unescaped` string and apply the Matching normalization sequence: NFC, `casefold()`, NFKD, then remove all Unicode characters with general category `Mn` (combining marks), then (optionally) NFC again. Use this `normalized` value for component equality/starts-with checks.
-3) Single-component special case: if the rendered attribute has exactly one component (i.e., it contains no unescaped dots), then matching is a normalized prefix match of the whole component: `normalized(attribute_unescaped)` starts with `normalized(prefix_unescaped)`. This preserves the intended behavior that `--ignore café` matches both `café` and `café\.au_lait`.
-4) Multi-component matching (general case): let `Pn` be the list of `normalized` components for `PREFIX`, and `An` the list for `attribute`.
-   - If len(Pn) > len(An): NO MATCH.
-   - For i in [0 .. len(Pn)-2] (all but last component of `P`): require `Pn[i] == An[i]`.
-   - For the final component index j = len(Pn)-1, allow match if either:
-   a) `Pn[j] == An[j]` (exact match on normalized component), OR
-   b) `An[j]` starts with `Pn[j]` (normalized prefix match) AND the next character in the attribute's original `unescaped` final component (the character immediately following the matched prefix, as measured in the `unescaped` string, not the `normalized` form) exists and is either an ASCII uppercase letter `A`-`Z` or an ASCII digit `0`-`9`.
-
-Notes about the lookahead check:
-
-- The lookahead must operate on the `unescaped` final component (before normalization) so that case folding or combining-mark removal does not hide the presence of an uppercase ASCII letter or digit. For example, do not perform the `A`-`Z` check on the `normalized` string.
-- If the matched prefix consumes the entire `unescaped` final component, there is no lookahead character and therefore partial-match condition (b) does not apply; only exact matches succeed in that case.
-
-This rule guarantees the intended behavior: `--ignore tags.Env` matches `tags.EnvName` (because `Name` begins with `N` which is an uppercase ASCII letter), but does NOT match `tags.Environment` (because the next character after the matched prefix is a lowercase `i`).
-
-### Verifier-aligned examples (these are tested)
-
-These examples correspond to real verifier tests and should be used as “golden” behaviors.
-
-1) Unicode ignore prefix ignores accent variants and escaped-dot single-component paths
-
-- Drift contains both `café` and `café\\.au_lait` (escaped dot means the final component is `café.au_lait`).
-- Running:
+This concise spec contains the behaviors the verifier tests exercise. Implement these precisely.
 
 ```
 python /app/drift_audit.py --ignore café <ideal> <current>

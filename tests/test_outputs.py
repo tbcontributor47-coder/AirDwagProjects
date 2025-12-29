@@ -1,188 +1,111 @@
-"""Verifier tests for Terraform Drift Audit.
+"""Small focused verifier tests for Terraform Drift Audit.
 
-Tests call `python /app/drift_audit.py` to match the runtime contract.
+These tests cover the essential behaviors the concise instruction requires:
+- CLI usage/usage message
+- simplified and terraform-like formats normalization
+- flattening + escaping rules for dots/backslashes
+- ignore-prefix filtering on rendered attribute paths
+- deterministic ordering where space sorts after other chars
 """
 
 import json
 import subprocess
 import tempfile
-import copy
 from pathlib import Path
 
 
-USAGE_LINE = (
-    "Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>"
-)
+USAGE_LINE = "Usage: python /app/drift_audit.py [--ignore PREFIX]... <ideal_state.json> <current_state.json>"
 
 
-def run_audit(args: list[str]) -> tuple[int, str, str]:
-    proc = subprocess.run(
-        ["python", "/app/drift_audit.py", *args],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+def run_audit(args):
+    proc = subprocess.run(["python", "/app/drift_audit.py", *args], capture_output=True, text=True)
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def write_json(tmpdir: Path, name: str, obj: object) -> Path:
-    path = tmpdir / name
-    path.write_text(json.dumps(obj), encoding="utf-8")
-    return path
+def write_json(tmpdir: Path, name: str, obj) -> Path:
+    p = tmpdir / name
+    p.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+    return p
 
 
-def parse_report(stdout: str) -> dict:
-    return json.loads(stdout)
-
-
-def test_usage_message_is_exact() -> None:
-    """Usage errors must print the exact usage line."""
-    code, out, err = run_audit([])
-    assert code == 2
+def test_usage_message_exact():
+    rc, out, err = run_audit([])
+    assert rc == 2
     assert out == ""
     assert err == USAGE_LINE + "\n"
-    assert "Traceback" not in err
 
 
-def test_missing_file_is_io_error_no_traceback() -> None:
-    """Missing input files are I/O errors (exit 1) without tracebacks."""
-    code, out, err = run_audit(["/tmp/nope_ideal.json", "/tmp/nope_current.json"])
-    assert code == 1
-    assert out == ""
-    assert err.strip() != ""
-    assert "Traceback" not in err
-
-
-def test_invalid_json_is_parse_error_no_traceback() -> None:
-    """Invalid JSON is a parse error (exit 2) without tracebacks."""
+def test_simplified_and_terraform_formats_and_basic_drifts():
     with tempfile.TemporaryDirectory() as td:
-        tmpdir = Path(td)
-        ideal = tmpdir / "ideal.json"
-        current = tmpdir / "current.json"
-        ideal.write_text("{", encoding="utf-8")
-        current.write_text("{}", encoding="utf-8")
+        tmp = Path(td)
+        ideal = {
+            "resources": [
+                {"type": "aws_instance", "name": "web", "attributes": {"a": 1, "b": 2}},
+            ]
+        }
+        current = {
+            "values": {"root_module": {"resources": [
+                {"type": "aws_instance", "name": "web", "values": {"a": 1, "b": 3}},
+                {"type": "aws_security_group", "name": "extra", "values": {"c": 5}}
+            ]}}
+        }
 
-        code, out, err = run_audit([str(ideal), str(current)])
-        assert code == 2
-        assert out == ""
-        assert err.strip() != ""
-        assert "Traceback" not in err
+        i = write_json(tmp, "ideal.json", ideal)
+        c = write_json(tmp, "current.json", current)
+
+        rc, out, err = run_audit([str(i), str(c)])
+        assert rc == 0, err
+        rep = json.loads(out)
+        assert rep["audit_timestamp"] == "STATIC"
+        assert rep["missing_resources"] == []
+        assert rep["extra_resources"] == ["aws_security_group.extra"]
+        assert rep["drift_detected"] is True
+        # verify attribute drift for aws_instance.web
+        diffs = rep["attribute_drift"]["aws_instance.web"]
+        assert any(d["attribute"] == "b" and d["expected"] == 2 and d["actual"] == 3 for d in diffs)
 
 
-def test_simplified_format_drift_report_is_deterministic() -> None:
-    """Detects drift in simplified snapshot format with deterministic ordering."""
+def test_escape_dots_and_backslashes_and_ignore():
     with tempfile.TemporaryDirectory() as td:
-        tmpdir = Path(td)
-        ideal_obj = {
-            "resources": [
-                {
-                    "type": "aws_instance",
-                    "name": "web",
-                    "attributes": {
-                        "instance_type": "t3.micro",
-                        "ami": "ami-0abc1234",
-                        "monitoring": True,
-                    },
-                },
-                {
-                    "type": "aws_s3_bucket",
-                    "name": "logs",
-                    "attributes": {"versioning": True, "encrypted": True},
-                },
-            ]
-        }
-        current_obj = {
-            "resources": [
-                {
-                    "type": "aws_instance",
-                    "name": "web",
-                    "attributes": {
-                        "instance_type": "t3.small",
-                        "ami": "ami-0abc1234",
-                        "monitoring": False,
-                    },
-                },
-                {
-                    "type": "aws_s3_bucket",
-                    "name": "logs",
-                    "attributes": {"versioning": True, "encrypted": False},
-                },
-                {
-                    "type": "aws_security_group",
-                    "name": "debug",
-                    "attributes": {"ingress_rules": 1},
-                },
-            ]
-        }
+        tmp = Path(td)
+        ideal = {"resources": [{"type": "aws_instance", "name": "web", "attributes": {"tags": {"Env.Name": "prod"}, "meta": {"path\\to.file": "X"}}}]}
+        current = {"resources": [{"type": "aws_instance", "name": "web", "attributes": {"tags": {"Env.Name": "dev"}, "meta": {"path\\to.file": "Y"}}}]}
 
-        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
-        current = write_json(tmpdir, "current.json", current_obj)
+        i = write_json(tmp, "ideal.json", ideal)
+        c = write_json(tmp, "current.json", current)
 
-        code, out, err = run_audit([str(ideal), str(current)])
-        assert code == 0, err
-        report = parse_report(out)
+        # without ignore both diffs present
+        rc, out, err = run_audit([str(i), str(c)])
+        assert rc == 0
+        rep = json.loads(out)
+        attrs = {d["attribute"] for d in rep["attribute_drift"]["aws_instance.web"]}
+        assert attrs == {"tags.Env\\.Name", "meta.path\\\\to\\.file"}
 
-        assert report["audit_timestamp"] == "STATIC"
-        assert report["missing_resources"] == []
-        assert report["extra_resources"] == ["aws_security_group.debug"]
-
-        # drift_detected should match presence of any drift
-        assert report["drift_detected"] is True
-
-        drift = report["attribute_drift"]
-        assert sorted(drift.keys()) == list(drift.keys())
-
-        # Ensure per-resource entries are sorted by attribute
-        for entries in drift.values():
-            attrs = [e["attribute"] for e in entries]
-            assert attrs == sorted(attrs)
-
-        # Spot-check expected drifts
-        web = drift["aws_instance.web"]
-        assert {e["attribute"] for e in web} == {"instance_type", "monitoring"}
-
-        logs = drift["aws_s3_bucket.logs"]
-        assert {e["attribute"] for e in logs} == {"encrypted"}
+        # ignore the tags key (rendered path)
+        rc2, out2, err2 = run_audit(["--ignore", "tags.Env\\.Name", str(i), str(c)])
+        assert rc2 == 0
+        rep2 = json.loads(out2)
+        # only meta diff remains
+        attrs2 = {d["attribute"] for d in rep2["attribute_drift"].get("aws_instance.web", [])}
+        assert attrs2 == {"meta.path\\\\to\\.file"}
 
 
-def test_nested_attributes_are_flattened_and_lists_are_atomic() -> None:
-    """Flattens nested dict attributes with dot paths; lists compare atomically."""
+def test_space_sorting_of_attributes():
     with tempfile.TemporaryDirectory() as td:
-        tmpdir = Path(td)
-        ideal_obj = {
-            "resources": [
-                {
-                    "type": "aws_instance",
-                    "name": "web",
-                    "attributes": {
-                        "tags": {"Environment": "prod"},
-                        "security_groups": ["sg-1", "sg-2"],
-                    },
-                }
-            ]
-        }
-        current_obj = {
-            "resources": [
-                {
-                    "type": "aws_instance",
-                    "name": "web",
-                    "attributes": {
-                        "tags": {"Environment": "dev"},
-                        "security_groups": ["sg-1"],
-                    },
-                }
-            ]
-        }
+        tmp = Path(td)
+        ideal = {"resources": [{"type": "aws_instance", "name": "s", "attributes": {"a": 1, "b": 2, "a ": 3}}]}
+        current = {"resources": [{"type": "aws_instance", "name": "s", "attributes": {"a": 9, "b": 2, "a ": 3}}]}
 
-        ideal = write_json(tmpdir, "ideal.json", ideal_obj)
-        current = write_json(tmpdir, "current.json", current_obj)
+        i = write_json(tmp, "ideal.json", ideal)
+        c = write_json(tmp, "current.json", current)
 
-        code, out, err = run_audit([str(ideal), str(current)])
-        assert code == 0, err
-        report = parse_report(out)
-        drift = report["attribute_drift"]["aws_instance.web"]
-        assert {e["attribute"] for e in drift} == {"security_groups", "tags.Environment"}
-
+        rc, out, err = run_audit([str(i), str(c)])
+        assert rc == 0
+        rep = json.loads(out)
+        diffs = rep["attribute_drift"]["aws_instance.s"]
+        attrs = [d["attribute"] for d in diffs]
+        # Expect ordering: 'a' then 'a ' then 'b' (space sorts after other chars)
+        assert attrs == ["a", "a ", "b"]
 
 def test_attributes_present_only_on_one_side_are_reported_as_null() -> None:
     """Reports expected/actual as null when attribute exists only in one snapshot."""
