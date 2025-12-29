@@ -587,13 +587,84 @@ if [ -f logs/oracle.log ]; then
     echo "" | tee -a logs/consolidate.log
     echo "--- Oracle (Fixed) Test Results ---" | tee -a logs/consolidate.log
     # Try to find verifier logs in jobs directory
-    VERIFIER_RESULT=$(find jobs -name "test-stdout.txt" -type f 2>/dev/null | head -n1)
+    VERIFIER_RESULT="$(find jobs -name "test-stdout.txt" -type f -print -quit 2>/dev/null || true)"
     if [ -n "$VERIFIER_RESULT" ] && [ -f "$VERIFIER_RESULT" ]; then
         grep -E "(PASSED|FAILED|passed|failed)" "$VERIFIER_RESULT" | tail -1 | tee -a logs/consolidate.log || echo "No oracle test summary" | tee -a logs/consolidate.log
     else
         echo "No oracle verifier log found" | tee -a logs/consolidate.log
     fi
 fi
+
+dump_harbor_run_from_log() {
+    local log_file="$1"
+    local label="$2"
+
+    if [ ! -f "$log_file" ]; then
+        return 0
+    fi
+
+    echo "" | tee -a logs/consolidate.log
+    echo "--- ${label} ---" | tee -a logs/consolidate.log
+    echo "Log: $log_file" | tee -a logs/consolidate.log
+
+    local result_json
+    result_json="$(awk '/Results written to /{print $NF}' "$log_file" | tail -n1)"
+    if [ -z "$result_json" ]; then
+        echo "No 'Results written to ...' line found in $log_file" | tee -a logs/consolidate.log
+        return 0
+    fi
+
+    if [ ! -f "$result_json" ] && [ -f "$WORKSPACE/$result_json" ]; then
+        result_json="$WORKSPACE/$result_json"
+    fi
+
+    if [ ! -f "$result_json" ]; then
+        echo "Result file not found: $result_json" | tee -a logs/consolidate.log
+        return 0
+    fi
+
+    echo "result.json: $result_json" | tee -a logs/consolidate.log
+    (cat "$result_json" 2>/dev/null | tee -a logs/consolidate.log) || true
+
+    local job_dir
+    job_dir="$(dirname "$result_json")"
+    echo "job dir: $job_dir" | tee -a logs/consolidate.log
+    (ls -la "$job_dir" 2>/dev/null | tee -a logs/consolidate.log) || true
+
+    if [ -f "$job_dir/job.log" ]; then
+        echo "--- $job_dir/job.log (tail 200) ---" | tee -a logs/consolidate.log
+        (tail -n 200 "$job_dir/job.log" 2>/dev/null | tee -a logs/consolidate.log) || true
+    fi
+
+    local trial_dir
+    trial_dir="$(find "$job_dir" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null || true)"
+    if [ -z "$trial_dir" ]; then
+        echo "No trial dir found under: $job_dir" | tee -a logs/consolidate.log
+        return 0
+    fi
+
+    echo "trial dir: $trial_dir" | tee -a logs/consolidate.log
+    (ls -la "$trial_dir" 2>/dev/null | tee -a logs/consolidate.log) || true
+
+    for f in \
+        "$trial_dir/config.json" \
+        "$trial_dir/agent/oracle.txt" \
+        "$trial_dir/agent/stdout.txt" \
+        "$trial_dir/agent/stderr.txt" \
+        "$trial_dir/stdout.txt" \
+        "$trial_dir/stderr.txt" \
+        "$trial_dir/verifier/test-stdout.txt" \
+        "$trial_dir/verifier/test-stderr.txt" \
+        ; do
+        if [ -f "$f" ]; then
+            echo "--- $f (first 2000 lines) ---" | tee -a logs/consolidate.log
+            (sed -n '1,2000p' "$f" 2>/dev/null | tee -a logs/consolidate.log) || true
+        fi
+    done
+}
+
+dump_harbor_run_from_log logs/agent-gpt5.log "Agent Run: GPT-5"
+dump_harbor_run_from_log logs/agent-claude.log "Agent Run: Claude Sonnet 4.5"
 
 echo "" | tee -a logs/consolidate.log
 echo "Expected: Baseline should have test failures, Oracle should have 0 failures" | tee -a logs/consolidate.log
