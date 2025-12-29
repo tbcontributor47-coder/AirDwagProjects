@@ -131,70 +131,7 @@ Only when `--payees-db` is provided:
 - If `account_no` is not found in the `payees` table, add an error containing `not found in payee database` or `Account`.
 - If `fraud_flag == 1`, add an error mentioning `fraud` or `risk`.
 - Compare payee names case-insensitively after trimming and collapsing internal whitespace; mismatches must include `name mismatch` or `payee name`.
-# EFT File Validation (Fixed-Width Payments)
 
-You are given a small CLI program inside the container at:
-
-- `/app/validate_eft.py`
-
-The program is **buggy**. Fix it.
-
-This document is the full runtime contract. Implement exactly what is specified.
-
-## Step-by-step implementation checklist (required)
-
-Implement `/app/validate_eft.py` exactly as this pipeline. This section is intentionally procedural to reduce ambiguity for agents.
-
-### Step 0: parse CLI args
-
-The verifier supplies valid arguments, but your code must still be robust and must not print a Python traceback.
-
-Read:
-
-- `file_path`
-- `schema_path`
-- `clearing_accounts_path`
-- `index_db_path`
-- `retention_days` (default 5)
-- optional `payees_db_path`
-
-### Step 1: load schema JSON
-
-1) Read `schema_path` as UTF-8 JSON.
-2) Validate required keys:
-   - `record_length` is an integer `L`.
-   - `fields` is a list.
-3) For each field descriptor in `fields`, validate:
-   - `name` string
-   - `start` int
-   - `length` int
-   - `type` in `{string, decimal, date}`
-   - `required` boolean
-   - optional `pattern` string
-   - optional `format` string
-
-If schema cannot be loaded/parsed, treat it as a validation failure (non-zero) and still print exactly one JSON report.
-
-### Step 2: load clearing accounts
-
-1) Read the clearing accounts file as UTF-8 text.
-2) Split into lines.
-3) For each line, compute `acct = line.strip()`.
-4) Keep `acct` if it is non-empty.
-
-Result: `allowed_clearing_accounts: set[str]`.
-
-### Step 3: read payment file bytes and compute `file_hash`
-
-Compute `file_hash` before validation so it is always present.
-
-Use the canonicalization rules exactly as specified in the “Canonicalization (exact)” section below.
-
-**Important (verifier-aligned):**
-
-- Stdout must contain **only** the single JSON report (no log lines, no extra text).
-- If you need to print diagnostics, print them to stderr.
-- Always compute and include `file_hash` in the report, even when validation fails.
 
 ## Authoritative execution order (to avoid ambiguity)
 
@@ -288,18 +225,17 @@ Validate these names if present in schema:
   - lowercase letters are invalid
   - special chars (including spaces or punctuation) are invalid
 
-- `account_no`:
-  - must be all digits
-  - must be length 8..20 (inclusive)
-  - Define the **core account** `acct8 = account_no[:8]` (the leftmost 8 digits).
-    - The verifier’s “first 4 digits” and “last digits” rules apply to `acct8`, not the full 8–20 digit string.
-    - Rationale (verifier-aligned): the provided `valid_payment.txt` uses 20-digit `account_no` values that may contain `0` in their *overall* trailing digits and must still be considered valid.
-  - forbidden prefixes (must error): `acct8[:4]` is any of `0000`, `0001`, `0010`, `0100`
-  - first 4 digits must not consist solely of `0` and `1` (apply to `acct8[:4]`; error text must contain `First 4 digits` or `0 and 1`)
-  - must be strictly greater than 0 (error text must contain `must be > 0` or `greater than 0`)
-  - must have at most 2 digits after the decimal point
-  - parse using schema `format` if present (verifier uses `%Y-%m-%d`)
-  - invalid date is an error
+  - `account_no`:
+    - must be all digits
+    - must be length 8..20 (inclusive)
+    - Define the **core account** `acct8 = account_no[:8]` (the leftmost 8 digits).
+      - The verifier’s `first 4` and `last-digits` rules apply to `acct8`, not the full 8–20 digit string.
+      - Rationale: some test data uses 20-digit `account_no` values where only the leftmost 8 digits are validated for these business rules.
+    - forbidden prefixes (must error): `acct8[:4]` is any of `0000`, `0001`, `0010`, `0100` (error should mention the offending prefix)
+    - first 4 digits of `acct8` must not consist solely of `0` and `1` (error should include `First 4 digits` or `0 and 1`)
+    - the last 2 digits of `acct8` must not contain the digit `0` (error should include `cannot contain 0`)
+    - treat numeric/comparison rules on the canonical numeric value where applicable (e.g., `must be > 0`)
+    - other numeric/date parsing follows the schema `type` and optional `format`
 
 - `clearing_account`:
   - after trimming, must be contained in `allowed_clearing_accounts` exactly
@@ -522,63 +458,7 @@ Required behavior:
   - `timestamp` in ISO-8601 (any `datetime.now().isoformat()`-style string is acceptable)
   - `record_count` equal to `records_processed`
 
-### Ignore-prefix matching and Unicode normalization (optional `--ignore` semantics)
-
-Some tests (and implementers) expect an optional ignore-style matching feature when comparing identifiers, paths, or other componentized strings. If your implementation supports an `--ignore`-style list of JSON Pointer-like prefixes (or any component-path prefixes used when comparing values), it MUST follow the precise Unicode normalization and matching semantics described here. Even if you do not expose `--ignore`, these rules clarify how to implement any component-aware matching used by the validator.
-
-Canonicalization steps for each path component
-- For any component string used in prefix matching, apply these transformations in this exact order:
-  1. Normalize to NFC (Unicode Normalization Form C).
-  2. Apply Unicode case-folding (use `str.casefold()` or equivalent).
-  3. Normalize to NFKD (Compatibility Decomposition).
-  4. Remove all combining marks (Unicode category `Mn`).
-  5. Normalize back to NFC.
-
-Rationale: this sequence (NFC → casefold → NFKD → strip `Mn` → NFC) ensures composed/decomposed forms, case differences, and common accent/diacritic variations are handled consistently (for example, `café`, `café` (decomposed), and `CAFE` all canonicalize to the same token `cafe`).
-
-Component-aware prefix matching rules
-- When matching a candidate component path against an ignore prefix, first split both into components (for JSON Pointer-style paths: unescape per RFC6901, then split on `/`; for dotted or other separator-based paths, split on the separator after applying the same unescape rules used by your code).
-- Normalize every component using the canonicalization steps above and then compare component-by-component.
-- Standard prefix match: the ignore prefix `I = [i0..iM]` matches candidate path `P = [p0..pN]` if `M <= N` and for all k in 0..M-1, `normalize(i_k) == normalize(p_k)`.
-
-Single-component special-case
-- If the ignore prefix has exactly one non-empty component (i.e., length 1 after splitting), treat it as a component-level match that succeeds if any component of the candidate path, after normalization, equals that single normalized component. For example, an ignore `/café` should match `/users/café/id` and `/users/cafe/id` and `/users/CAFE/id`.
-
-Edge cases and implementation notes
-- The root prefix (`/` or empty components list) matches all paths.
-- Always apply identical normalization to both the ignore prefixes and the candidate paths.
-- Implementations must not treat the matching as a simple substring search — it must be component-aware unless a single-component special-case applies as above.
-
-Pseudocode (Python-style) for component normalization and matching
-
-```
-import unicodedata
-
-def normalize_component(s: str) -> str:
-  s = unicodedata.normalize('NFC', s)
-  s = s.casefold()
-  s = unicodedata.normalize('NFKD', s)
-  s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
-  return unicodedata.normalize('NFC', s)
-
-def matches_ignore(ignore_components: list[str], candidate_components: list[str]) -> bool:
-  I = [normalize_component(c) for c in ignore_components]
-  P = [normalize_component(c) for c in candidate_components]
-  if len(I) == 0:
-    return True
-  if len(I) == 1:
-    return any(pc == I[0] for pc in P)
-  if len(I) > len(P):
-    return False
-  return all(I[k] == P[k] for k in range(len(I)))
-```
-
-Examples
-- Ignore `/meta/generated_at` matches `/meta/generated_at` and `/meta/generated_at/2025`.
-- Ignore `/café` (single-component) matches `/users/café/id`, `/users/cafe/id`, and `/users/CAFE/id`.
-
-Testing
-- If you add or rely on ignore behavior in your implementation, include unit tests that verify composed and decomposed Unicode forms, case differences, and the single-component special-case.
+*(Optional `--ignore` / component-prefix matching guidance removed — not required by verifier tests. If you intend to implement component-aware ignore-prefix matching, ask and I will add a focused appendix describing the exact normalization steps.)*
 
 
 ## Validation rules
@@ -620,7 +500,7 @@ These checks are required regardless of whether the schema also provides pattern
   - must not start with any forbidden prefix: `0000`, `0001`, `0010`, `0100`
   - first 4 digits must not consist solely of `0` and `1` (error text must include `First 4 digits` or `0 and 1`)
   - Define the core account `acct8 = account_no[:8]`.
-  - the last 2 digits of `acct8` must not contain `0` (error text must include `cannot contain 0`)
+  - the last 2 digits of `acct8` must not contain the digit `0` (error text must include `cannot contain 0`)
 
 - `amount`:
   - parse as a decimal number
