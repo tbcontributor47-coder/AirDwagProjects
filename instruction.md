@@ -75,6 +75,12 @@ Note: `--ignore` accepts exact JSON Pointer strings and descendant matching only
 	 - If the multisets differ (different element counts for at least one canonical element), report FIRST_DIFF at the array pointer itself (e.g. `/items`) with `EXPECTED` set to the expected array and `ACTUAL` set to the actual array.
 	 - If the multisets are equal, arrays are considered equal regardless of element order.
 
+	Important clarification (ignore semantics for `items` elements):
+
+	- When performing multiset comparison for an `items` array, apply any `--ignore` JSON Pointer filters to each element *before* producing the canonical element form used for multiset counting. In other words, for each element in the expected and actual `items` arrays, remove (or treat as absent) any fields matching an ignore pointer that targets a descendant of that element, then canonicalize the resulting reduced element (apply string trimming, numeric handling, object key ordering, etc.) and use that canonical representation when computing multiset multiplicities.
+	- The verifier tests supply explicit per-element pointers when they need to ignore the same field across multiple elements (for example `--ignore /items/0/time --ignore /items/1/time`). Wildcard-style ignore patterns across all elements are not required by the verifier; if you need to ignore the same subfield for every element, pass one `--ignore` per element as the tests do.
+	- This filtering-before-canonicalization rule ensures that ignored subfields inside elements do not affect multiset membership, matching test expectations such as `[{"id":1,"time":"t1"},{"id":2,"time":"t2"}]` comparing equal to `[{"id":1,"time":"x"},{"id":2,"time":"y"}]` when `/items/0/time` and `/items/1/time` are ignored.
+
    - Note: if the array is not under an object key (i.e., the root value is an array), the property-name special-case does not apply; the root array uses the default order-sensitive behavior.
 
 8) Null vs missing
