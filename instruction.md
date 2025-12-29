@@ -84,7 +84,12 @@ Read the payment file as UTF-8 text.
 - Split on `\n`.
 - Drop only empty trailing lines at the end of the file.
 
-`records_processed = number of remaining lines`.
+Clarification (explicit examples):
+
+- Only remove empty lines that occur at the *end* of the file after normalizing line endings. Do not drop empty or short lines that occur in the middle of the file — they count as records and must be validated.
+- Example: the text `"LINE1\n\nLINE2\n"` becomes three lines `['LINE1', '', 'LINE2']` and `records_processed` is `3`. The trailing final empty line created by a trailing `\n` after the last line is removed only if it results in an empty last element; i.e. `"LINE1\nLINE2\n"` -> `['LINE1','LINE2']` -> `records_processed=2`.
+
+`records_processed = number of remaining lines after removing only trailing empty lines`.
 
 ## Record length handling
 
