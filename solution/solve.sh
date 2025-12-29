@@ -66,6 +66,7 @@ cat > /app/main.cob <<'COBOL'
      01  ws-whole-scan        pic x(64).
     01  ws-pipe-count        pic 9 value 0.
     01  ws-skip-validate     pic 9 value 0.
+    01  ws-line-error-flag   pic 9 value 0.
 
        01  ws-year-x            pic x(4).
        01  ws-mon-x             pic x(2).
@@ -152,6 +153,7 @@ cat > /app/main.cob <<'COBOL'
 
        parse-line.
            move spaces to ws-acc ws-date ws-amt ws-desc
+           move 0 to ws-line-error-flag
            move 0 to ws-skip-validate
 
            *> Count pipe separators to detect unexpected field counts
@@ -431,6 +433,11 @@ cat > /app/main.cob <<'COBOL'
                exit paragraph
            end-if
 
+           *> If any prior validation error occurred for this line, do not include amount in totals
+           if ws-line-error-flag = 1
+               exit paragraph
+           end-if
+
            compute ws-numval = function numval(ws-amt-trim)
            if ws-numval <= 0
                move 'AMOUNT must be > 0' to ws-err-msg
@@ -444,6 +451,7 @@ cat > /app/main.cob <<'COBOL'
 
        add-error.
            add 1 to ws-errors
+           move 1 to ws-line-error-flag
            if ws-err-count < ws-err-max
                add 1 to ws-err-count
                move ws-line-no to ws-line-no-z
