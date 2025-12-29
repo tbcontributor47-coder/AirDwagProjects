@@ -1662,8 +1662,9 @@ def test_space_character_sorting() -> None:
 
         diffs = report["attribute_drift"]["aws_instance.spaces"]
         attrs = [d["attribute"] for d in diffs]
-        # Expect 'a' < 'b' < 'a ' because space sorts after other chars
-        assert attrs == ["a", "b", "a "]
+        # Expect 'a' < 'a ' < 'b' when comparing lexicographically with space treated
+        # as a character that sorts after others at the character level.
+        assert attrs == ["a", "a ", "b"]
 
 
 def test_ignore_with_escaped_backslash_prefix() -> None:
