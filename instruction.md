@@ -92,7 +92,7 @@ Else:
 4) Query for any prior submission with the same `file_hash` and a timestamp >= cutoff.
    - If any exists: set `duplicate = true`.
    - Else: `duplicate = false`.
-5) If `duplicate` is false, insert a new row with:
+5) If `duplicate` is not true, insert a new row with:
    - `file_hash`
    - `filename` (input filename or full path)
    - `timestamp` (ISO-8601 now)
@@ -112,7 +112,6 @@ Important:
 - Always report `duplicate: false`.
 - Do not query the DB for duplicates.
 - Do not insert anything into the DB.
-
 ### Step 5: parse records and validate
 
 Let `L = record_length` from schema.
@@ -133,31 +132,14 @@ Let the remaining list be `records`.
 
 Set:
 
-- `records_processed = len(records)`
-
-5.2) For each record line `records[i]` (1-based line number `line_no = i+1`)
-
-Record length rules (must match verifier):
-
 - If `len(line) < L`: error.
-- Else if `len(line) == L`: ok.
-- Else (`len(line) > L`):
   - If `line[L:].strip() == ""` (only spaces/tabs): accept, and use `line = line[:L]` for parsing.
   - Otherwise: error.
 
 Field extraction:
 
 - For each field descriptor:
-  - `raw = line[start:start+length]`
-  - `value = raw.strip()`
-
-Collect all field values into a dict `row` keyed by field name.
-
-5.3) Required-field validation
-
 For each schema field with `required == true`:
-
-- If `row[name] == ""`: add error `Line N: <field> is required`.
 
 5.4) Field-specific validation (verifier-checked)
 
@@ -181,14 +163,8 @@ Validate these names if present in schema:
     - Rationale (verifier-aligned): the provided `valid_payment.txt` uses 20-digit `account_no` values that may contain `0` in their *overall* trailing digits and must still be considered valid.
   - forbidden prefixes (must error): `acct8[:4]` is any of `0000`, `0001`, `0010`, `0100`
   - first 4 digits must not consist solely of `0` and `1` (apply to `acct8[:4]`; error text must contain `First 4 digits` or `0 and 1`)
-  - the last 2 digits must not contain `0` (apply to `acct8[-2:]`; error text must contain `cannot contain 0`)
-
-- `amount`:
-  - parse as decimal
   - must be strictly greater than 0 (error text must contain `must be > 0` or `greater than 0`)
   - must have at most 2 digits after the decimal point
-
-- `clearance_date`:
   - parse using schema `format` if present (verifier uses `%Y-%m-%d`)
   - invalid date is an error
 
@@ -197,12 +173,8 @@ Validate these names if present in schema:
   - substring matches must NOT be accepted
 
 5.5) Schema regex validation (optional)
-
 If a field descriptor includes `pattern`, enforce it as a full regex match against the trimmed value.
 
-5.6) Payees DB checks (only when `--payees-db` is provided)
-
-For each record, after `account_no` and `payee_name` are parsed:
 
 1) Query `payees` table by `account_no`.
    - If no row: error containing `not found in payee database` or `Account`.
@@ -211,9 +183,6 @@ For each record, after `account_no` and `payee_name` are parsed:
    - Normalize both:
      - `strip()`
      - collapse internal whitespace runs to one space
-     - compare with `.casefold()`
-   - If mismatch: error containing `name mismatch` or `payee name`.
-
 Important note:
 
 - The verifier expects payee name comparison to be case-insensitive (e.g., `john doe` must match `JOHN DOE`).
@@ -236,8 +205,6 @@ Set `duplicate` based on Step 4.
 - Else: exit `0`.
 
 Exit-code truth table (authoritative)
-
-- If `duplicate` is `true` → exit code is non-zero (the verifier only checks “non-zero”, you may use `1`).
 - Else if `n_errors > 0` → exit code is non-zero.
 - Else (`duplicate == false` AND `n_errors == 0`) → exit code is exactly `0`.
 
@@ -266,8 +233,6 @@ The verifier always passes valid CLI arguments. You still must avoid printing a 
 
 For every invocation (success, validation failure, or duplicate), print exactly one JSON object to stdout.
 
-The JSON object must contain at least these keys:
-
 - `duplicate`: boolean
 - `n_errors`: integer
 - `n_warnings`: integer
@@ -278,20 +243,16 @@ The JSON object must contain at least these keys:
 
 Notes:
 
-- The verifier parses stdout as JSON even on failures.
 - Set `n_warnings = 0` and `warnings = []`.
 
 ### Exit code
 
-- Exit `0` only if:
   - `duplicate` is `false`, and
   - `n_errors` is `0`.
 - Exit non-zero if either:
-  - `duplicate` is `true`, or
   - `n_errors` is greater than `0`.
 
 ## Input files
-
 ### 1) Payment file (`--file`)
 
 The payment file is UTF-8 text. It contains fixed-width records, one record per line.
@@ -301,16 +262,13 @@ Line ending handling:
 - Treat `\r\n` and bare `\r` as `\n`.
 
 Trailing empty lines:
-
 - Ignore empty trailing lines at the end of the file for both hashing and `records_processed`.
 
 ### 2) Schema JSON (`--schema`)
 
-The validator must use the provided schema file for parsing.
 
 The schema JSON has this shape:
 
-```json
 {
   "record_length": 296,
   "fields": [
