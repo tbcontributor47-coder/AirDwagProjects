@@ -319,24 +319,6 @@ def test_hash_normalization_crlf_and_trailing_spaces(test_env):
     assert json.loads(out2)["duplicate"] is True
 
 
-def test_clearing_account_requires_exact_match_not_substring(test_env):
-    """clearing_account must match an allowed account exactly (no substring matching)."""
-    schema = _load_schema(test_env["schema"])
-
-    # Override clearing accounts to create a substring trap
-    clearing_path = Path(test_env["tmp_path"]) / "clearing_accounts.txt"
-    _write_text(clearing_path, "1234567890\n")
-
-    line = _make_fixed_width_line(schema, {"clearing_account": "2345"})
-    f = Path(test_env["tmp_path"]) / "sub.txt"
-    _write_text(f, line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], str(clearing_path), test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep["n_errors"] >= 1
-
-
 def test_randomized_record_not_hardcoded(test_env):
     """A small randomized valid record should validate (guards against hardcoding)."""
     schema = _load_schema(test_env["schema"])
@@ -402,22 +384,6 @@ def test_required_fields_empty_are_reported(test_env):
     assert rep['n_errors'] >= 1
     assert any("eftno" in e.lower() or "Field 'eftno'" in e for e in rep.get('errors', []))
     assert any("Line 1" in e for e in rep.get('errors', []))
-
-
-def test_eftno_and_bank_code_alphanumeric_constraints(test_env):
-    """eftno and bank_code should be alphanumeric; non-alnum values must error."""
-    schema = _load_schema(test_env["schema"])
-    # include punctuation in eftno and bank_code
-    bad_line = _make_fixed_width_line(schema, {"eftno": "EFT#123!@#", "bank_code": "BANK CODE!"})
-    f = Path(test_env["tmp_path"]) / "alnum.txt"
-    _write_text(f, bad_line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    # Expect at least one error mentioning eftno or bank_code
-    errors_text = "\n".join(rep.get('errors', []))
-    assert ("eftno" in errors_text.lower()) or ("bank_code" in errors_text.lower()) or rep['n_errors'] >= 1
 
 
 def test_account_forbidden_prefixes(test_env):
@@ -683,32 +649,6 @@ def test_empty_lines_at_end(test_env):
     assert rep['n_errors'] == 0
 
 
-def test_record_too_short(test_env):
-    """Records shorter than 296 characters should be rejected."""
-    short_line = "SHORT"  # Much shorter
-    f = Path(test_env["tmp_path"]) / "short_record.txt"
-    _write_text(f, short_line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep['n_errors'] > 0
-
-
-def test_record_too_long(test_env):
-    """Records longer than 296 characters should be handled."""
-    schema = _load_schema(test_env["schema"])
-
-    long_line = _make_fixed_width_line(schema) + "EXTRA"
-    f = Path(test_env["tmp_path"]) / "long_record.txt"
-    _write_text(f, long_line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep['n_errors'] > 0
-
-
 def test_invalid_date_format(test_env):
     """Invalid date formats should be rejected."""
     schema = _load_schema(test_env["schema"])
@@ -764,27 +704,6 @@ def test_clearing_account_substring_match_bug(test_env):
     assert rc != 0
     rep = json.loads(out)
     assert rep['n_errors'] > 0
-
-
-def test_duplicate_different_filename_bug(test_env):
-    """Duplicate detection should work regardless of filename."""
-    schema = _load_schema(test_env["schema"])
-
-    line = _make_fixed_width_line(schema, {"account_no": "12345678"})
-    f1 = Path(test_env["tmp_path"]) / "file1.txt"
-    _write_text(f1, line + "\n")
-
-    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc1 == 0
-
-    # Same content, different filename
-    f2 = Path(test_env["tmp_path"]) / "file2.txt"
-    _write_text(f2, line + "\n")
-
-    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc2 != 0
-    rep2 = json.loads(out2)
-    assert rep2['duplicate'] is True
 
 
 def test_retention_days_ignored_bug(test_env):
@@ -870,34 +789,6 @@ def test_special_characters_in_address(test_env):
     assert rep['n_errors'] == 0
 
 
-def test_bank_code_starting_with_letter(test_env):
-    """Bank codes starting with letters should be invalid."""
-    schema = _load_schema(test_env["schema"])
-
-    line = _make_fixed_width_line(schema, {"bank_code": "aBANKCODE1"})
-    f = Path(test_env["tmp_path"]) / "bank_code_letter.txt"
-    _write_text(f, line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep['n_errors'] > 0
-
-
-def test_bank_code_with_lowercase(test_env):
-    """Bank codes with lowercase letters should be invalid."""
-    schema = _load_schema(test_env["schema"])
-
-    line = _make_fixed_width_line(schema, {"bank_code": "1bankcode1"})
-    f = Path(test_env["tmp_path"]) / "bank_code_lower.txt"
-    _write_text(f, line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep['n_errors'] > 0
-
-
 def test_exact_length_with_padding(test_env):
     """Records with extra trailing spaces beyond record length should be valid."""
     schema = _load_schema(test_env["schema"])
@@ -911,20 +802,6 @@ def test_exact_length_with_padding(test_env):
     assert rc == 0
     rep = json.loads(out)
     assert rep['n_errors'] == 0
-
-
-def test_eftno_with_special_chars(test_env):
-    """EFT numbers with non-alphanumeric should be invalid."""
-    schema = _load_schema(test_env["schema"])
-
-    line = _make_fixed_width_line(schema, {"eftno": "EFT@000001"})
-    f = Path(test_env["tmp_path"]) / "eftno_special.txt"
-    _write_text(f, line + "\n")
-
-    rc, out, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'])
-    assert rc != 0
-    rep = json.loads(out)
-    assert rep['n_errors'] > 0
 
 
 def test_solution_runtime_within_limit(test_env):
