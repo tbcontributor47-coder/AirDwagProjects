@@ -287,6 +287,125 @@ harbor run --agent oracle --path "$TMPDIR" --force-build 2>&1 | tee logs/oracle.
 '''
             }
         }
+
+        stage('Agent Runs (optional)') {
+            when {
+                expression { return env.OPENAI_API_KEY?.trim() && (params.RUN_ALL_MODES || params.RUN_CODEX || params.RUN_CLAUDE) }
+            }
+            steps {
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs
+
+export PATH="$HOME/.local/bin:$PATH"
+[ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
+
+command -v harbor >/dev/null || { echo "harbor not found in PATH"; exit 127; }
+
+# Multibranch support
+if [ -n "${BRANCH_NAME:-}" ] && [ -d "$WORKSPACE/$BRANCH_NAME" ]; then
+    EFFECTIVE_TASK_PATH="$BRANCH_NAME"
+else
+    EFFECTIVE_TASK_PATH="$TASK_PATH"
+fi
+
+TASK_ABS="$(cd "$WORKSPACE/$EFFECTIVE_TASK_PATH" 2>/dev/null && pwd -P)"
+echo "Task absolute path: $TASK_ABS"
+
+# Copy to lowercase temp dir to avoid Docker invalid image name errors
+BASENAME="$(basename "$TASK_ABS" | tr '[:upper:]' '[:lower:]')"
+SUFFIX="$(openssl rand -hex 6 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c6 || echo '000000')"
+TMPDIR="/tmp/${BASENAME}.${SUFFIX}"
+mkdir -p "$TMPDIR"
+echo "Using temporary lowercase task dir: $TMPDIR"
+
+rsync -a --exclude='.git' "$TASK_ABS/" "$TMPDIR/" || cp -a "$TASK_ABS/." "$TMPDIR/" || true
+
+dump_harbor_run_from_log() {
+    local log_file="$1"
+    local label="$2"
+
+    if [ ! -f "$log_file" ]; then
+        return 0
+    fi
+
+    echo ""
+    echo "--- ${label} ---"
+    echo "Log: $log_file"
+
+    local result_json
+    result_json="$(awk '/Results written to /{print $NF}' "$log_file" | tail -n1)"
+    if [ -z "$result_json" ]; then
+        echo "No 'Results written to ...' line found in $log_file"
+        return 0
+    fi
+
+    if [ ! -f "$result_json" ] && [ -f "$WORKSPACE/$result_json" ]; then
+        result_json="$WORKSPACE/$result_json"
+    fi
+
+    if [ ! -f "$result_json" ]; then
+        echo "Result file not found: $result_json"
+        return 0
+    fi
+
+    echo "result.json: $result_json"
+    cat "$result_json" 2>/dev/null || true
+
+    local job_dir
+    job_dir="$(dirname "$result_json")"
+    echo "job dir: $job_dir"
+    ls -la "$job_dir" 2>/dev/null || true
+
+    if [ -f "$job_dir/job.log" ]; then
+        echo "--- $job_dir/job.log (tail 200) ---"
+        tail -n 200 "$job_dir/job.log" 2>/dev/null || true
+    fi
+
+    local trial_dir
+    trial_dir="$(find "$job_dir" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null || true)"
+    if [ -z "$trial_dir" ]; then
+        echo "No trial dir found under: $job_dir"
+        return 0
+    fi
+
+    echo "trial dir: $trial_dir"
+    ls -la "$trial_dir" 2>/dev/null || true
+
+    for f in \
+        "$trial_dir/config.json" \
+        "$trial_dir/agent/oracle.txt" \
+        "$trial_dir/agent/stdout.txt" \
+        "$trial_dir/agent/stderr.txt" \
+        "$trial_dir/stdout.txt" \
+        "$trial_dir/stderr.txt" \
+        "$trial_dir/verifier/test-stdout.txt" \
+        "$trial_dir/verifier/test-stderr.txt" \
+        ; do
+        if [ -f "$f" ]; then
+            echo "--- $f (first 2000 lines) ---"
+            sed -n '1,2000p' "$f" 2>/dev/null || true
+        fi
+    done
+}
+
+if [ "${RUN_ALL_MODES:-false}" = "true" ] || [ "${RUN_CODEX:-false}" = "true" ]; then
+    echo "Running GPT-5 agent..."
+    harbor run -a terminus-2 -m openai/@openai-tbench/gpt-5 -p "$TMPDIR" 2>&1 | tee logs/agent-gpt5.log
+    dump_harbor_run_from_log logs/agent-gpt5.log "Agent Run: GPT-5"
+fi
+
+if [ "${RUN_ALL_MODES:-false}" = "true" ] || [ "${RUN_CLAUDE:-false}" = "true" ]; then
+    echo "Running Claude Sonnet 4.5 agent..."
+    harbor run -a terminus-2 -m openai/@anthropic-tbench/claude-sonnet-4-5-20250929 -p "$TMPDIR" 2>&1 | tee logs/agent-claude.log
+    dump_harbor_run_from_log logs/agent-claude.log "Agent Run: Claude Sonnet 4.5"
+fi
+
+# Cleanup
+[ "${KEEP_TMPDIR:-false}" != "true" ] && rm -rf "$TMPDIR" || true
+'''
+            }
+        }
     }
 
     post {

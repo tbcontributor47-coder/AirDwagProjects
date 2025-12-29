@@ -71,3 +71,21 @@ Exit codes:
 - Locale is fixed to `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`.
 - No network/time/random usage.
 - Output must be deterministic and stable.
+
+## Verifier tests (required coverage)
+
+The verifier uses `pytest` and executes the program through `/bin/bash /app/run_cobol.sh <input>`.
+
+### How the verifier runs (step-by-step)
+
+1) Writes an input file.
+2) Runs `/bin/bash /app/run_cobol.sh <input_path>`.
+3) Parses stdout as JSON (exactly one line + trailing newline).
+4) Validates `records_processed`, `n_errors`, `total_cents`, and `errors`.
+5) Validates exit code: `0` iff `n_errors == 0`, else `2`.
+
+### Complete test list (all tests must pass)
+
+- `test_valid_single_record` — One valid record produces correct totals and exit `0`.
+- `test_blank_lines_ignored_but_line_numbers_count` — Blank lines don’t increment `records_processed` but still affect `Line N:` numbering.
+- `test_amount_zero_is_error_and_excludes_from_total` — `0.00` is an error and is excluded from the cents total.
