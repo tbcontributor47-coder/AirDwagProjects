@@ -661,6 +661,19 @@ dump_harbor_run_from_log() {
             (sed -n '1,2000p' "$f" 2>/dev/null | tee -a logs/consolidate.log) || true
         fi
     done
+
+    # Some verifier harnesses write per-invocation stdout/stderr under verifier/; surface anything useful
+    if [ -d "$trial_dir/verifier" ]; then
+        echo "--- $trial_dir/verifier (file list) ---" | tee -a logs/consolidate.log
+        (find "$trial_dir/verifier" -maxdepth 3 -type f -print 2>/dev/null | tee -a logs/consolidate.log) || true
+
+        echo "--- Verifier artifacts (stdout/stderr/report/json, first 400 lines each) ---" | tee -a logs/consolidate.log
+        while IFS= read -r vf; do
+            [ -f "$vf" ] || continue
+            echo "--- $vf (first 400 lines) ---" | tee -a logs/consolidate.log
+            (sed -n '1,400p' "$vf" 2>/dev/null | tee -a logs/consolidate.log) || true
+        done < <(find "$trial_dir/verifier" -maxdepth 3 -type f \( -iname '*stdout*' -o -iname '*stderr*' -o -iname '*.json' -o -iname '*report*' \) 2>/dev/null || true)
+    fi
 }
 
 dump_harbor_run_from_log logs/agent-gpt5.log "Agent Run: GPT-5"
