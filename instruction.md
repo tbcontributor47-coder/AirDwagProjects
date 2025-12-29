@@ -176,9 +176,12 @@ Validate these names if present in schema:
 - `account_no`:
   - must be all digits
   - must be length 8..20 (inclusive)
-  - forbidden prefixes (must error): `0000`, `0001`, `0010`, `0100`
-  - first 4 digits must not consist solely of `0` and `1` (error text must contain `First 4 digits` or `0 and 1`)
-  - last 4 digits must not contain `0` (error text must contain `Last 4 digits` or `cannot contain 0`)
+  - Define the **core account** `acct8 = account_no[:8]` (the leftmost 8 digits).
+    - The verifier’s “first 4 digits” and “last 4 digits” rules apply to `acct8`, not the full 8–20 digit string.
+    - Rationale (verifier-aligned): the provided `valid_payment.txt` uses 20-digit `account_no` values that may contain `0` in their *overall* last 4 digits and must still be considered valid.
+  - forbidden prefixes (must error): `acct8[:4]` is any of `0000`, `0001`, `0010`, `0100`
+  - first 4 digits must not consist solely of `0` and `1` (apply to `acct8[:4]`; error text must contain `First 4 digits` or `0 and 1`)
+  - last 4 digits must not contain `0` (apply to `acct8[-4:]`; error text must contain `Last 4 digits` or `cannot contain 0`)
 
 - `amount`:
   - parse as decimal
