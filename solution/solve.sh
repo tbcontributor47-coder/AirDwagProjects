@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -eu
+# Enable pipefail when running under bash; plain /bin/sh may not support it.
 if [ -n "${BASH_VERSION-}" ]; then
   set -o pipefail
 fi
+
 cat > /app/compare_json.py <<'PY'
 #!/usr/bin/env python3
 
@@ -18,7 +20,7 @@ USAGE = "Usage: python3 /app/compare_json.py --expected <path> --actual <path> [
 
 
 def _dump_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
 
 
 def _escape_pointer_token(token: str) -> str:
@@ -33,9 +35,9 @@ def _join_ptr(base: str, token: str) -> str:
 
 def _normalize_string(s: str) -> str:
     # Remove trailing spaces/tabs on each line.
-    parts = s.split("\n")
-    parts = [p.rstrip(" \t") for p in parts]
-    return "\n".join(parts)
+    parts = s.split("\\n")
+    parts = [p.rstrip(" \\t") for p in parts]
+    return "\\n".join(parts)
 
 
 def _is_number(x: Any) -> bool:
@@ -206,17 +208,17 @@ def main(argv: list[str]) -> int:
     diff = _first_diff(expected, actual, "", float(args.tolerance or 0.0), ignores)
 
     if diff is None:
-        sys.stdout.write("EQUAL\n")
+        sys.stdout.write("EQUAL\\n")
         return 0
 
     ptr, exp_v, act_v = diff
     if ptr == "":
         ptr = "/"
 
-    sys.stdout.write("NOT_EQUAL\n")
-    sys.stdout.write(f"FIRST_DIFF {ptr}\n")
-    sys.stdout.write(f"EXPECTED {_dump_json(exp_v)}\n")
-    sys.stdout.write(f"ACTUAL {_dump_json(act_v)}\n")
+    sys.stdout.write("NOT_EQUAL\\n")
+    sys.stdout.write(f"FIRST_DIFF {ptr}\\n")
+    sys.stdout.write(f"EXPECTED {_dump_json(exp_v)}\\n")
+    sys.stdout.write(f"ACTUAL {_dump_json(act_v)}\\n")
     return 2
 
 
