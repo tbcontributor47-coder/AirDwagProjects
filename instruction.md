@@ -177,11 +177,11 @@ Validate these names if present in schema:
   - must be all digits
   - must be length 8..20 (inclusive)
   - Define the **core account** `acct8 = account_no[:8]` (the leftmost 8 digits).
-    - The verifier’s “first 4 digits” and “last 4 digits” rules apply to `acct8`, not the full 8–20 digit string.
-    - Rationale (verifier-aligned): the provided `valid_payment.txt` uses 20-digit `account_no` values that may contain `0` in their *overall* last 4 digits and must still be considered valid.
+    - The verifier’s “first 4 digits” and “last digits” rules apply to `acct8`, not the full 8–20 digit string.
+    - Rationale (verifier-aligned): the provided `valid_payment.txt` uses 20-digit `account_no` values that may contain `0` in their *overall* trailing digits and must still be considered valid.
   - forbidden prefixes (must error): `acct8[:4]` is any of `0000`, `0001`, `0010`, `0100`
   - first 4 digits must not consist solely of `0` and `1` (apply to `acct8[:4]`; error text must contain `First 4 digits` or `0 and 1`)
-  - last 4 digits must not contain `0` (apply to `acct8[-4:]`; error text must contain `Last 4 digits` or `cannot contain 0`)
+  - the last 2 digits must not contain `0` (apply to `acct8[-2:]`; error text must contain `cannot contain 0`)
 
 - `amount`:
   - parse as decimal
@@ -499,7 +499,7 @@ Error message formatting requirements (verifier-checked):
 - Every error string must include the 1-based line number prefix `Line N`.
 - Some tests look for these substrings in at least one error when relevant:
   - `First 4 digits`
-  - `Last 4 digits`
+  - `cannot contain 0`
   - `must start with a digit`
   - `must be > 0` (or `greater than 0`)
   - `fraud` or `risk`
@@ -528,7 +528,8 @@ These checks are required regardless of whether the schema also provides pattern
   - must be 8–20 digits only
   - must not start with any forbidden prefix: `0000`, `0001`, `0010`, `0100`
   - first 4 digits must not consist solely of `0` and `1` (error text must include `First 4 digits` or `0 and 1`)
-  - last 4 digits must not contain `0` (error text must include `Last 4 digits` or `cannot contain 0`)
+  - Define the core account `acct8 = account_no[:8]`.
+  - the last 2 digits of `acct8` must not contain `0` (error text must include `cannot contain 0`)
 
 - `amount`:
   - parse as a decimal number
@@ -645,7 +646,7 @@ The verifier runs a suite of `pytest` tests that invoke the CLI as an external p
 - `test_bank_code_no_lowercase_or_special_chars` / `test_bank_code_with_lowercase` — `bank_code` must contain only uppercase letters and digits; lowercase or special characters are rejected.
 - `test_account_no_length_validation` / `test_amount_must_be_positive` — `account_no` must be 8..20 digits only; `amount` must parse as decimal, be > 0, and have at most 2 decimals (errors must reference `must be > 0` or `greater than 0`).
 - `test_account_forbidden_prefixes` / `test_account_forbidden_first_four_zeros_ones` — Reject `account_no` prefixes `0000`, `0001`, `0010`, `0100`. First 4 digits must not be only `0` and `1` (error should include `First 4 digits` or `0 and 1`).
-- `test_account_last_four_cannot_have_zeros` — Last 4 digits must not contain `0` (error should include `Last 4 digits` or `cannot contain 0`).
+- `test_account_last_four_cannot_have_zeros` — Core account last 2 digits must not contain `0` (error should include `cannot contain 0`).
 - `test_invalid_date_format` — `clearance_date` parsed by schema `format` (verifier uses `%Y-%m-%d`) and invalid dates are errors.
 - `test_amount_with_more_than_two_decimals` — Amounts with >2 decimal places are rejected.
 - `test_clearing_account_requires_exact_match_not_substring` / `test_clearing_account_substring_match_bug` — `clearing_account` must match one of the allowed clearing accounts exactly after trimming; substring matches are not accepted.
