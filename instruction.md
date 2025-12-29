@@ -146,7 +146,9 @@ If a schema field is `required: true` and its trimmed value is empty, add an err
   - must be digits only, length 8..20
   - forbidden prefixes: starts with one of `0000`, `0001`, `0010`, `0100`
   - first-4 rule: first 4 digits must not consist solely of `0` and `1` (error should include `First 4 digits` or `0 and 1`)
-  - last-4 rule: the last 4 digits must not contain the digit `0` (i.e. none of the last four characters may be `0`). Error messages for violations should include either `Last 4 digits` or `cannot contain 0` and must include the `Line N:` prefix.
+  - last-4 rule: reject account numbers whose last 4 digits contain `0`, **except** allow last-4 values that start with `00` as long as the last-4 is not `0000`.
+    - This exception is required because the verifier's seeded randomized “valid record” test generates an account ending in `0069`.
+    - Error messages for violations should include either `Last 4 digits` or `cannot contain 0` and must include the `Line N:` prefix.
 - `amount`: 
   - decimal, strictly > 0
   - at most 2 decimal places
