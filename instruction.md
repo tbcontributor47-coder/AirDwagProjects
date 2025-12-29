@@ -519,12 +519,61 @@ def prefix_matches(prefix, attribute):
 
   # normalized prefix + lookahead on unescaped attribute final component
   if An[j].startswith(Pn[j]):
-    # length of the matched prefix in characters as measured on unescaped prefix
+    # Important: the lookahead is performed on the *unescaped* final attribute component
+    # and the matched prefix length is measured on the *unescaped prefix* (not the
+    # normalized string). Use Python-like character indexing (codepoints), not byte offsets.
     prefix_len = len(P_un[j])
+    # If the matched prefix consumes the entire unescaped final component, there is
+    # no lookahead character and the partial-match rule does not apply. Only an
+    # exact normalized equality (handled above) succeeds in that case.
     if prefix_len < len(A_un[j]):
       next_ch = A_un[j][prefix_len]
-      return ('A' <= next_ch <= 'Z') or ('0' <= next_ch <= '9')
+      # The lookahead succeeds only when the immediate next character is an ASCII
+      # uppercase letter A-Z or an ASCII digit 0-9. Do not case-fold or normalize
+      # for this check; inspect the raw `unescaped` character as-is.
+      if ('A' <= next_ch <= 'Z') or ('0' <= next_ch <= '9'):
+        return True
   return False
+
+```
+
+Edge-case clarifications (authoritative):
+
+- Measuring the prefix length: when computing `prefix_len` use the length of the
+  `unescaped` prefix string (the component from `P_un[j]`) measured in Unicode
+  codepoints (i.e., `len()` in Python). Do NOT use the normalized or NFKD-decomposed
+  lengths for this measurement.
+- When `prefix_len == len(A_un[j])` (the matched prefix consumes the entire
+  unescaped final component) the partial-match rule with lookahead does NOT apply.
+  In that case, the only way the component matches is if the normalized forms are
+  exactly equal (the exact-match branch above).
+- The single-component special-case (when the rendered attribute contains no
+  unescaped dots) uses a normalized prefix comparison of the entire final component
+  (i.e., `An[0].startswith(Pn[0])`). This still allows a prefix that equals the whole
+  component to match (because it is a normalized starts-with check), which is the
+  intended behavior for `--ignore café` matching `café` and `café\.au_lait` when
+  the latter is rendered as a single escaped component.
+
+Concrete examples to illustrate the rules (authoritative):
+
+- `--ignore tags.Env` vs attribute `tags.EnvName`:
+  - `P_un = ["tags", "Env"]`; `A_un = ["tags", "EnvName"]`
+  - Normalized prefix `Pn[1] == "env"`, `An[1] == "envname"` so `An[1]` starts
+    with `Pn[1]`. `prefix_len = len("Env") == 3 < len("EnvName")` and the
+    next character is `"N"` (ASCII uppercase) → match.
+
+- `--ignore tags.Env` vs attribute `tags.Environment`:
+  - `An[1]` starts with `Pn[1]` but the next unescaped character is `"i"` (lowercase)
+    → lookahead fails → no match.
+
+- `--ignore cafe` vs attribute `tags.café` or `tags.cafe\u0301Env`:
+  - Normalization makes `Pn[-1]` and `An[-1]` comparable; lookahead rules use the
+    unescaped attribute final component for the case/digit check, so `--ignore cafe`
+    can match `tags.cafeName` (if next unescaped char is `N`) but not `tags.cafee`.
+
+These clarifications remove ambiguity about which string form is used for length
+measurement and lookahead, and what happens when the prefix exactly equals the
+final component length.
 ```
 
 Additional examples demonstrating Unicode interaction:
