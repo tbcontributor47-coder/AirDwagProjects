@@ -140,6 +140,15 @@ Validation rules:
 	- `test_valid_single_record` — One valid record produces correct totals and exit `0`.
 	- `test_blank_lines_ignored_but_line_numbers_count` — Blank lines don’t increment `records_processed` but still affect `Line N:` numbering.
 	- `test_amount_zero_is_error_and_excludes_from_total` — `0.00` is an error and is excluded from the cents total.
+	- `test_trim_fields_are_allowed` — Leading/trailing whitespace on fields must be trimmed before validation.
+	- `test_unexpected_field_count_is_error` — Lines containing more than three `|` separators must produce `Line N: unexpected field count` and be treated as errors.
+	- `test_amount_rejects_commas_and_symbols` — `AMOUNT` values containing commas, currency symbols, or embedded spaces must be rejected as malformed.
+	- `test_leap_year_date_validation` — Enforce calendar validation including leap years (`2024-02-29` accepted; `2023-02-29` rejected).
+	- `test_empty_fields_are_errors` — Missing required fields (empty after trimming) are validation errors and excluded from totals.
+	- `test_description_pipe_causes_unexpected_field_count` — An extra unescaped `|` in the description must be treated as an unexpected field count error.
+	- `test_accept_windows_line_endings` — Files using CRLF (`\r\n`) line endings are accepted.
+
+	Note: the verifier enforces the behaviors listed here. Other rules mentioned elsewhere in this file (for example, optional escape mechanisms for `|` in descriptions or accepting leading `+` on amounts) are advisory and are not covered by the current test suite unless explicitly listed above.
 
 	## Test formatting and agent timeout notes (reviewer feedback)
 
@@ -154,7 +163,7 @@ Validation rules:
 	- **Trim fields:** Trim leading and trailing whitespace (including non-ASCII spaces) from every field before validation.
 	- **Empty fields:** Multiple consecutive pipes indicate empty fields. Missing `ACCOUNT`, `DATE`, or `AMOUNT` (empty after trimming) is a validation error.
 	- **Unexpected field count:** Lines with more than four fields (more than 3 pipe separators) must be rejected with an error message `Line N: unexpected field count`.
-	- **Amount format:** Reject `AMOUNT` values that include thousands separators (commas), currency symbols, or embedded spaces. A leading `+` is allowed (e.g. `+12.34`). `AMOUNT` must otherwise match the `[-+]?[0-9]+\.[0-9]{2}` pattern after trimming.
+	- **Amount format:** Reject `AMOUNT` values that include thousands separators (commas), currency symbols, or embedded spaces. `AMOUNT` must otherwise be a numeric value with exactly two decimals after trimming (e.g. `10.50`).
 	- **Zero/negative amounts:** `0.00` and negative amounts are errors and excluded from totals.
 	- **Date validation:** Enforce full calendar validation including leap years (accept `YYYY-02-29` only on leap years). Reject `0000-00-00` and any month/day out of range.
 	- **Account validation:** After trimming, `ACCOUNT` must be exactly 10 ASCII digits. Internal spaces or any non-digit characters are errors.
