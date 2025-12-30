@@ -10,6 +10,30 @@ The tool compares an **ideal** Terraform state snapshot against a **current** sn
 
 This document is the full runtime contract. Do not guess; implement exactly what is specified.
 
+## Intentional Bugs
+
+The program at `/app/drift_audit.py` contains numerous bugs that must be fixed to meet the specification:
+
+1. **Broken Argument Parsing**: The CLI blindly takes the first two arguments and ignores `--ignore` flags entirely.
+2. **Incorrect Timestamp**: The report uses `"DYNAMIC"` instead of the required `"STATIC"`.
+3. **Invalid JSON Output**: The output is pretty-printed (indent=2) with unsorted keys, violating the compact, deterministic requirement.
+4. **Missing Attribute Flattening**: Nested objects are not flattened into dot-notation paths (e.g. `network.id`), causing structural mismatches.
+5. **Incorrect Dot Escaping**: Dots in keys are replaced with underscores (`_`) instead of being escaped as `\.`.
+6. **Arbitrary Attribute Skipping**: The code explicitly skips attributes containing "tag", list values, and values longer than 100 characters.
+7. **Missing Ignore Filtering**: The `--ignore` logic is not implemented; the arguments are ignored.
+8. **Incorrect Sorting**: The custom sorting rule for space characters (lexicographically largest) is missing or applied inconsistently.
+9. **Missing Terraform Format Support**: The parser only handles a "simplified" input format and fails on standard Terraform `values.root_module` structures.
+10. **Missing Duplicate Check**: Duplicate resource IDs are silently overwritten instead of raising a parse error.
+11. **Incorrect Error Handling**: File I/O and JSON errors return simplified or incorrect exit codes/messages compared to the strict requirements.
+
+## Hints
+
+- **Parsing**: Use a robust argument parser or careful manual loop to handle `--ignore` flags appearing anywhere before the positional arguments.
+- **Flattening**: Implement a recursive function or stack-based approach to flatten nested dictionaries into dot-separated keys. Remember to escape existing backslashes and dots in keys *during* flattening.
+- **Filtering**: Apply the ignore filters against the fully flattened path keys.
+- **Output**: Use `json.dump(..., sort_keys=True, separators=(',', ':'))` for the strict output format.
+- **Sorting**: Create a key function that replaces spaces with a high unicode character (e.g., `\uffff`) just for the sorting step to ensure `attribute` comes before `attribute 2`.
+
 ## Step-by-step implementation checklist (required)
 
 Implement `/app/drift_audit.py` exactly as the following pipeline. This section is intentionally redundant and procedural to remove ambiguity.
