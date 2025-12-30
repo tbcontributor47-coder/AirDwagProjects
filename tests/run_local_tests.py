@@ -2,7 +2,6 @@
 import sys
 import os
 import pytest
-from unittest.mock import patch
 import subprocess
 
 # Add the tests directory to sys.path so we can import test_outputs
