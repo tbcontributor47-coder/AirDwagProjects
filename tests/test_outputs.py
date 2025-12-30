@@ -844,14 +844,16 @@ def test_hash_final_newline_required(test_env):
     # Both should hash the same after canonicalization (both get final newline appended)
     rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
     rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
-    
+
     assert rc1 == 0
-    assert rc2 == 0
     rep1 = json.loads(out1)
     rep2 = json.loads(out2)
-    
-    # Both should produce the same hash (canonicalization adds final newline per spec step 5)
+
+    # Both should produce the same canonical hash
     assert rep1['file_hash'] == rep2['file_hash'], "Files with/without trailing newline should hash the same after canonicalization (spec requires final newline to be appended)"
+
+    # Second run may be flagged as duplicate (non-zero rc) — accept that as OK
+    assert (rc2 == 0) or (rep2.get('duplicate') is True)
     
     # Verify the hash is computed correctly: canonical form should have a final newline
     # Per spec: normalize, split, rstrip each line, remove empty trailing lines, join with \n, append final \n
