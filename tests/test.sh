@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
 
 if [ "$PWD" = "/" ]; then
   echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."

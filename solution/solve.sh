@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
 
 cat > /app/drift_audit.py <<'PY'
 #!/usr/bin/env python3
