@@ -235,6 +235,19 @@ path\\\\to\.file
 
 ---
 
+### Attribute Drift Entry Schema
+
+Each attribute-level drift entry **must** be represented as a JSON object
+with the following exact structure:
+
+```json
+{
+  "attribute": "<string>",
+  "expected": <any JSON value or null>,
+  "actual": <any JSON value or null>
+}
+
+
 ## Ignore Filtering (`--ignore`)
 
 The `--ignore PREFIX` flag suppresses attribute drift entries.
