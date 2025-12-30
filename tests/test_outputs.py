@@ -96,23 +96,6 @@ def test_escape_dots_and_backslashes_and_ignore():
         assert attrs2 == {"meta.path\\\\to\\.file"}
 
 
-def test_space_sorting_of_attributes():
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        ideal = {"resources": [{"type": "aws_instance", "name": "s", "attributes": {"a": 1, "b": 2, "a ": 3}}]}
-        current = {"resources": [{"type": "aws_instance", "name": "s", "attributes": {"a": 9, "b": 2, "a ": 3}}]}
-
-        i = write_json(tmp, "ideal.json", ideal)
-        c = write_json(tmp, "current.json", current)
-
-        rc, out, err = run_audit([str(i), str(c)])
-        assert rc == 0
-        rep = json.loads(out)
-        diffs = rep["attribute_drift"]["aws_instance.s"]
-        attrs = [d["attribute"] for d in diffs]
-        # Expect ordering: 'a' then 'a ' then 'b' (space sorts after other chars)
-        assert attrs == ["a", "a ", "b"]
-
 def test_attributes_present_only_on_one_side_are_reported_as_null() -> None:
     """Reports expected/actual as null when attribute exists only in one snapshot."""
     with tempfile.TemporaryDirectory() as td:

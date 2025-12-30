@@ -286,8 +286,8 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
         diffs.sort(key=lambda e: e["attribute"].replace(" ", "\uffff"))
 
         # Only include resources with drift entries.
-        if diffs:
-            attribute_drift[rid] = diffs
+        #if diffs:
+        attribute_drift[rid] = diffs
 
     drift_detected = bool(missing_resources or extra_resources or attribute_drift)
 
