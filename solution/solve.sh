@@ -32,13 +32,13 @@ def load_json_file(path: str) -> Any:
         raise ParseError(f"invalid JSON: {exc.msg}")
 
 
-def add_resource(out: dict[str, dict[str, Any]], resource_type: str, resource_name: str, attributes: Any) -> None:
-    rid = f"{resource_type}.{resource_name}"
+def add_resource(out: dict[str, dict[str, Any]], rt: str, rn: str, attrs: Any) -> None:
+    rid = f"{rt}.{rn}"
     if rid in out:
         raise ParseError(f"duplicate resource id: {rid}")
-    if not isinstance(attributes, dict):
+    if not isinstance(attrs, dict):
         raise ParseError(f"attributes for {rid} must be an object")
-    out[rid] = attributes
+    out[rid] = attrs
 
 
 def normalize_snapshot(doc: Any) -> dict[str, dict[str, Any]]:
@@ -46,47 +46,22 @@ def normalize_snapshot(doc: Any) -> dict[str, dict[str, Any]]:
         raise ParseError("snapshot must be a JSON object")
 
     if "resources" in doc:
-        resources = doc.get("resources")
-        if not isinstance(resources, list):
-            raise ParseError("resources must be a list")
-
         out: dict[str, dict[str, Any]] = {}
-        for r in resources:
-            if not isinstance(r, dict):
-                raise ParseError("resource entries must be objects")
-            rt = r.get("type")
-            rn = r.get("name")
-            attrs = r.get("attributes") or {}
-            if not isinstance(rt, str) or not isinstance(rn, str):
-                raise ParseError("resource must include string 'type' and 'name'")
-            add_resource(out, rt, rn, attrs)
+        for r in doc.get("resources", []):
+            add_resource(out, r["type"], r["name"], r.get("attributes") or {})
         return out
 
-    values = doc.get("values")
-    if not isinstance(values, dict):
-        raise ParseError("unsupported snapshot schema")
-
-    root = values.get("root_module")
+    root = doc.get("values", {}).get("root_module")
     if not isinstance(root, dict):
         raise ParseError("unsupported snapshot schema")
 
     out: dict[str, dict[str, Any]] = {}
 
-    def walk(mod: dict[str, Any]) -> None:
-        for r in mod.get("resources", []) or []:
-            if not isinstance(r, dict):
-                raise ParseError("module resource entries must be objects")
-            rt = r.get("type")
-            rn = r.get("name")
-            attrs = r.get("values") or {}
-            if not isinstance(rt, str) or not isinstance(rn, str):
-                raise ParseError("module resource must include string 'type' and 'name'")
-            add_resource(out, rt, rn, attrs)
-
-        for child in mod.get("child_modules", []) or []:
-            if not isinstance(child, dict):
-                raise ParseError("child module entries must be objects")
-            walk(child)
+    def walk(m):
+        for r in m.get("resources", []) or []:
+            add_resource(out, r["type"], r["name"], r.get("values") or {})
+        for c in m.get("child_modules", []) or []:
+            walk(c)
 
     walk(root)
     return out
@@ -96,14 +71,11 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
     if not isinstance(obj, dict):
         return {prefix: obj} if prefix else {}
 
-    result: dict[str, Any] = {}
-
     def esc(k: str) -> str:
         return k.replace("\\", "\\\\").replace(".", "\\.")
 
-    tags_literal_mode = False
-    if not prefix:
-        tags_literal_mode = "tags.Env" in obj
+    result: dict[str, Any] = {}
+    tags_literal_mode = not prefix and "tags.Env" in obj
 
     for k, v in obj.items():
         key = k if isinstance(k, str) else str(k)
@@ -125,42 +97,41 @@ def flatten_attributes(obj: Any, prefix: str = "") -> dict[str, Any]:
     return result
 
 
-def unescape_path(path: str) -> str:
-    return path.replace("\\\\", "\x00").replace("\\.", ".").replace("\x00", "\\")
+def unescape_path(p: str) -> str:
+    return p.replace("\\\\", "\x00").replace("\\.", ".").replace("\x00", "\\")
 
 
-def split_components(path: str) -> list[str]:
+def split_components(p: str) -> list[str]:
     out, cur, i = [], "", 0
-    while i < len(path):
-        if path[i] == "\\" and i + 1 < len(path):
-            cur += path[i + 1]
+    while i < len(p):
+        if p[i] == "\\" and i + 1 < len(p):
+            cur += p[i + 1]
             i += 2
-        elif path[i] == ".":
+        elif p[i] == ".":
             out.append(cur)
             cur = ""
             i += 1
         else:
-            cur += path[i]
+            cur += p[i]
             i += 1
     out.append(cur)
     return out
 
 
-def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
-    if not ignore_prefixes:
-        return False
-
+def should_ignore(path: str, prefixes: list[str]) -> tuple[bool, bool]:
     pcs = split_components(path)
     upath = unescape_path(path)
 
-    for p in ignore_prefixes:
+    for p in prefixes:
         if not p:
             continue
 
         if len(pcs) == 1:
             up = unescape_path(p)
-            if upath == up or upath.startswith(up):
-                return True
+            if upath == up:
+                return True, False
+            if upath.startswith(up):
+                return True, True
             continue
 
         ppcs = split_components(p)
@@ -171,39 +142,42 @@ def should_ignore(path: str, ignore_prefixes: list[str]) -> bool:
 
         last, plast = pcs[len(ppcs) - 1], ppcs[-1]
         if last == plast:
-            return True
+            return True, False
         if last.startswith(plast):
             rest = last[len(plast):]
             if rest and (rest[0].isupper() or rest[0].isdigit()):
-                return True
+                return True, True
 
-    return False
+    return False, False
 
 
 def compute_report(ideal, current, ignore_prefixes):
     missing = sorted(set(ideal) - set(current))
     extra = sorted(set(current) - set(ideal))
-    attribute_drift: dict[str, list[dict[str, Any]]] = {}
+    attribute_drift = {}
 
     for rid in sorted(set(ideal) & set(current)):
-        ideal_flat = flatten_attributes(ideal[rid])
-        current_flat = flatten_attributes(current[rid])
-        all_paths = {**ideal_flat, **current_flat}
+        ideal_f = flatten_attributes(ideal[rid])
+        current_f = flatten_attributes(current[rid])
+        paths = {**ideal_f, **current_f}
 
-        had_any_drift = False
-        diffs: list[dict[str, Any]] = []
+        had_drift = False
+        prefix_ignored = False
+        diffs = []
 
-        for path in all_paths:
-            exp = ideal_flat.get(path)
-            act = current_flat.get(path)
+        for p in paths:
+            exp, act = ideal_f.get(p), current_f.get(p)
             if exp != act:
-                had_any_drift = True
-                if not should_ignore(path, ignore_prefixes):
-                    diffs.append({"attribute": path, "expected": exp, "actual": act})
+                had_drift = True
+                ignored, by_prefix = should_ignore(p, ignore_prefixes)
+                if ignored:
+                    prefix_ignored |= by_prefix
+                else:
+                    diffs.append({"attribute": p, "expected": exp, "actual": act})
 
         diffs.sort(key=lambda d: d["attribute"].replace(" ", "\uffff"))
 
-        if diffs or had_any_drift:
+        if diffs or (had_drift and prefix_ignored):
             attribute_drift[rid] = diffs
 
     return {
@@ -240,9 +214,11 @@ def main(argv):
         return 2
 
     try:
-        ideal = normalize_snapshot(load_json_file(ip))
-        current = normalize_snapshot(load_json_file(cp))
-        report = compute_report(ideal, current, ignore)
+        report = compute_report(
+            normalize_snapshot(load_json_file(ip)),
+            normalize_snapshot(load_json_file(cp)),
+            ignore,
+        )
     except OSError as e:
         eprint(f"Error: {e}")
         return 1
