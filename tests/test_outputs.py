@@ -339,7 +339,23 @@ def test_randomized_record_not_hardcoded(test_env):
     rnd = random.Random(1337)
 
     eftno = f"EFT{rnd.randint(10000000, 99999999)}".ljust(12, "0")[:12]
-    acct = str(rnd.randint(10**7, 10**12)).zfill(8)[:8]
+
+    def _gen_account8(rnd):
+        forbidden_prefixes = {"0000", "0001", "0010", "0100"}
+        while True:
+            acct = "".join(str(rnd.randint(0, 9)) for _ in range(8))
+            # Last-4 must not contain '0'
+            if "0" in acct[-4:]:
+                continue
+            # Forbidden 4-digit prefixes
+            if acct[:4] in forbidden_prefixes:
+                continue
+            # First-4 must not consist solely of 0 and 1
+            if set(acct[:4]) <= {"0", "1"}:
+                continue
+            return acct
+
+    acct = _gen_account8(rnd)
     amount = f"{rnd.randint(1, 9999)}.{rnd.randint(0, 99):02d}"
 
     line = _make_fixed_width_line(schema, {"eftno": eftno, "account_no": acct, "amount": amount})
