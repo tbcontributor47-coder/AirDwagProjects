@@ -20,7 +20,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def _is_ignored(pointer: str, ignores: list[str]) -> bool:
-    # BUG: only checks exact match, doesn't check if pointer is descendant of ignored path
     return pointer in ignores
 
 
@@ -28,8 +27,6 @@ def _first_diff(expected: Any, actual: Any, pointer: str, ignores: list[str], to
     if _is_ignored(pointer, ignores):
         return None
 
-    # BUG: type check happens before bool/int special handling
-    # This causes booleans to be treated differently than spec requires
     if type(expected) is not type(actual):
         return pointer, expected, actual
 
@@ -38,7 +35,6 @@ def _first_diff(expected: Any, actual: Any, pointer: str, ignores: list[str], to
         act_keys = sorted(actual.keys())
 
         for k in exp_keys:
-            # BUG: doesn't escape special characters in JSON Pointer (~ and /)
             child_ptr = pointer + "/" + str(k)
             if k not in actual:
                 return child_ptr, expected[k], None
@@ -54,7 +50,6 @@ def _first_diff(expected: Any, actual: Any, pointer: str, ignores: list[str], to
         return None
 
     if isinstance(expected, list):
-        # BUG: all arrays order-sensitive; no special `/items` handling for multiset comparison
         n = min(len(expected), len(actual))
         for i in range(n):
             child_ptr = pointer + "/" + str(i)
@@ -70,14 +65,12 @@ def _first_diff(expected: Any, actual: Any, pointer: str, ignores: list[str], to
 
     # Handle strings
     if isinstance(expected, str) and isinstance(actual, str):
-        # BUG: strips ALL whitespace instead of just trailing whitespace
         if expected.strip() != actual.strip():
             return pointer, expected, actual
         return None
 
     # Handle numbers with tolerance
     if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
-        # BUG: uses < instead of <=, so exact tolerance boundary fails
         if abs(expected - actual) < tolerance:
             return None
         return pointer, expected, actual
