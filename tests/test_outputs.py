@@ -175,7 +175,16 @@ def test_valid_file_validation(test_env):
 
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
     assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
-    report = json.loads(out)
+    
+    # Stdout must be exactly one JSON object (no extra text)
+    assert out.strip(), "stdout must not be empty"
+    try:
+        report = json.loads(out)
+    except json.JSONDecodeError as e:
+        pytest.fail(f"stdout must be exactly one JSON object, but parsing failed: {e}\nstdout content: {out!r}")
+    
+    # Check that stdout contains only JSON (no extra text before/after)
+    # The _run_cli function already strips, so we verify it parses as complete JSON
     assert set(report.keys()) >= {
         "duplicate",
         "n_errors",
@@ -187,8 +196,13 @@ def test_valid_file_validation(test_env):
     }
     assert report['duplicate'] is False
     assert report['n_errors'] == 0
+    assert report['n_warnings'] == 0, "warnings must always be 0"
+    assert report['warnings'] == [], "warnings must always be empty list"
     assert report['records_processed'] == 3
     assert len(report['file_hash']) == 64
+    
+    # No traceback on stderr
+    assert "Traceback" not in err, f"stderr must not contain traceback, but got: {err}"
 
 
 def test_duplicate_detection(test_env):
@@ -707,16 +721,26 @@ def test_clearing_account_substring_match_bug(test_env):
 
 
 def test_retention_days_ignored_bug(test_env):
-    """Retention days flag should affect duplicate detection."""
+    """Retention days flag should affect duplicate detection. With 0-day retention, DB inserts must be avoided."""
     schema = _load_schema(test_env["schema"])
 
     line = _make_fixed_width_line(schema, {"account_no": "12345678"})
     f = Path(test_env["tmp_path"]) / "retention_test.txt"
     _write_text(f, line + "\n")
 
-    # First run
-    rc1, _, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
+    # First run with 0-day retention - should not insert into DB
+    rc1, out1, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
     assert rc1 == 0
+    rep1 = json.loads(out1)
+    assert rep1['duplicate'] is False
+    
+    # Verify DB is empty (0-day retention should avoid inserts)
+    conn = sqlite3.connect(test_env['db'])
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM file_index")
+    count = cursor.fetchone()[0]
+    conn.close()
+    assert count == 0, "With --retention-days 0, no rows should be inserted into the DB"
 
     # With a 0-day retention window, prior runs moments ago should not count as duplicates.
     rc2, out2, _ = _run_cli(f, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '0'])
@@ -802,6 +826,38 @@ def test_exact_length_with_padding(test_env):
     assert rc == 0
     rep = json.loads(out)
     assert rep['n_errors'] == 0
+
+
+def test_hash_final_newline_required(test_env):
+    """Hashing spec requires a final newline to be appended before hashing."""
+    schema = _load_schema(test_env["schema"])
+    line = _make_fixed_width_line(schema, {"eftno": "EFTFINAL001"})
+    
+    # File without trailing newline in source
+    f1 = Path(test_env["tmp_path"]) / "no_final_nl.txt"
+    _write_text(f1, line)  # No trailing newline
+    
+    # File with trailing newline in source  
+    f2 = Path(test_env["tmp_path"]) / "with_final_nl.txt"
+    _write_text(f2, line + "\n")  # With trailing newline
+    
+    # Both should hash the same after canonicalization (both get final newline appended)
+    rc1, out1, _ = _run_cli(f1, test_env['schema'], test_env['clearing'], test_env['db'])
+    rc2, out2, _ = _run_cli(f2, test_env['schema'], test_env['clearing'], test_env['db'])
+    
+    assert rc1 == 0
+    assert rc2 == 0
+    rep1 = json.loads(out1)
+    rep2 = json.loads(out2)
+    
+    # Both should produce the same hash (canonicalization adds final newline per spec step 5)
+    assert rep1['file_hash'] == rep2['file_hash'], "Files with/without trailing newline should hash the same after canonicalization (spec requires final newline to be appended)"
+    
+    # Verify the hash is computed correctly: canonical form should have a final newline
+    # Per spec: normalize, split, rstrip each line, remove empty trailing lines, join with \n, append final \n
+    # For a single line with no trailing spaces: the canonical form is line + "\n"
+    assert rep1['file_hash'] is not None
+    assert len(rep1['file_hash']) == 64, "Hash must be 64 hex characters (SHA-256)"
 
 
 def test_solution_runtime_within_limit(test_env):

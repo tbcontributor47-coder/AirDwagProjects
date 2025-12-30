@@ -138,6 +138,20 @@ class EFTValidator:
             if not value:
                 continue
 
+            # Field-specific validations
+            if name == "eftno":
+                if not value or not re.match(r"^[a-zA-Z0-9]+$", value):
+                    errors.append(f"Line {line_num}: Field 'eftno' must be non-empty and alphanumeric")
+
+            elif name == "bank_code":
+                if not value:
+                    errors.append(f"Line {line_num}: Field 'bank_code' is required but empty")
+                else:
+                    if not value[0].isdigit():
+                        errors.append(f"Line {line_num}: Bank code must start with a digit")
+                    if not re.match(r"^[A-Z0-9]+$", value):
+                        errors.append(f"Line {line_num}: Bank code must contain only uppercase letters and digits")
+
             if ftype == "string":
                 pattern = field.get("pattern")
                 if pattern and not re.match(pattern, value):
@@ -165,8 +179,32 @@ class EFTValidator:
         errors: List[str] = []
 
         acct = (record.get("account_no") or "").strip()
-        if acct and not re.match(r"^\d{8,20}$", acct):
+        if not acct:
+            return errors
+
+        # Basic format check: must be 8-20 digits
+        if not re.match(r"^\d{8,20}$", acct):
             errors.append(f"Line {line_num}: Invalid account_no")
+            return errors
+
+        # Define core account acct8 = account_no[:8] (leftmost 8 digits)
+        acct8 = acct[:8]
+
+        # Forbidden prefixes: acct8[:4] cannot be 0000, 0001, 0010, or 0100
+        prefix = acct8[:4]
+        forbidden = {"0000", "0001", "0010", "0100"}
+        if prefix in forbidden:
+            errors.append(f"Line {line_num}: Account number has forbidden prefix {prefix}")
+
+        # First 4 digits rule: first 4 digits of acct8 must not consist solely of 0 and 1
+        first4 = acct8[:4]
+        if all(d in "01" for d in first4):
+            errors.append(f"Line {line_num}: First 4 digits cannot consist solely of 0 and 1")
+
+        # Last 4 digits rule: last 4 digits of acct8 must not contain the digit 0
+        last4 = acct8[4:8]
+        if "0" in last4:
+            errors.append(f"Line {line_num}: Last 4 digits cannot contain 0")
 
         clearing = (record.get("clearing_account") or "").strip()
         if clearing and self.clearing_accounts:
@@ -197,7 +235,14 @@ class EFTValidator:
             return errors
 
         db_name, fraud_flag = row
-        if payee_name.strip().lower() != db_name.strip().lower():
+        
+        # Collapse internal whitespace to single space, then trim and case-fold
+        def normalize_name(name: str) -> str:
+            # Collapse internal whitespace runs to single space
+            normalized = re.sub(r'\s+', ' ', name.strip())
+            return normalized.lower()
+        
+        if normalize_name(payee_name) != normalize_name(db_name):
             errors.append(f"Line {line_num}: Payee name mismatch for {account_no}")
 
         if int(fraud_flag or 0) == 1:
@@ -212,18 +257,21 @@ class EFTValidator:
         filename = Path(file_path).name
         is_dup = self.check_duplicate(file_hash, filename)
 
-        # Normalize line endings and split into lines.
+        # Normalize line endings and split into lines
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
         lines = normalized.split("\n")
-        # For parsing/validation we ignore empty lines anywhere in the file
-        data_lines = [ln for ln in lines if ln != ""]
+        
+        # Remove only trailing empty lines (per spec: drop only empty trailing lines at the end)
+        while lines and lines[-1] == "":
+            lines.pop()
+        
+        # records_processed = number of remaining lines
+        processed = len(lines)
 
         errors: List[str] = []
         warnings: List[str] = []
-        # records_processed is number of non-empty data lines
-        processed = len(data_lines)
 
-        for i, line in enumerate(data_lines, start=1):
+        for i, line in enumerate(lines, start=1):
             rec, rec_errors = self.parse_record(line, i)
             if rec_errors:
                 errors.extend(rec_errors)
@@ -240,7 +288,8 @@ class EFTValidator:
                     errors.extend(payee_errors)
                     continue
 
-        if not is_dup:
+        # Only insert into DB if not duplicate AND retention_days > 0
+        if not is_dup and self.retention_days > 0:
             self.record_file(file_hash, filename, processed)
 
         return {
