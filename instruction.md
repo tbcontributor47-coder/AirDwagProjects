@@ -4,32 +4,6 @@ Goal
 ----
 Fix `/app/compare_json.py` so it implements the exact runtime contract required by the verifier tests. The tests exercise a small but precise set of semantics — your implementation must follow them exactly.
 
-## Intentional Bugs
-
-The program at `/app/compare_json.py` contains the following bugs that must be fixed:
-
-1. **Ignore logic only checks exact match**: `_is_ignored` only checks if the pointer exactly matches an ignore pattern, but doesn't check if the pointer is a descendant of an ignored path (e.g., if `/meta` is ignored, `/meta/timestamp` should also be ignored)
-
-2. **Type mismatch check happens too early**: The type check occurs before special handling for booleans and numbers, which can cause issues since `bool` is a subclass of `int` in Python
-
-3. **JSON Pointer escaping missing**: Object keys containing `~` or `/` characters are not escaped according to RFC 6901 (should replace `~` with `~0` and `/` with `~1`)
-
-4. **String comparison strips ALL whitespace**: The string comparison uses `.strip()` which removes both leading and trailing whitespace, but the spec only requires trailing whitespace to be ignored
-
-5. **Tolerance boundary condition wrong**: Numeric tolerance uses `<` instead of `<=`, so values exactly at the tolerance boundary incorrectly fail
-
-6. **No multiset comparison for items arrays**: Arrays under the key `items` should be compared as multisets (order-insensitive, multiplicity-sensitive), but currently all arrays are compared order-sensitively
-
-## Hints
-
-- The `_is_ignored` function needs to check both exact matches and descendant paths using `startswith`
-- Consider the order of type checking - numbers and booleans need special handling before the general type mismatch check
-- JSON Pointer escaping should happen when building child pointers for object keys
-- For strings, use `.rstrip()` instead of `.strip()` to only remove trailing whitespace
-- Tolerance comparison should use `<=` not `<` to include the boundary
-- Track the parent key name through recursion to detect when you're inside an `items` array
-- For multiset comparison, you'll need to canonicalize elements (applying ignore filters) before counting
-
 High-level contract (what the tests expect)
 ----------------------------------------
 - CLI invocation (must be accepted exactly as shown by the tests):
