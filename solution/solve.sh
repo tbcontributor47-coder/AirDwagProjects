@@ -274,38 +274,20 @@ def compute_report(ideal: dict[str, dict[str, Any]], current: dict[str, dict[str
         # Use dict to preserve insertion order (Python 3.7+)
         all_paths_dict = {**ideal_flat, **current_flat}
         diffs: list[dict[str, Any]] = []
-        had_any_difference = False
 
         for path in all_paths_dict:
             expected = ideal_flat.get(path)
             actual = current_flat.get(path)
             if expected != actual:
-                had_any_difference = True
                 if not should_ignore(path, ignore_prefixes):
                     diffs.append({"attribute": path, "expected": expected, "actual": actual})
-
-        # If there was any difference in this resource, include ALL attribute paths
-        # (not only those that differ) in the report so ordering can be observed.
-        if had_any_difference:
-            diffs = []
-            for path in all_paths_dict:
-                if should_ignore(path, ignore_prefixes):
-                    continue
-                expected = ideal_flat.get(path)
-                actual = current_flat.get(path)
-                diffs.append({"attribute": path, "expected": expected, "actual": actual})
 
         # Deterministic ordering: mostly lexicographic, but treat spaces as last.
         diffs.sort(key=lambda e: e["attribute"].replace(" ", "\uffff"))
 
         # Only include resources with drift entries.
-        # Exception: if everything was filtered by a single-component ignore prefix (e.g., "café"),
-        # keep the resource present with an empty list (test expects this).
         if diffs:
             attribute_drift[rid] = diffs
-        elif had_any_difference:
-            if any(("." not in p and "\\" not in p) for p in ignore_prefixes):
-                attribute_drift[rid] = []
 
     drift_detected = bool(missing_resources or extra_resources or attribute_drift)
 
