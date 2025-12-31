@@ -66,3 +66,7 @@ Standardize and validate a batch of Insurance Premium records using COBOL. The p
 - If all checks pass, output `VALID`.
 - Return exit code `0` on success, and `1` on any validation error.
 - Adhere to strict COBOL fixed-format rules (Indicators in Col 7, Area A/B alignment).
+
+## Task
+Modify `/app/validate.cbl` to implement the Insurance Validator based on the rules effectively.
+The final program must be named `validate.cbl` and reside in the `/app` directory.

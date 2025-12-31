@@ -58,8 +58,8 @@ cat <<EOF > validate.cbl
            05 WORK-CHKSUM      PIC 9(5) VALUE 0.
            05 WORK-IDX         PIC 9(2).
            05 WORK-POL-STR     PIC X(10).
-           01 REDEFINES WORK-POL-STR.
-              05 WORK-POL-DIGIT PIC 9 OCCURS 10 TIMES.
+           05 WORK-POL-REDEF REDEFINES WORK-POL-STR.
+              10 WORK-POL-DIGIT PIC 9 OCCURS 10 TIMES.
 
        PROCEDURE DIVISION.
            MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE.
