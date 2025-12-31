@@ -82,6 +82,8 @@ def test_date_validation_failure():
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_header_pattern_failure():
     """Header pattern must match HHHHHHHHHH."""
@@ -93,6 +95,7 @@ def test_header_pattern_failure():
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_trailer_sum_failure():
     """Trailer total value must match details."""
@@ -107,15 +110,8 @@ def test_trailer_sum_failure():
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
-    
-    # Requirement: If ALL 5 files pass merge. If one fails, we should not have the final output
-    # Or at least, it should not be the completed 5-file version.
-    # Instruction says: "If all 5 files pass validation, copy... into all_sites.dat"
-    # This implies all-or-nothing.
-    if os.path.exists("all_sites.dat"):
-        with open("all_sites.dat", "r") as f:
-            lines = f.readlines()
-        assert len(lines) < 2, "Should not produce partial output on failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_trailer_comp_mismatch():
     """Test specifically for Completed Value mismatch."""
@@ -124,9 +120,12 @@ def test_trailer_comp_mismatch():
     # Corrupt COMP total in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 100.0}], corrupt_comp=50.0)
     
+    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_trailer_pend_mismatch():
     """Test specifically for Pending Value mismatch."""
@@ -135,9 +134,12 @@ def test_trailer_pend_mismatch():
     # Corrupt PEND total in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'N', 'phone': '1', 'val': 100.0}], corrupt_pend=50.0)
     
+    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_trailer_count_mismatch():
     """Test specifically for Record Count mismatch."""
@@ -146,9 +148,12 @@ def test_trailer_count_mismatch():
     # Corrupt COUNT in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_count=99)
     
+    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_trailer_pattern_mismatch():
     """Test specifically for Trailer Pattern mismatch."""
@@ -157,9 +162,12 @@ def test_trailer_pattern_mismatch():
     # Corrupt Trailer pattern in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], trailer_pat="BADTRAILER")
     
+    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
+    assert not os.path.exists("all_sites.dat"), "all_sites.dat should not exist on validation failure"
 
 def test_cobol_formatting():
     source_path = "/app/merge.cbl"
