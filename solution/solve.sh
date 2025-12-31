@@ -60,14 +60,10 @@ cat <<EOF > merge.cbl
            PERFORM UNTIL WS-EOF-SAL = 'Y' AND 
                          WS-EOF-COMM = 'Y' AND 
                          WS-EOF-BONUS = 'Y'
-               
-               * Determine the minimum ID among the current records
                PERFORM 100-FIND-MIN-ID
                
                MOVE WS-CURRENT-ID TO WS-REP-ID
                MOVE 0 TO WS-TOTAL-COMP
-               
-               * Process all files that match the minimum ID
                IF WS-EOF-SAL = 'N' AND SAL-ID = WS-CURRENT-ID
                    ADD SAL-AMOUNT TO WS-TOTAL-COMP
                    READ SALARY-FILE AT END MOVE 'Y' TO WS-EOF-SAL
