@@ -79,6 +79,8 @@ def test_date_validation_failure():
     # Corrupt site1 with old date
     generate_site_file("data/site1.dat", [], date_str="19990101")
     
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
@@ -92,6 +94,8 @@ def test_header_pattern_failure():
     # Corrupt site1 with bad pattern
     generate_site_file("data/site1.dat", [], header_pat="BADPAT1234")
     
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
@@ -120,7 +124,8 @@ def test_trailer_comp_mismatch():
     # Corrupt COMP total in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 100.0}], corrupt_comp=50.0)
     
-    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
@@ -134,7 +139,8 @@ def test_trailer_pend_mismatch():
     # Corrupt PEND total in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'N', 'phone': '1', 'val': 100.0}], corrupt_pend=50.0)
     
-    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
@@ -148,7 +154,8 @@ def test_trailer_count_mismatch():
     # Corrupt COUNT in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_count=99)
     
-    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
@@ -162,7 +169,8 @@ def test_trailer_pattern_mismatch():
     # Corrupt Trailer pattern in site1
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], trailer_pat="BADTRAILER")
     
-    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
