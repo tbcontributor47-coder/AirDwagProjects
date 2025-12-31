@@ -81,7 +81,7 @@ cat <<EOF > merge.cbl
                PERFORM UNTIL WS-EOF = 'Y'
                    READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
                    NOT AT END
-                       IF SITE-REC(142:10) = "TTTTTTTTTT"
+                       IF SITE-REC(39:10) = "TTTTTTTTTT"
                            MOVE 'Y' TO WS-EOF
                            MOVE SITE-REC TO WS-TRAILER
                            IF WS-ACC-COUNT NOT = WS-TR-COUNT OR

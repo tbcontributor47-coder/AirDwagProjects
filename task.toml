@@ -1,8 +1,8 @@
 [task]
 id = "cobol-file-merge"
 version = "1.0.0"
-title = "COBOL 3-File Merge Logic"
-description = "A classic legacy batch processing challenge: merging three sorted files with missing keys using the Balance Line algorithm."
+title = "COBOL: Real Estate Data Validator"
+description = "Validate and consolidate multi-file Real Estate site data (Header/Detail/Trailer) with fiscal integrity checks."
 
 [metadata]
 author_name = "TerminalBench Contributors"
