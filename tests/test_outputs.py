@@ -72,14 +72,6 @@ def test_format_error_account():
     assert res.returncode == 1
     assert "FORMAT_ERR" in res.stdout
 
-def test_account_length_error_short():
-    # To test length, we might need manual file writing if generate_insurance_file pads.
-    # But if we assume the input file MUST follow format, then length error is more about malformed lines?
-    # The prompt implies logic check.
-    # "Account No must be exactly 10 digits" -> Standard fixed width ensures 10 chars.
-    # If 10 chars are read into PIC 9(10), it is 10 digits.
-    # This might refer to checking for spaces if alphanumeric? But it's numeric.
-    # I will stick to adding COUNT_ERR.
 
 
 def test_banned_country():
