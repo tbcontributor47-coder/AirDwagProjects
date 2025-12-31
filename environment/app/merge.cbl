@@ -39,7 +39,7 @@
        
        01 WS-TOTAL-REPORT.
            05 WS-REP-ID       PIC 9(5).
-           05 FILLER          PIC X(5) VALUE " | TS:".
+           05 FILLER          PIC X(6) VALUE " | TS:".
            05 WS-REP-TOTAL    PIC 9(7).99.
 
        PROCEDURE DIVISION.
@@ -54,9 +54,9 @@
                          WS-EOF-COMM = 'Y' AND 
                          WS-EOF-BONUS = 'Y'
                
-               * BUG: Naive assumption that ID matches across all files
-               * It just reads one record from each file simultaneously.
-               * If IDs are missing or mismatched, results will be wrong.
+*      BUG: Naive assumption that ID matches across all files
+*      It just reads one record from each file simultaneously.
+*      If IDs are missing or mismatched, results will be wrong.
                
                MOVE SAL-ID TO WS-REP-ID
                COMPUTE WS-REP-TOTAL = SAL-AMOUNT + COMM-AMOUNT + 
