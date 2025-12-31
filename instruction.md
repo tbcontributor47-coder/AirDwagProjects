@@ -32,7 +32,7 @@ In reality, an employee might have a salary but no bonus, or a commission but be
 - **Organization**: All input files are `LINE SEQUENTIAL`.
 - **Fields**:
   - `EMP-ID`: 5 digits (`PIC 9(5)`)
-  - `AMOUNT`: 6 integer digits, 2 decimal digits (`PIC 9(6)V99`)
+  - `AMOUNT`: 5 integer digits, 3 decimal digits (`PIC 9(5)V999`)
 
 ## Task
 Modify `/app/merge.cbl` so that it correctly handles the "Balance Line" logic required to merge three sorted files with missing records.
