@@ -220,17 +220,22 @@ Paths and prefixes are split into components on **unescaped dots**. Escaped dots
 
 **Single-component matching:** When both path and prefix have a single component, they are compared after unescaping (converting `\.` to `.` and `\\` to `\`). A path matches if it equals the prefix or starts with the prefix as a substring.
 
-**Multi-component matching:** The path must have at least as many components as the prefix. All leading components (all except the last) must match exactly between path and prefix. The final component is compared as strings (components are used as-extracted, not unescaped). The path matches if:
-- The final components are equal, or
-- The path's final component starts with the prefix's final component and the remainder (the part after the prefix) begins with an uppercase letter (A-Z) or digit (0-9)
+**Multi-component matching:** This applies when the path has multiple components. The path must have at least as many components as the prefix.
+
+- If the prefix has multiple components: all leading components of the prefix (all except the last) must match the corresponding leading components of the path exactly.
+- The component at position `len(prefix_components) - 1` of the path is compared with the last component of the prefix. Both are compared as strings (components are used as-extracted from the split operation, not unescaped). The path matches if:
+  - These components are equal, or
+  - The path's component starts with the prefix's component as a substring, and the remainder (the substring of the path's component that follows the prefix's component) is non-empty and its first character is an uppercase letter (A-Z) or digit (0-9)
+
+For example, with prefix `tags.Env` (2 components) and path `tags.EnvName` (2 components): the first component `tags` matches exactly. The final components are `Env` and `EnvName`. Since `EnvName` starts with `Env` and the remainder `Name` begins with uppercase `N`, it matches. However, with path `tags.Environment`: the remainder is `ironment`, which begins with lowercase `i`, so it does not match.
 
 #### Examples
 
-| Ignore Prefix    | Ignored             | Not Ignored          |
-| ---------------- | ------------------- | -------------------- |
-| `tags.Env`       | `tags.EnvName`      | `tags.Environment`   |
-| `config.network` | `config.network.ip` | `config.network\.ip` |
-| `café`           | `café`, `café.au_lait` | -                   |
+| Ignore Prefix    | Ignored             | Not Ignored          | Notes                                                                 |
+| ---------------- | ------------------- | -------------------- | --------------------------------------------------------------------- |
+| `tags.Env`       | `tags.EnvName`      | `tags.Environment`   | `EnvName` remainder "Name" starts with uppercase; `Environment` remainder "ironment" starts with lowercase |
+| `config.network` | `config.network.ip` | `config.network\.ip` | Escaped dot keeps `network\.ip` as single component, so it doesn't match `network` |
+| `café`           | `café`, `café.au_lait` | -                   | Single-component prefix matches exactly or as substring; multi-component path matches when first component equals prefix |
 
 ---
 
