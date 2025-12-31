@@ -57,14 +57,16 @@ def test_insurance_valid():
     
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
-    assert "VALID" in res.stdout
+    assert res.returncode == 0
+    assert res.stdout.strip() == "VALID"
 
 def test_date_error():
     compile_validator()
     generate_insurance_file("insurance.dat", [], date_str="19990101")
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "DATE_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "DATE_ERR"
 
 def test_format_error_account():
     # Account must start with 9
@@ -73,7 +75,8 @@ def test_format_error_account():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "FORMAT_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FORMAT_ERR"
 
 
 
@@ -83,7 +86,8 @@ def test_banned_country():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "BANNED_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "BANNED_ERR"
 
 def test_age_error():
     compile_validator()
@@ -91,7 +95,8 @@ def test_age_error():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "AGE_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "AGE_ERR"
 
 def test_fiscal_error_prem_cap():
     compile_validator()
@@ -99,7 +104,8 @@ def test_fiscal_error_prem_cap():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "FISCAL_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FISCAL_ERR"
 
 def test_tax_calculation_rounding():
     # 100.05 * 0.10 = 10.005 -> 10.01
@@ -108,7 +114,8 @@ def test_tax_calculation_rounding():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
-    assert "VALID" in res.stdout
+    assert res.returncode == 0
+    assert res.stdout.strip() == "VALID"
 
 def test_tax_calculation_risk2():
     # 5% tax
@@ -117,7 +124,8 @@ def test_tax_calculation_risk2():
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
-    assert "VALID" in res.stdout
+    assert res.returncode == 0
+    assert res.stdout.strip() == "VALID"
 
 def test_checksum_failure():
     compile_validator()
@@ -127,7 +135,8 @@ def test_checksum_failure():
     # 0+1+2+3+4+5+6+7+8 = 36. 36 % 10 = 6. Since 10th digit is 1, it should fail.
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "CHECKSUM_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "CHECKSUM_ERR"
 
 def test_batch_sum_mismatch():
     compile_validator()
@@ -135,7 +144,8 @@ def test_batch_sum_mismatch():
     generate_insurance_file("insurance.dat", [p], corrupt_trl_prem=999.99)
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "BATCH_SUM_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "BATCH_SUM_ERR"
 
 def test_trailer_count_error():
     compile_validator()
@@ -143,7 +153,54 @@ def test_trailer_count_error():
     generate_insurance_file("insurance.dat", [p], corrupt_trl_count=99999)
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
-    assert "COUNT_ERR" in res.stdout
+    assert res.returncode == 1
+    assert res.stdout.strip() == "COUNT_ERR"
+
+def test_error_priority():
+    # Priority: FORMAT_ERR > CHECKSUM_ERR
+    compile_validator()
+    # Invalid Checksum (ends in 1 -> 36%10=6 != 1) AND Account starts with 8 (FORMAT_ERR)
+    p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 8876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FORMAT_ERR"
+
+def test_fiscal_error_mismatch():
+    compile_validator()
+    # Total Due != Prem + Tax (111.00 != 100+10)
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.00, 'tax': 10.00, 'due': 111.00, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FISCAL_ERR"
+
+def test_tax_calculation_risk1():
+    # Risk 1 -> 0% Tax
+    compile_validator()
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.00, 'tax': 0.00, 'due': 100.00, 'risk': '1', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator"], capture_output=True, text=True)
+    assert res.returncode == 0
+    assert res.stdout.strip() == "VALID"
+
+def test_account_length():
+    # Manually create a file with an 9-digit account number padded with space (or just space at end)
+    # Requirement: "Exactly 10 digits". 
+    # "987654321 " has 9 digits + 1 space.
+    compile_validator()
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
+    header = f"H{date_str}BATCH001  NY\n"
+    # P + 123456786 + Valid User... (20) + 00010000 + 00001000 + 00001100 + 3 + US + 987654321  (space at end) + 030
+    pol_line = "P123456786Valid User          0001000000001000000110003US987654321 030\n"
+    trailer = "T000010000001000000000001000000011000\n"
+    
+    with open("insurance.dat", 'w') as f:
+        f.write(header + pol_line + trailer)
+    
+    res = subprocess.run(["./validator"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FORMAT_ERR"
 
 
 

@@ -18,9 +18,30 @@ cat <<EOF > validate.cbl
        01 WS-FLAGS.
            05 WS-EOF           PIC X VALUE 'N'.
            05 WS-TR-FOUND      PIC X VALUE 'N'.
+           05 WS-HAS-SPACES    PIC 9 VALUE 0.
 
        01 WS-SYS-DATE          PIC 9(8).
        
+       * Error Levels used for Priority matching:
+       * 10=Valid
+       * 9=BatchSum (Lowest priority of errors caught at end?) No, BATCH_SUM is 9 in my list, but priority list says BATCH_SUM is last.
+       * Priority Order:
+       * 1 DATE (Stop)
+       * 2 FORMAT (Stop)
+       * 3 BANNED (Stop)
+       * 4 AGE (Stop)
+       * 5 COUNT (Stop - Checked at Trailer)
+       * 6 FISCAL (Lowest Priority? No: Date > Format > Banned > Age > Count > Fiscal > Tax > Checksum > BatchSum)
+       * Lower number = Higher Priority.
+       * So if I find Fiscal (6), I should store it.
+       * If I later find Count (5), I should report Count.
+       * So I need to store the LOWEST error level found.
+       * Initialize WS-ERR-LEVEL to 99 (Valid).
+       * If Fiscal found, set to 6.
+       * If multiple errors, keep MIN.
+       
+       01 WS-ERR-LEVEL         PIC 99 VALUE 99.
+
        01 WS-HDR-REC.
            05 HDR-TYPE         PIC X.
            05 HDR-DATE         PIC 9(8).
@@ -82,32 +103,35 @@ cat <<EOF > validate.cbl
                    IF INS-REC(1:1) = 'P'
                        MOVE INS-REC TO WS-POL-REC
                        
-      * FORMAT_ERR: Account No must start with 9
-                       IF INS-REC(59:1) NOT = '9'
+      * FORMAT_ERR (Priority 2): Acct starts with 9, 10 digits (no spaces)
+                       MOVE 0 TO WS-HAS-SPACES
+                       INSPECT INS-REC(59:10) TALLYING WS-HAS-SPACES FOR ALL SPACES
+                       IF INS-REC(59:1) NOT = '9' OR WS-HAS-SPACES > 0
                            DISPLAY "FORMAT_ERR"
                            STOP RUN RETURNING 1
                        END-IF
 
-      * BANNED_ERR: Country RU or KP
+      * BANNED_ERR (Priority 3)
                        IF POL-COUNTRY = 'RU' OR POL-COUNTRY = 'KP'
                            DISPLAY "BANNED_ERR"
                            STOP RUN RETURNING 1
                        END-IF
 
-      * AGE_ERR: 18 to 120
+      * AGE_ERR (Priority 4)
                        IF POL-AGE < 18 OR POL-AGE > 120
                            DISPLAY "AGE_ERR"
                            STOP RUN RETURNING 1
                        END-IF
 
-      * FISCAL_ERR: Prem > 100k or Total mismatch
+      * FISCAL_ERR (Priority 6)
                        IF POL-PREM > 100000.00 OR 
                           POL-TOTAL NOT = POL-PREM + POL-TAX
-                           DISPLAY "FISCAL_ERR"
-                           STOP RUN RETURNING 1
+                           IF 6 < WS-ERR-LEVEL
+                               MOVE 6 TO WS-ERR-LEVEL
+                           END-IF
                        END-IF
 
-      * TAX_ERR: Risk-based calculation
+      * TAX_ERR (Priority 7)
                        MOVE 0 TO WORK-TAX-CALC
                        IF POL-RISK = '3'
                            COMPUTE WORK-TAX-CALC = POL-PREM * 0.10
@@ -120,11 +144,12 @@ cat <<EOF > validate.cbl
                        ADD 0.005 TO WORK-TAX-CALC
                        MOVE WORK-TAX-CALC TO WORK-TAX-ROUND
                        IF POL-TAX NOT = WORK-TAX-ROUND
-                           DISPLAY "TAX_ERR"
-                           STOP RUN RETURNING 1
+                           IF 7 < WS-ERR-LEVEL
+                               MOVE 7 TO WS-ERR-LEVEL
+                           END-IF
                        END-IF
 
-      * CHECKSUM_ERR: Policy No sum
+      * CHECKSUM_ERR (Priority 8)
                        MOVE 0 TO WORK-CHKSUM
                        MOVE POL-NO TO WORK-POL-STR
                        PERFORM VARYING WORK-IDX FROM 1 BY 1 
@@ -134,8 +159,9 @@ cat <<EOF > validate.cbl
                        
                        IF FUNCTION MOD(WORK-CHKSUM, 10) 
                           NOT = WORK-POL-DIGIT(10)
-                           DISPLAY "CHECKSUM_ERR"
-                           STOP RUN RETURNING 1
+                           IF 8 < WS-ERR-LEVEL
+                               MOVE 8 TO WS-ERR-LEVEL
+                           END-IF
                        END-IF
                        
                        ADD 1 TO ACC-COUNT
@@ -149,19 +175,20 @@ cat <<EOF > validate.cbl
                        MOVE 'Y' TO WS-EOF
                        MOVE 'Y' TO WS-TR-FOUND
                        
+      * COUNT_ERR (Priority 5) - Overrides Fiscal/Tax/Checksum
                        IF ACC-COUNT NOT = TRL-COUNT
                            DISPLAY "COUNT_ERR"
                            STOP RUN RETURNING 1
                        END-IF
                        
+      * BATCH_SUM_ERR (Priority 9) - Lowest priority
                        IF ACC-TOT-PREM NOT = TRL-TOT-PREM OR
                           ACC-TOT-TAX NOT = TRL-TOT-TAX OR
                           ACC-TOT-DUE NOT = TRL-TOT-DUE
-                           DISPLAY "BATCH_SUM_ERR"
-                           STOP RUN RETURNING 1
+                           IF 9 < WS-ERR-LEVEL
+                               MOVE 9 TO WS-ERR-LEVEL
+                           END-IF
                        END-IF
-                       
-                       DISPLAY "VALID"
                    END-IF
            END-READ
            END-PERFORM.
@@ -170,6 +197,14 @@ cat <<EOF > validate.cbl
                DISPLAY "BATCH_SUM_ERR"
                STOP RUN RETURNING 1
            END-IF
+
+           EVALUATE WS-ERR-LEVEL
+               WHEN 6 DISPLAY "FISCAL_ERR" STOP RUN RETURNING 1
+               WHEN 7 DISPLAY "TAX_ERR" STOP RUN RETURNING 1
+               WHEN 8 DISPLAY "CHECKSUM_ERR" STOP RUN RETURNING 1
+               WHEN 9 DISPLAY "BATCH_SUM_ERR" STOP RUN RETURNING 1
+               WHEN 99 DISPLAY "VALID" STOP RUN RETURNING 0
+           END-EVALUATE.
 
            CLOSE INS-FILE.
            STOP RUN.
