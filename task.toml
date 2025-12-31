@@ -8,7 +8,7 @@ category = "system-administration"
 tags = ["terraform", "infrastructure", "diff", "comparison", "json"]
 
 [verifier]
-timeout_sec = 120
+timeout_sec = 900
 
 [agent]
 timeout_sec = 900
