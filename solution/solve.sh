@@ -22,23 +22,22 @@ cat <<EOF > validate.cbl
 
        01 WS-SYS-DATE          PIC 9(8).
        
-       * Error Levels used for Priority matching:
-       * 10=Valid
-       * 9=BatchSum (Lowest priority of errors caught at end?) No, BATCH_SUM is 9 in my list, but priority list says BATCH_SUM is last.
-       * Priority Order:
-       * 1 DATE (Stop)
-       * 2 FORMAT (Stop)
-       * 3 BANNED (Stop)
-       * 4 AGE (Stop)
-       * 5 COUNT (Stop - Checked at Trailer)
-       * 6 FISCAL (Lowest Priority? No: Date > Format > Banned > Age > Count > Fiscal > Tax > Checksum > BatchSum)
-       * Lower number = Higher Priority.
-       * So if I find Fiscal (6), I should store it.
-       * If I later find Count (5), I should report Count.
-       * So I need to store the LOWEST error level found.
-       * Initialize WS-ERR-LEVEL to 99 (Valid).
-       * If Fiscal found, set to 6.
-       * If multiple errors, keep MIN.
+      * Error Levels used for Priority matching:
+      * 10=Valid
+      * Priority Order:
+      * 1 DATE (Stop)
+      * 2 FORMAT (Stop)
+      * 3 BANNED (Stop)
+      * 4 AGE (Stop)
+      * 5 COUNT (Stop - Checked at Trailer)
+      * 6 FISCAL (Lowest Priority)
+      * Lower number = Higher Priority.
+      * So if I find Fiscal (6), I should store it.
+      * If I later find Count (5), I should report Count.
+      * So I need to store the LOWEST error level found.
+      * Initialize WS-ERR-LEVEL to 99 (Valid).
+      * If Fiscal found, set to 6.
+      * If multiple errors, keep MIN.
        
        01 WS-ERR-LEVEL         PIC 99 VALUE 99.
 
