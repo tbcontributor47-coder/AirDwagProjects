@@ -64,6 +64,7 @@ cat <<EOF > merge.cbl
            
            PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 
                UNTIL WS-FILE-COUNT > 5
+               MOVE SPACES TO WS-FILE-NAME
                STRING "data/site" WS-FILE-COUNT ".dat" 
                    DELIMITED BY SIZE INTO WS-FILE-NAME
                
@@ -76,7 +77,7 @@ cat <<EOF > merge.cbl
                    STOP RUN RETURNING 1
                END-IF
                
-               MOVE 0 TO WS-ACCUM
+               INITIALIZE WS-ACCUM
                MOVE 'N' TO WS-EOF
                PERFORM UNTIL WS-EOF = 'Y'
                    READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
