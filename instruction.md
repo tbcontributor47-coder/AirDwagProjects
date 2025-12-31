@@ -1,40 +1,58 @@
-# COBOL Batch Processing: The 3-File Merge Challenge
+# COBOL: Real Estate Site Data Validator and Merger
 
-Your task is to fix a legacy COBOL program that merges compensation data from three different sources.
+Your task is to fix a legacy COBOL program used to validate and consolidate real estate site records from multiple regional offices.
 
 ## Current State
-The program `merge.cbl` attempts to read three sequential files:
-1. `data/salary.dat` (Base salary)
-2. `data/comm.dat` (Commissions)
-3. `data/bonus.dat` (Bonuses)
+The program `merge.cbl` is designed to process 5 regional data files:
+1. `data/site1.dat`
+2. `data/site2.dat`
+3. `data/site3.dat`
+4. `data/site4.dat`
+5. `data/site5.dat`
 
-It is supposed to produce a single report `report.txt` containing the total compensation for **every unique employee** found in **any** of the files.
+It is supposed to validate each file's integrity and produce a single master file `all_sites.dat` containing only validated records.
 
 ## The Problem
-The current implementation is **buggy**. It assumes that:
-- Every employee ID exists in all three files.
-- The files are perfectly synchronized.
+The current implementation is **buggy**. It fails to:
+- Process the new Real Estate site data format (Header, Detail, Trailer).
+- Validate multiple input files (`data/site1.dat` through `data/site5.dat`).
+- Check that the header date matches today's date.
+- Verify trailer totals for site values and agreement statuses.
+- Merge all valid records into a single consolidated file `all_sites.dat`.
 
-In reality, an employee might have a salary but no bonus, or a commission but be missing from the salary file (e.g., a contractor). 
+## Input File Format (Real Estate Sites)
+Each input file is `LINE SEQUENTIAL`.
+
+### Header Record
+- **Date**: YYYYMMDD (Positions 1-8). Must be today's date.
+- **Pattern**: "HHHHHHHHHH" (Positions 9-18).
+
+### Detail Record (Length: 152 chars)
+- **Owner Name**: PIC X(20) (Pos 1-20)
+- **Account Name**: PIC X(20) (Pos 21-40)
+- **Site No**: PIC 9(5) (Pos 41-45)
+- **Site Location**: PIC X(30) (Pos 46-75)
+- **Site Details**: PIC X(50) (Pos 76-125)
+- **Agreement Completed**: PIC X (Pos 126, 'Y' or 'N')
+- **Phone No**: PIC X(15) (Pos 127-141)
+- **Site Value**: PIC 9(9)V99 (Pos 142-152)
+
+### Trailer Record
+- **Total Records**: PIC 9(5) (Pos 1-5)
+- **Total Value**: PIC 9(9)V99 (Pos 6-16)
+- **Total Completed Value**: PIC 9(9)V99 (Pos 17-27, sum of 'Y' records)
+- **Total Pending Value**: PIC 9(9)V99 (Pos 28-38, sum of 'N' records)
+- **Pattern**: "TTTTTTTTTT" (Pos 39-48).
 
 ## Requirements
-1. **Full Outer Join**: You must include every `EMP-ID` that appears in at least one of the three input files.
-2. **Missing Data**: If an employee is missing from a specific file, treat their amount for that category as **0.00**.
-3. **Sorting**: The input files are already sorted by `EMP-ID` (ascending). Your output MUST also be sorted by `EMP-ID` (ascending).
-4. **Output Format**: Each line in `report.txt` must follow this exact format:
-   `ID | TS:TOTAL`
-   - `ID`: 5-digit employee ID (e.g., `00001`)
-   - `TOTAL`: Total compensation (Salary + Commission + Bonus) formatted as `9999999.99`
-   - Example: `00010 | TS:0005500.50`
-
-## Technical Details
-- **Compiler**: GnuCOBOL (cobc)
-- **Organization**: All input files are `LINE SEQUENTIAL`.
-- **Fields**:
-  - `EMP-ID`: 5 digits (`PIC 9(5)`)
-  - `AMOUNT`: 5 integer digits, 3 decimal digits (`PIC 9(5)V999`)
+1.  **Date Validation**: The header date must match the system date (e.g., 20260101).
+2.  **Trailer Validation**: After reading all details in a file:
+    - Detail count must match `Total Records`.
+    - Sum of all values must match `Total Value`.
+    - Sum of 'Y' values must match `Total Completed Value`.
+    - Sum of 'N' values must match `Total Pending Value`.
+3.  **File Aggregation**: If all 5 files pass validation, copy all detail records into `all_sites.dat`. If any file fails, stop and exit with status 1.
+4.  **Formatting**: Stick to Area A/B rules.
 
 ## Task
-Modify `/app/merge.cbl` so that it correctly handles the "Balance Line" logic required to merge three sorted files with missing records.
-
-Ensure your code is strictly compliant with COBOL formatting rules (Area A starts at column 8, Area B at column 12).
+Modify `/app/merge.cbl` to implement the Real Estate validator and merger.
