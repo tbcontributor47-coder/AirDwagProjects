@@ -23,7 +23,6 @@ cat <<EOF > merge.cbl
        WORKING-STORAGE SECTION.
        01 WS-FILE-NAME        PIC X(30).
        01 WS-FILE-COUNT       PIC 9 VALUE 1.
-       01 WS-EOF              PIC X VALUE 'N'.
        
        01 WS-SYS-DATE.
           05 WS-SYS-YYYY      PIC 9(4).
@@ -57,6 +56,10 @@ cat <<EOF > merge.cbl
           05 WS-ACC-COMP      PIC 9(9)V99 VALUE 0.
           05 WS-ACC-PEND      PIC 9(9)V99 VALUE 0.
 
+       01 WS-FLAGS.
+           05 WS-EOF              PIC X VALUE 'N'.
+           05 WS-TR-FOUND         PIC X VALUE 'N'.
+
        PROCEDURE DIVISION.
            MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE.
            
@@ -77,11 +80,13 @@ cat <<EOF > merge.cbl
                
                INITIALIZE WS-ACCUM
                MOVE 'N' TO WS-EOF
+               MOVE 'N' TO WS-TR-FOUND
                PERFORM UNTIL WS-EOF = 'Y'
                    READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
                    NOT AT END
                        IF SITE-REC(39:10) = "TTTTTTTTTT"
                            MOVE 'Y' TO WS-EOF
+                           MOVE 'Y' TO WS-TR-FOUND
                            MOVE SITE-REC TO WS-TRAILER
                            IF WS-ACC-COUNT NOT = WS-TR-COUNT OR
                               WS-ACC-TOTAL NOT = WS-TR-TOTAL OR
@@ -103,6 +108,11 @@ cat <<EOF > merge.cbl
                END-READ
                END-PERFORM
                
+               IF WS-TR-FOUND NOT = 'Y'
+                   DISPLAY "TRAILER MISMATCH"
+                   STOP RUN RETURNING 1
+               END-IF
+
                CLOSE SITE-FILE
            END-PERFORM.
 

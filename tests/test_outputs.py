@@ -60,7 +60,7 @@ def test_real_estate_merge():
 
     # 3. Run
     try:
-        res = subprocess.run(["./merge_app"], check=True, capture_output=True, text=True)
+        subprocess.run(["./merge_app"], check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
         print(f"STDOUT: {e.stdout}")
         print(f"STDERR: {e.stderr}")
@@ -80,7 +80,18 @@ def test_date_validation_failure():
     generate_site_file("data/site1.dat", [], date_str="19990101")
     
     res = subprocess.run(["./merge_app"], capture_output=True)
-    assert res.returncode != 0
+    assert res.returncode == 1
+    assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
+
+def test_header_pattern_failure():
+    """Header pattern must match HHHHHHHHHH."""
+    for i in range(1, 6):
+        generate_site_file(f"data/site{i}.dat", [])
+    # Corrupt site1 with bad pattern
+    generate_site_file("data/site1.dat", [], header_pat="BADPAT1234")
+    
+    res = subprocess.run(["./merge_app"], capture_output=True)
+    assert res.returncode == 1
     assert b"INVALID HEADER" in res.stdout or b"INVALID HEADER" in res.stderr
 
 def test_trailer_sum_failure():
@@ -91,9 +102,10 @@ def test_trailer_sum_failure():
     # Corrupt site3 trailer sum
     generate_site_file("data/site3.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 3, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_total=999.99)
     
-    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    if os.path.exists("all_sites.dat"):
+        os.remove("all_sites.dat")
     res = subprocess.run(["./merge_app"], capture_output=True)
-    assert res.returncode != 0
+    assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
     
     # Requirement: If ALL 5 files pass merge. If one fails, we should not have the final output
@@ -113,7 +125,7 @@ def test_trailer_comp_mismatch():
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 100.0}], corrupt_comp=50.0)
     
     res = subprocess.run(["./merge_app"], capture_output=True)
-    assert res.returncode != 0
+    assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
 
 def test_trailer_pend_mismatch():
@@ -124,7 +136,29 @@ def test_trailer_pend_mismatch():
     generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'N', 'phone': '1', 'val': 100.0}], corrupt_pend=50.0)
     
     res = subprocess.run(["./merge_app"], capture_output=True)
-    assert res.returncode != 0
+    assert res.returncode == 1
+    assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+
+def test_trailer_count_mismatch():
+    """Test specifically for Record Count mismatch."""
+    for i in range(1, 6):
+         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': i, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}])
+    # Corrupt COUNT in site1
+    generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_count=99)
+    
+    res = subprocess.run(["./merge_app"], capture_output=True)
+    assert res.returncode == 1
+    assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+
+def test_trailer_pattern_mismatch():
+    """Test specifically for Trailer Pattern mismatch."""
+    for i in range(1, 6):
+         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': i, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}])
+    # Corrupt Trailer pattern in site1
+    generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], trailer_pat="BADTRAILER")
+    
+    res = subprocess.run(["./merge_app"], capture_output=True)
+    assert res.returncode == 1
     assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
 
 def test_cobol_formatting():
@@ -133,7 +167,8 @@ def test_cobol_formatting():
     with open(source_path, "r") as f:
         lines = f.readlines()
     for i, line in enumerate(lines, 1):
-        if not line.strip(): continue
+        if not line.strip():
+            continue
         if len(line) > 6:
             indicator = line[6]
             assert indicator in (' ', '*', '-', '/'), f"Line {i}: format error"
