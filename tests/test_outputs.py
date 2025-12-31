@@ -50,7 +50,10 @@ def compile_validator():
 def test_insurance_valid():
     """Test valid insurance batch."""
     compile_validator()
-
+    # Use a policy with valid checksum (123456786 -> 36%10=6, check digit 6)
+    # Prem 100.00 -> Tax 10% = 10.00 + 0.005 = 10.005 -> 10.00 (Truncated)
+    p = {'no': 123456786, 'holder': 'Valid User', 'prem': 100.00, 'tax': 10.00, 'due': 110.00, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
     
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
@@ -101,7 +104,7 @@ def test_fiscal_error_prem_cap():
 def test_tax_calculation_rounding():
     # 100.05 * 0.10 = 10.005 -> 10.01
     compile_validator()
-    p = {'no': 123456781, 'holder': 'X', 'prem': 100.05, 'tax': 10.01, 'due': 110.06, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.05, 'tax': 10.01, 'due': 110.06, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
@@ -110,7 +113,7 @@ def test_tax_calculation_rounding():
 def test_tax_calculation_risk2():
     # 5% tax
     compile_validator()
-    p = {'no': 123456781, 'holder': 'X', 'prem': 1000.00, 'tax': 50.00, 'due': 1050.00, 'risk': '2', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    p = {'no': 123456786, 'holder': 'X', 'prem': 1000.00, 'tax': 50.00, 'due': 1050.00, 'risk': '2', 'country': 'US', 'acc': 9876543210, 'age': 30}
     generate_insurance_file("insurance.dat", [p])
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
@@ -121,9 +124,6 @@ def test_checksum_failure():
     # 1+2+3+4+5+6+7+8+1 = 37. 37 % 10 = 7. If we put 1 at end, it should fail.
     p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
     generate_insurance_file("insurance.dat", [p])
-    # Correction: The code above actually makes 123456781. The 10th digit is not provided in generate_insurance_file loop?
-    # Wait, pol_no = f"{p['no']:010d}". So it will be 0012345678? No, the no is 123456781.
-    # 123456781 is 9 digits. 0123456781 is 10 digits.
     # 0+1+2+3+4+5+6+7+8 = 36. 36 % 10 = 6. Since 10th digit is 1, it should fail.
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
@@ -139,36 +139,12 @@ def test_batch_sum_mismatch():
 
 def test_trailer_count_error():
     compile_validator()
-    p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
     generate_insurance_file("insurance.dat", [p], corrupt_trl_count=99999)
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 1
     assert "COUNT_ERR" in res.stdout
 
-def test_account_length_error():
-    # Account must be exactly 10 digits.
-    compile_validator()
-    # Test with 9 digits (too short)
-    p_short = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 987654321, 'age': 30}
-    # generate_insurance_file uses :010d formatting, so pass a smaller int and it will be padded with 0.
-    # 987654321 -> 0987654321. First digit '0' is not '9', so it hits FORMAT_ERR (starts with 9) check first?
-    # Requirement: "Account No must be exactly 10 digits and must start with '9'".
-    # If we pass 123 (3 digits), padded to 0000000123.
-    # If we pass valid 10-digit starting with 8: 8876543210 -> FORMAT_ERR.
-    # To mimic length error specifically, the generator logic (Pos 59-68, length 10) enforces 10 chars.
-    # The vulnerability might be if the code reads fewer digits? But the layout is fixed.
-    # "Account Validation: Account No must be exactly 10 digits".
-    # Fixed width file P(10)H(20)...Acc(10)Age(3). 
-    # If file has spaces? Generator pads with 0.
-    # If we want to test "short" account, we'd need to modify generator or file manually?
-    # But generator uses f"{p['acc']:010d}".
-    # Let's verify start-with-9 logic covers the main constraint.
-    # The log said "no check for Account No length=10". Since it's fixed width, it will always be 10 chars in file.
-    # Maybe it means valid account numbers cannot be less than 10^9?
-    # Or just that the layout logic (PIC 9(10)) implicitly handles it?
-    # I'll rely on the existing tests and the start-with-9 check which effectively constrains it significantly.
-    # Actually, let's skip a specific "length" test if the file format enforces it, unless we write a malformed line.
-    # But let's add the COUNT_ERR test above.
 
 
 def test_cobol_formatting():
