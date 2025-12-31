@@ -62,14 +62,16 @@ cat <<EOF > merge.cbl
            
            OPEN OUTPUT ALL-SITES-FILE.
            
-           PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 UNTIL WS-FILE-COUNT > 5
-               STRING "data/site" WS-FILE-COUNT ".dat" DELIMITED BY SIZE
-                      INTO WS-FILE-NAME
+           PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 
+               UNTIL WS-FILE-COUNT > 5
+               STRING "data/site" WS-FILE-COUNT ".dat" 
+                   DELIMITED BY SIZE INTO WS-FILE-NAME
                
                OPEN INPUT SITE-FILE
                
                READ SITE-FILE INTO WS-HEADER
-               IF WS-HDR-DATE NOT = WS-SYS-DATE OR WS-HDR-PAT NOT = "HHHHHHHHHH"
+               IF WS-HDR-DATE NOT = WS-SYS-DATE OR 
+                  WS-HDR-PAT NOT = "HHHHHHHHHH"
                    DISPLAY "INVALID HEADER IN " WS-FILE-NAME
                    STOP RUN RETURNING 1
                END-IF
@@ -79,14 +81,15 @@ cat <<EOF > merge.cbl
                PERFORM UNTIL WS-EOF = 'Y'
                    READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
                    NOT AT END
-                       IF SITE-REC(39:10) = "TTTTTTTTTT"
+                       IF SITE-REC(142:10) = "TTTTTTTTTT"
                            MOVE 'Y' TO WS-EOF
                            MOVE SITE-REC TO WS-TRAILER
                            IF WS-ACC-COUNT NOT = WS-TR-COUNT OR
                               WS-ACC-TOTAL NOT = WS-TR-TOTAL OR
                               WS-ACC-COMP NOT = WS-TR-COMP OR
                               WS-ACC-PEND NOT = WS-TR-PEND
-                               DISPLAY "TRAILER MISMATCH IN " WS-FILE-NAME
+                               DISPLAY "TRAILER MISMATCH IN " 
+                                   WS-FILE-NAME
                                STOP RUN RETURNING 1
                            END-IF
                        ELSE

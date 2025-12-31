@@ -45,9 +45,10 @@
        PROCEDURE DIVISION.
            OPEN OUTPUT ALL-SITES-FILE.
            
-           PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 UNTIL WS-FILE-COUNT > 5
-               STRING "data/site" WS-FILE-COUNT ".dat" DELIMITED BY SIZE
-                      INTO WS-FILE-NAME
+           PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 
+               UNTIL WS-FILE-COUNT > 5
+               STRING "data/site" WS-FILE-COUNT ".dat" 
+                   DELIMITED BY SIZE INTO WS-FILE-NAME
                
                OPEN INPUT SITE-FILE
       * BUG: Fails to read Header, treats Header as Detail
@@ -57,7 +58,8 @@
                    READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
                    NOT AT END
       * BUG: Fails to detect Trailer, treats Trailer as Detail
-                       WRITE ALL-SITES-REC FROM SITE-REC
+                       MOVE SITE-REC TO ALL-SITES-REC
+                       WRITE ALL-SITES-REC
                END-READ
                END-PERFORM
                
