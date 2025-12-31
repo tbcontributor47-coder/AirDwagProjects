@@ -50,7 +50,7 @@ def compile_validator():
 def test_insurance_valid():
     """Test valid insurance batch."""
     compile_validator()
-    p1 = {'no': 123456781, 'holder': 'ALICE', 'prem': 1000.00, 'tax': 100.00, 'due': 1100.00, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+
     
     res = subprocess.run(["./validator"], capture_output=True, text=True)
     assert res.returncode == 0
@@ -143,7 +143,8 @@ def test_cobol_formatting():
     with open(source_path, "r") as f:
         lines = f.readlines()
     for i, line in enumerate(lines, 1):
-        if not line.strip(): continue
+        if not line.strip():
+            continue
         if len(line) > 6:
             indicator = line[6]
             assert indicator in (' ', '*', '-', '/'), f"Line {i}: format error"
