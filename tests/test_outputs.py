@@ -85,10 +85,43 @@ def test_date_validation_failure():
 
 def test_trailer_sum_failure():
     """Trailer total value must match details."""
-    for i in range(1, 6):
-         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}])
+    # Setup 4 valid files
+    for i in [1, 2, 4, 5]:
+         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': i, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}])
     # Corrupt site3 trailer sum
-    generate_site_file("data/site3.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_total=999.99)
+    generate_site_file("data/site3.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 3, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 1.0}], corrupt_total=999.99)
+    
+    if os.path.exists("all_sites.dat"): os.remove("all_sites.dat")
+    res = subprocess.run(["./merge_app"], capture_output=True)
+    assert res.returncode != 0
+    assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+    
+    # Requirement: If ALL 5 files pass merge. If one fails, we should not have the final output
+    # Or at least, it should not be the completed 5-file version.
+    # Instruction says: "If all 5 files pass validation, copy... into all_sites.dat"
+    # This implies all-or-nothing.
+    if os.path.exists("all_sites.dat"):
+        with open("all_sites.dat", "r") as f:
+            lines = f.readlines()
+        assert len(lines) < 2, "Should not produce partial output on failure"
+
+def test_trailer_comp_mismatch():
+    """Test specifically for Completed Value mismatch."""
+    for i in range(1, 6):
+         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': i, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 100.0}])
+    # Corrupt COMP total in site1
+    generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'Y', 'phone': '1', 'val': 100.0}], corrupt_comp=50.0)
+    
+    res = subprocess.run(["./merge_app"], capture_output=True)
+    assert res.returncode != 0
+    assert b"TRAILER MISMATCH" in res.stdout or b"TRAILER MISMATCH" in res.stderr
+
+def test_trailer_pend_mismatch():
+    """Test specifically for Pending Value mismatch."""
+    for i in range(1, 6):
+         generate_site_file(f"data/site{i}.dat", [{'owner': 'X', 'acc': 'Y', 'sno': i, 'loc': 'Z', 'det': 'W', 'agree': 'N', 'phone': '1', 'val': 100.0}])
+    # Corrupt PEND total in site1
+    generate_site_file("data/site1.dat", [{'owner': 'X', 'acc': 'Y', 'sno': 1, 'loc': 'Z', 'det': 'W', 'agree': 'N', 'phone': '1', 'val': 100.0}], corrupt_pend=50.0)
     
     res = subprocess.run(["./merge_app"], capture_output=True)
     assert res.returncode != 0

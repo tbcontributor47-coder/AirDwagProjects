@@ -60,8 +60,6 @@ cat <<EOF > merge.cbl
        PROCEDURE DIVISION.
            MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE.
            
-           OPEN OUTPUT ALL-SITES-FILE.
-           
            PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 
                UNTIL WS-FILE-COUNT > 5
                MOVE SPACES TO WS-FILE-NAME
@@ -73,7 +71,7 @@ cat <<EOF > merge.cbl
                READ SITE-FILE INTO WS-HEADER
                IF WS-HDR-DATE NOT = WS-SYS-DATE OR 
                   WS-HDR-PAT NOT = "HHHHHHHHHH"
-                   DISPLAY "INVALID HEADER IN " WS-FILE-NAME
+                   DISPLAY "INVALID HEADER"
                    STOP RUN RETURNING 1
                END-IF
                
@@ -89,8 +87,7 @@ cat <<EOF > merge.cbl
                               WS-ACC-TOTAL NOT = WS-TR-TOTAL OR
                               WS-ACC-COMP NOT = WS-TR-COMP OR
                               WS-ACC-PEND NOT = WS-TR-PEND
-                               DISPLAY "TRAILER MISMATCH IN " 
-                                   WS-FILE-NAME
+                               DISPLAY "TRAILER MISMATCH"
                                STOP RUN RETURNING 1
                            END-IF
                        ELSE
@@ -102,7 +99,6 @@ cat <<EOF > merge.cbl
                            ELSE
                                ADD WS-VALUE TO WS-ACC-PEND
                            END-IF
-                           WRITE ALL-SITES-REC FROM SITE-REC
                        END-IF
                END-READ
                END-PERFORM
@@ -110,6 +106,28 @@ cat <<EOF > merge.cbl
                CLOSE SITE-FILE
            END-PERFORM.
 
+           OPEN OUTPUT ALL-SITES-FILE.
+           PERFORM VARYING WS-FILE-COUNT FROM 1 BY 1 
+               UNTIL WS-FILE-COUNT > 5
+               MOVE SPACES TO WS-FILE-NAME
+               STRING "data/site" WS-FILE-COUNT ".dat" 
+                   DELIMITED BY SIZE INTO WS-FILE-NAME
+               
+               OPEN INPUT SITE-FILE
+               READ SITE-FILE INTO WS-HEADER
+               MOVE 'N' TO WS-EOF
+               PERFORM UNTIL WS-EOF = 'Y'
+                   READ SITE-FILE AT END MOVE 'Y' TO WS-EOF
+                   NOT AT END
+                       IF SITE-REC(39:10) = "TTTTTTTTTT"
+                           MOVE 'Y' TO WS-EOF
+                       ELSE
+                           WRITE ALL-SITES-REC FROM SITE-REC
+                       END-IF
+               END-READ
+               END-PERFORM
+               CLOSE SITE-FILE
+           END-PERFORM.
            CLOSE ALL-SITES-FILE.
            STOP RUN.
 EOF
