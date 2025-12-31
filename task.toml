@@ -1,0 +1,22 @@
+[task]
+id = "cobol-file-merge"
+version = "1.0.0"
+title = "COBOL 3-File Merge Logic"
+description = "A classic legacy batch processing challenge: merging three sorted files with missing keys using the Balance Line algorithm."
+
+[metadata]
+author_name = "TerminalBench Contributors"
+author_email = "tbench@example.com"
+difficulty = "hard"
+category = "Legacy"
+tags = ["cobol", "batch", "merge", "algorithm"]
+
+[verifier]
+timeout_sec = 900
+
+[agent]
+timeout_sec = 900
+
+[evaluation]
+test_command = "bash ../tests/test.sh"
+oracle_command = "bash ../solution/solve.sh"
