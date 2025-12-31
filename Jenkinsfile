@@ -294,9 +294,9 @@ dump_harbor_run_from_log() {
     echo "Log: $log_file"
 
     local result_json
-    result_json="$(awk \'/Results written to /{print $NF}\' "$log_file" | tail -n1)"
+    result_json="$(awk '/Results written to /{print $NF}' "$log_file" | tail -n1)"
     if [ -z "$result_json" ]; then
-        echo "No \'Results written to ...\' line found in $log_file"
+        echo "No 'Results written to ...' line found in $log_file"
         return 0
     fi
 
@@ -344,7 +344,7 @@ dump_harbor_run_from_log() {
         ; do
         if [ -f "$f" ]; then
             echo "--- $f (first 2000 lines) ---"
-            sed -n \'1,2000p\' "$f" 2>/dev/null || true
+            sed -n '1,2000p' "$f" 2>/dev/null || true
         fi
     done
 }
