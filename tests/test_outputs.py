@@ -171,7 +171,7 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def test_valid_file_validation(test_env):
-    test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'valid_payment.txt'
 
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
     assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
@@ -206,7 +206,7 @@ def test_valid_file_validation(test_env):
 
 
 def test_duplicate_detection(test_env):
-    test_file = Path(__file__).parent / 'data' / 'duplicate_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'duplicate_payment.txt'
 
     rc1, out1, err1 = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
     assert rc1 == 0, f"expected first run rc=0 but got rc={rc1}\nstdout=\n{out1}\n\nstderr=\n{err1}\n"
@@ -240,7 +240,7 @@ def test_duplicate_detection_across_filenames(test_env):
 
 
 def test_invalid_file_validation(test_env):
-    test_file = Path(__file__).parent / 'data' / 'invalid_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'invalid_payment.txt'
     rc, out, _ = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
     # validator should exit non-zero when errors are present
     assert rc != 0
@@ -293,7 +293,7 @@ def test_retention_window(test_env):
     conn.close()
 
     # call CLI check_duplicate via running validator on a different file; the old hash should not trigger duplicate
-    test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'valid_payment.txt'
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], db)
     assert rc == 0, f"expected rc=0 but got rc={rc}\nstdout=\n{out}\n\nstderr=\n{err}\n"
     rep = json.loads(out)
@@ -302,7 +302,7 @@ def test_retention_window(test_env):
 
 def test_retention_days_flag_affects_duplicate_detection(test_env):
     """--retention-days must be honored by the CLI."""
-    test_file = Path(__file__).parent / 'data' / 'duplicate_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'duplicate_payment.txt'
 
     rc1, out1, err1 = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'], extra_args=['--retention-days', '5'])
     assert rc1 == 0, f"expected first run rc=0 but got rc={rc1}\nstdout=\n{out1}\n\nstderr=\n{err1}\n"
@@ -885,7 +885,7 @@ def test_solution_runtime_within_limit(test_env):
     `EFT_RUNTIME_LIMIT` (seconds) when running the tests or CI.
     """
     limit = float(os.environ.get("EFT_RUNTIME_LIMIT", "10"))
-    test_file = Path(__file__).parent / 'data' / 'valid_payment.txt'
+    test_file = Path(__file__).parent / 'environment' / 'app' / 'data' / 'valid_payment.txt'
 
     start = time.perf_counter()
     rc, out, err = _run_cli(test_file, test_env['schema'], test_env['clearing'], test_env['db'])
