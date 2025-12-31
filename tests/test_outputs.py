@@ -6,18 +6,18 @@ def test_merge_logic():
     # 1. Compile
     compile_cmd = ["cobc", "-x", "-o", "merge_app", "merge.cbl"]
     try:
-        subprocess.run(compile_cmd, check=True, cwd="environment/app", capture_output=True)
+        subprocess.run(compile_cmd, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         assert False, f"Compilation failed: {e.stderr.decode()}"
 
     # 2. Run
     try:
-        subprocess.run(["./merge_app"], check=True, cwd="environment/app", capture_output=True)
+        subprocess.run(["./merge_app"], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         assert False, f"Execution failed: {e.stderr.decode()}"
 
     # 3. Verify Output
-    report_path = "environment/app/report.txt"
+    report_path = "report.txt"
     assert os.path.exists(report_path), "Output report.txt not found"
 
     with open(report_path, "r") as f:

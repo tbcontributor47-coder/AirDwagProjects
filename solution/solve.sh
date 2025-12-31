@@ -102,5 +102,4 @@ cat <<EOF > merge.cbl
                MOVE BONUS-ID TO WS-CURRENT-ID
            END-IF.
 EOF
-# Copy the fixed merge.cbl to the app directory if needed
-cp merge.cbl ../environment/app/merge.cbl
+# Fixed merge.cbl is already written to the current directory by the heredoc above
