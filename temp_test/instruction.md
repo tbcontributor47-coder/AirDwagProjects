@@ -229,28 +229,17 @@ Additional rules:
 
 ### Component Semantics
 
-Attribute paths and ignore prefixes are split into components on **unescaped dots**. Escaped dots (`\.`) are treated as literal characters within component names and do not split components.
-
-**Matching Algorithm:**
-
-1. Split both the path and prefix into components on unescaped dots (after applying escaping rules)
-2. Apply Unicode normalization (NFKD) and diacritic stripping to both path and prefix for comparison
-3. Compare components:
-   - **If the path has only 1 component**: Match if the path component equals the prefix, or if the path component starts with the prefix as a substring
-   - **If the path has multiple components**:
-     - The path must have at least as many components as the prefix
-     - If the prefix has multiple components: the first `len(prefix_components) - 1` components of the path must match the first `len(prefix_components) - 1` components of the prefix exactly
-     - Compare the path component at index `len(prefix_components) - 1` with the prefix's last component:
-       - If they are equal (exact match): the path matches
-       - If the path component starts with the prefix's last component as a substring: check the remainder (the part of the path component after the prefix component). If the remainder exists and its first character is an uppercase letter (A-Z) or digit (0-9), the path matches. This rule ensures prefix matching respects word boundaries (e.g., `Env` matches `EnvName` because `Name` starts with `N`, but doesn't match `Environment` because `ironment` starts with `i`)
+* Attribute paths are split on **unescaped dots**
+* Prefix components must exactly match the initial path components
+* Escaped dots (`\.`) are treated as literal characters
 
 #### Examples
 
-| Ignore Prefix    | Ignored             | Not Ignored          | Explanation                                                                 |
-| ---------------- | ------------------- | -------------------- | --------------------------------------------------------------------------- |
-| `tags.Env`       | `tags.EnvName`      | `tags.Environment`   | Both split to `["tags", "Env"]` vs `["tags", "EnvName"]` or `["tags", "Environment"]`. First component `tags` matches exactly in both cases. For `EnvName`: `EnvName` starts with `Env`, remainder `Name` starts with `N` (uppercase) ✓. For `Environment`: `Environment` starts with `Env`, remainder `ironment` starts with `i` (lowercase) ✗ |
-| `config.network` | `config.network.ip` | `config.network\.ip` | Prefix splits to `["config", "network"]`. Path `config.network.ip` splits to `["config", "network", "ip"]`: path has ≥2 components, first component matches exactly, and path component at index `len(prefix)-1 = 1` (`network`) equals prefix's last component, so matches ✓. Path `config.network\.ip` splits to `["config", "network\.ip"]`: path has 2 components, first matches, but component at index 1 is `network\.ip` (literal backslash-dot, not a component separator) which doesn't equal `network` ✗ |
-| `café`           | `café`, `café.au_lait` | -                   | Single-component prefix. Path `café` (1 component) matches exactly. Path `café.au_lait` splits to `["café", "au_lait"]`: component at index 0 equals the prefix, so matches ✓ |
+| Ignore Prefix    | Ignored             | Not Ignored          |
+| ---------------- | ------------------- | -------------------- |
+| `tags.Env`       | `tags.EnvName`      | `tags.Environment`   |
+| `config.network` | `config.network.ip` | `config.network\.ip` |
+| `cafe`           | `café.au_lait`      | `cafeteria`          |
 
 ---
 

@@ -1,0 +1,20 @@
+version = "1.0.0"
+
+[metadata]
+difficulty = "hard"
+author_name = "TerminalBench Contributors"
+author_email = "tbench@example.com"
+category = "system-administration"
+tags = ["terraform", "infrastructure", "diff", "comparison", "json"]
+
+[verifier]
+timeout_sec = 900
+
+[agent]
+timeout_sec = 900
+
+[environment]
+build_timeout_sec = 600
+cpus = 2
+memory_mb = 2048
+storage_mb = 5120
