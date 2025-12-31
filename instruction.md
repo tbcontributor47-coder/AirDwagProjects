@@ -51,9 +51,10 @@ Each input file is `LINE SEQUENTIAL`.
     - Sum of all values must match `Total Value`.
     - Sum of 'Y' values must match `Total Completed Value`.
     - Sum of 'N' values must match `Total Pending Value`.
+    - Trailer pattern must match "TTTTTTTTTT".
 3.  **File Aggregation**: If all 5 files pass validation, copy all detail records into `all_sites.dat`. If any validation fails (in any file), the program must **not** produce the `all_sites.dat` file (or must delete/empty it) and must exit with status 1 after displaying a descriptive error message.
     - For header date or pattern issues: Display `INVALID HEADER`.
-    - For trailer count or sum mismatches: Display `TRAILER MISMATCH`.
+    - For trailer count, sum, or pattern mismatches: Display `TRAILER MISMATCH`.
 4.  **Formatting**: Stick to Area A/B rules.
 
 ## Task
