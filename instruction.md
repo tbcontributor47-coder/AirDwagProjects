@@ -218,16 +218,24 @@ Ignore matching is performed against the **rendered (escaped) attribute path**. 
 
 Paths and prefixes are split into components on **unescaped dots**. Escaped dots (`\.`) are treated as literal characters within component names and do not split components.
 
-**Single-component matching:** When both path and prefix have a single component, they are compared after unescaping (converting `\.` to `.` and `\\` to `\`). A path matches if it equals the prefix or starts with the prefix as a substring.
+**If the path has a single component:**
+- Both the path and prefix are unescaped (converting `\.` to `.` and `\\` to `\`)
+- The path matches if it equals the unescaped prefix or starts with the unescaped prefix as a substring
 
-**Multi-component matching:** This applies when the path has multiple components. The path must have at least as many components as the prefix.
-
-- If the prefix has multiple components: all leading components of the prefix (all except the last) must match the corresponding leading components of the path exactly.
-- The component at position `len(prefix_components) - 1` of the path is compared with the last component of the prefix. Both are compared as strings (components are used as-extracted from the split operation, not unescaped). The path matches if:
+**If the path has multiple components:**
+- Split the prefix into components
+- The path must have at least as many components as the prefix
+- If the prefix has multiple components (more than 1), the first `len(prefix_components) - 1` components of the path must equal the first `len(prefix_components) - 1` components of the prefix exactly
+- Compare the path component at index `len(prefix_components) - 1` with the last component of the prefix (both as strings, as-extracted from splitting, not unescaped)
+- The path matches if:
   - These components are equal, or
-  - The path's component starts with the prefix's component as a substring, and the remainder (the substring of the path's component that follows the prefix's component) is non-empty and its first character is an uppercase letter (A-Z) or digit (0-9)
+  - The path's component starts with the prefix's component as a substring, and the remainder (the substring remaining after removing the prefix's component from the start of the path's component) is non-empty and its first character is an uppercase letter (A-Z) or digit (0-9)
 
-For example, with prefix `tags.Env` (2 components) and path `tags.EnvName` (2 components): the first component `tags` matches exactly. The final components are `Env` and `EnvName`. Since `EnvName` starts with `Env` and the remainder `Name` begins with uppercase `N`, it matches. However, with path `tags.Environment`: the remainder is `ironment`, which begins with lowercase `i`, so it does not match.
+**Examples:**
+- Prefix `tags.Env` with path `tags.EnvName`: prefix has 2 components `["tags", "Env"]`, path has 2 components `["tags", "EnvName"]`. First components match (`tags` == `tags`). Comparing `Env` with `EnvName`: `EnvName` starts with `Env`, remainder is `Name` which begins with uppercase `N` → matches
+- Prefix `tags.Env` with path `tags.Environment`: remainder is `ironment` which begins with lowercase `i` → does not match
+- Prefix `config.network` with path `config.network.ip`: prefix components `["config", "network"]`, path components `["config", "network", "ip"]`. First component matches. Comparing `network` with `network` → equal → matches
+- Prefix `config.network` with path `config.network\.ip`: path components are `["config", "network.ip"]` (escaped dot doesn't split). First component matches. Comparing `network` with `network.ip`: `network.ip` starts with `network`, but remainder is `.ip` which begins with `.` (not uppercase/digit) → does not match
 
 #### Examples
 
