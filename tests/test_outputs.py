@@ -22,7 +22,7 @@ def generate_site_file(filename, details_data, date_str=None, header_pat="HHHHHH
         det = d['det'].ljust(50)[:50]
         agree = d['agree']
         phone = d['phone'].ljust(15)[:15]
-        val_int = int(d['val'] * 100)
+        val_int = int(round(d['val'] * 100))
         val_str = f"{val_int:011d}"
         
         details_str += f"{owner}{acc}{sno}{loc}{det}{agree}{phone}{val_str}\n"
@@ -38,7 +38,7 @@ def generate_site_file(filename, details_data, date_str=None, header_pat="HHHHHH
     final_comp = corrupt_comp if corrupt_comp is not None else total_comp
     final_pend = corrupt_pend if corrupt_pend is not None else total_pend
     
-    trailer = f"{final_count:05d}{int(final_total*100):011d}{int(final_comp*100):011d}{int(final_pend*100):011d}{trailer_pat}\n"
+    trailer = f"{final_count:05d}{int(round(final_total*100)):011d}{int(round(final_comp*100)):011d}{int(round(final_pend*100)):011d}{trailer_pat}\n"
     
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as f:
@@ -60,9 +60,11 @@ def test_real_estate_merge():
 
     # 3. Run
     try:
-        subprocess.run(["./merge_app"], check=True, capture_output=True)
+        res = subprocess.run(["./merge_app"], check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        assert False, f"Execution failed: {e.stderr.decode()}"
+        print(f"STDOUT: {e.stdout}")
+        print(f"STDERR: {e.stderr}")
+        assert False, f"Execution failed: {e.stderr}"
 
     # 4. Verify Output
     assert os.path.exists("all_sites.dat"), "all_sites.dat not generated"
