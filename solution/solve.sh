@@ -104,7 +104,8 @@ cat <<EOF > validate.cbl
                        
       * FORMAT_ERR (Priority 2): Acct starts with 9, 10 digits (no spaces)
                        MOVE 0 TO WS-HAS-SPACES
-                       INSPECT INS-REC(59:10) TALLYING WS-HAS-SPACES FOR ALL SPACES
+                       MOVE INS-REC(59:10) TO WORK-POL-STR
+                       INSPECT WORK-POL-STR TALLYING WS-HAS-SPACES FOR ALL SPACES
                        IF INS-REC(59:1) NOT = '9' OR WS-HAS-SPACES > 0
                            DISPLAY "FORMAT_ERR"
                            STOP RUN RETURNING 1
