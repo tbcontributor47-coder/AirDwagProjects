@@ -1,7 +1,7 @@
 id = "cobol-file-validation"
 version = "1.0.0"
 title = "COBOL EFT File Validation"
-description = "Implement a robust data validator in COBOL for fixed-width EFT (Electronic Funds Transfer) files."
+description = "Implement a robust data validator in COBOL for Insurance Premium Batch files."
 
 [metadata]
 author_name = "TerminalBench Contributors"

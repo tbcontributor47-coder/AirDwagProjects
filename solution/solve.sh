@@ -103,6 +103,11 @@ cat <<EOF > validate.cbl
                        MOVE INS-REC TO WS-POL-REC
                        
       * FORMAT_ERR (Priority 2): Acct starts 9, 10 digs
+                       IF INS-REC(59:10) IS NOT NUMERIC
+                           DISPLAY "FORMAT_ERR"
+                           STOP RUN RETURNING 1
+                       END-IF
+
                        MOVE 0 TO WS-HAS-SPACES
                        MOVE INS-REC(59:10) TO WORK-POL-STR
                        INSPECT WORK-POL-STR
@@ -210,7 +215,7 @@ cat <<EOF > validate.cbl
            END-PERFORM.
 
            IF WS-TR-FOUND NOT = 'Y'
-               DISPLAY "BATCH_SUM_ERR"
+               DISPLAY "COUNT_ERR"
                STOP RUN RETURNING 1
            END-IF
 
