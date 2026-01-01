@@ -82,7 +82,8 @@ cat <<EOF > validate.cbl
               10 WORK-POL-DIGIT PIC 9 OCCURS 10 TIMES.
 
        PROCEDURE DIVISION.
-           MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE.
+           MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE
+           .
            OPEN INPUT INS-FILE.
            
            READ INS-FILE INTO WS-HDR-REC
@@ -105,7 +106,8 @@ cat <<EOF > validate.cbl
       * FORMAT_ERR (Priority 2): Acct starts with 9, 10 digits (no spaces)
                        MOVE 0 TO WS-HAS-SPACES
                        MOVE INS-REC(59:10) TO WORK-POL-STR
-                       INSPECT WORK-POL-STR TALLYING WS-HAS-SPACES FOR ALL SPACES
+                       INSPECT WORK-POL-STR TALLYING WS-HAS-SPACES
+      -                FOR ALL SPACES
                        IF INS-REC(59:1) NOT = '9' OR WS-HAS-SPACES > 0
                            DISPLAY "FORMAT_ERR"
                            STOP RUN RETURNING 1
@@ -124,8 +126,8 @@ cat <<EOF > validate.cbl
                        END-IF
 
       * FISCAL_ERR (Priority 6)
-                       IF POL-PREM > 100000.00 OR 
-                          POL-TOTAL NOT = POL-PREM + POL-TAX
+                       IF POL-PREM > 100000.00 OR
+      -                    POL-TOTAL NOT = POL-PREM + POL-TAX
                            IF 6 < WS-ERR-LEVEL
                                MOVE 6 TO WS-ERR-LEVEL
                            END-IF
@@ -134,9 +136,11 @@ cat <<EOF > validate.cbl
       * TAX_ERR (Priority 7)
                        MOVE 0 TO WORK-TAX-CALC
                        IF POL-RISK = '3'
-                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.10
+                           COMPUTE WORK-TAX-CALC =
+      -                    POL-PREM * 0.10
                        ELSE IF POL-RISK = '2'
-                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.05
+                           COMPUTE WORK-TAX-CALC =
+      -                    POL-PREM * 0.05
                        ELSE
                            MOVE 0 TO WORK-TAX-CALC
                        END-IF END-IF
@@ -152,13 +156,13 @@ cat <<EOF > validate.cbl
       * CHECKSUM_ERR (Priority 8)
                        MOVE 0 TO WORK-CHKSUM
                        MOVE POL-NO TO WORK-POL-STR
-                       PERFORM VARYING WORK-IDX FROM 1 BY 1 
-                           UNTIL WORK-IDX > 9
+                       PERFORM VARYING WORK-IDX FROM 1 BY 1
+      -                    UNTIL WORK-IDX > 9
                            ADD WORK-POL-DIGIT(WORK-IDX) TO WORK-CHKSUM
                        END-PERFORM
                        
-                       IF FUNCTION MOD(WORK-CHKSUM, 10) 
-                          NOT = WORK-POL-DIGIT(10)
+                       IF FUNCTION MOD(WORK-CHKSUM, 10)
+      -                    NOT = WORK-POL-DIGIT(10)
                            IF 8 < WS-ERR-LEVEL
                                MOVE 8 TO WS-ERR-LEVEL
                            END-IF
@@ -183,8 +187,8 @@ cat <<EOF > validate.cbl
                        
       * BATCH_SUM_ERR (Priority 9) - Lowest priority
                        IF ACC-TOT-PREM NOT = TRL-TOT-PREM OR
-                          ACC-TOT-TAX NOT = TRL-TOT-TAX OR
-                          ACC-TOT-DUE NOT = TRL-TOT-DUE
+      -                   ACC-TOT-TAX NOT = TRL-TOT-TAX OR
+      -                   ACC-TOT-DUE NOT = TRL-TOT-DUE
                            IF 9 < WS-ERR-LEVEL
                                MOVE 9 TO WS-ERR-LEVEL
                            END-IF
@@ -199,11 +203,21 @@ cat <<EOF > validate.cbl
            END-IF
 
            EVALUATE WS-ERR-LEVEL
-               WHEN 6 DISPLAY "FISCAL_ERR" STOP RUN RETURNING 1
-               WHEN 7 DISPLAY "TAX_ERR" STOP RUN RETURNING 1
-               WHEN 8 DISPLAY "CHECKSUM_ERR" STOP RUN RETURNING 1
-               WHEN 9 DISPLAY "BATCH_SUM_ERR" STOP RUN RETURNING 1
-               WHEN 99 DISPLAY "VALID" STOP RUN RETURNING 0
+               WHEN 6
+                   DISPLAY "FISCAL_ERR"
+                   STOP RUN RETURNING 1
+               WHEN 7
+                   DISPLAY "TAX_ERR"
+                   STOP RUN RETURNING 1
+               WHEN 8
+                   DISPLAY "CHECKSUM_ERR"
+                   STOP RUN RETURNING 1
+               WHEN 9
+                   DISPLAY "BATCH_SUM_ERR"
+                   STOP RUN RETURNING 1
+               WHEN 99
+                   DISPLAY "VALID"
+                   STOP RUN RETURNING 0
            END-EVALUATE.
 
            CLOSE INS-FILE.
