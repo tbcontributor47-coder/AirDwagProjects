@@ -82,8 +82,7 @@ cat <<EOF > validate.cbl
               10 WORK-POL-DIGIT PIC 9 OCCURS 10 TIMES.
 
        PROCEDURE DIVISION.
-           MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE
-           .
+           MOVE FUNCTION CURRENT-DATE(1:8) TO WS-SYS-DATE.
            OPEN INPUT INS-FILE.
            
            READ INS-FILE INTO WS-HDR-REC
@@ -103,18 +102,20 @@ cat <<EOF > validate.cbl
                    IF INS-REC(1:1) = 'P'
                        MOVE INS-REC TO WS-POL-REC
                        
-      * FORMAT_ERR (Priority 2): Acct starts with 9, 10 digits (no spaces)
+      * FORMAT_ERR (Priority 2): Acct starts 9, 10 digs
                        MOVE 0 TO WS-HAS-SPACES
                        MOVE INS-REC(59:10) TO WORK-POL-STR
-                       INSPECT WORK-POL-STR TALLYING WS-HAS-SPACES
-      -                FOR ALL SPACES
-                       IF INS-REC(59:1) NOT = '9' OR WS-HAS-SPACES > 0
+                       INSPECT WORK-POL-STR
+                           TALLYING WS-HAS-SPACES FOR ALL SPACES
+                       IF INS-REC(59:1) NOT = '9'
+                          OR WS-HAS-SPACES > 0
                            DISPLAY "FORMAT_ERR"
                            STOP RUN RETURNING 1
                        END-IF
 
       * BANNED_ERR (Priority 3)
-                       IF POL-COUNTRY = 'RU' OR POL-COUNTRY = 'KP'
+                       IF POL-COUNTRY = 'RU'
+                          OR POL-COUNTRY = 'KP'
                            DISPLAY "BANNED_ERR"
                            STOP RUN RETURNING 1
                        END-IF
@@ -126,21 +127,23 @@ cat <<EOF > validate.cbl
                        END-IF
 
       * FISCAL_ERR (Priority 6)
-                       IF POL-PREM > 100000.00 OR
-      -                    POL-TOTAL NOT = POL-PREM + POL-TAX
-                           IF 6 < WS-ERR-LEVEL
-                               MOVE 6 TO WS-ERR-LEVEL
-                           END-IF
+                       IF POL-PREM > 100000.00
+                          IF 6 < WS-ERR-LEVEL
+                              MOVE 6 TO WS-ERR-LEVEL
+                          END-IF
+                       END-IF
+                       IF POL-TOTAL NOT = POL-PREM + POL-TAX
+                          IF 6 < WS-ERR-LEVEL
+                              MOVE 6 TO WS-ERR-LEVEL
+                          END-IF
                        END-IF
 
       * TAX_ERR (Priority 7)
                        MOVE 0 TO WORK-TAX-CALC
                        IF POL-RISK = '3'
-                           COMPUTE WORK-TAX-CALC =
-      -                    POL-PREM * 0.10
+                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.10
                        ELSE IF POL-RISK = '2'
-                           COMPUTE WORK-TAX-CALC =
-      -                    POL-PREM * 0.05
+                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.05
                        ELSE
                            MOVE 0 TO WORK-TAX-CALC
                        END-IF END-IF
@@ -157,12 +160,13 @@ cat <<EOF > validate.cbl
                        MOVE 0 TO WORK-CHKSUM
                        MOVE POL-NO TO WORK-POL-STR
                        PERFORM VARYING WORK-IDX FROM 1 BY 1
-      -                    UNTIL WORK-IDX > 9
-                           ADD WORK-POL-DIGIT(WORK-IDX) TO WORK-CHKSUM
+                           UNTIL WORK-IDX > 9
+                           ADD WORK-POL-DIGIT(WORK-IDX)
+                               TO WORK-CHKSUM
                        END-PERFORM
                        
                        IF FUNCTION MOD(WORK-CHKSUM, 10)
-      -                    NOT = WORK-POL-DIGIT(10)
+                          NOT = WORK-POL-DIGIT(10)
                            IF 8 < WS-ERR-LEVEL
                                MOVE 8 TO WS-ERR-LEVEL
                            END-IF
@@ -179,19 +183,27 @@ cat <<EOF > validate.cbl
                        MOVE 'Y' TO WS-EOF
                        MOVE 'Y' TO WS-TR-FOUND
                        
-      * COUNT_ERR (Priority 5) - Overrides Fiscal/Tax/Checksum
+      * COUNT_ERR (Priority 5) - Overrides Fiscal/Tax/Chksum
                        IF ACC-COUNT NOT = TRL-COUNT
                            DISPLAY "COUNT_ERR"
                            STOP RUN RETURNING 1
                        END-IF
                        
       * BATCH_SUM_ERR (Priority 9) - Lowest priority
-                       IF ACC-TOT-PREM NOT = TRL-TOT-PREM OR
-      -                   ACC-TOT-TAX NOT = TRL-TOT-TAX OR
-      -                   ACC-TOT-DUE NOT = TRL-TOT-DUE
-                           IF 9 < WS-ERR-LEVEL
-                               MOVE 9 TO WS-ERR-LEVEL
-                           END-IF
+                       IF ACC-TOT-PREM NOT = TRL-TOT-PREM
+                          IF 9 < WS-ERR-LEVEL
+                              MOVE 9 TO WS-ERR-LEVEL
+                          END-IF
+                       END-IF
+                       IF ACC-TOT-TAX NOT = TRL-TOT-TAX
+                          IF 9 < WS-ERR-LEVEL
+                              MOVE 9 TO WS-ERR-LEVEL
+                          END-IF
+                       END-IF
+                       IF ACC-TOT-DUE NOT = TRL-TOT-DUE
+                          IF 9 < WS-ERR-LEVEL
+                              MOVE 9 TO WS-ERR-LEVEL
+                          END-IF
                        END-IF
                    END-IF
            END-READ
