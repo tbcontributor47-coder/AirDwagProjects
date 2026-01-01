@@ -1,7 +1,6 @@
 import subprocess
 import os
 import datetime
-import pytest
 
 def generate_insurance_file(filename, policies, date_str=None, batch_name="BATCH001", state="NY", corrupt_trl_count=None, corrupt_trl_prem=None, corrupt_trl_tax=None, corrupt_trl_due=None, header_type="H", trailer_type="T", omit_trailer=False):
     """
@@ -411,13 +410,6 @@ def test_cobol_formatting():
         area_a_keywords = ["DIVISION", "SECTION", "FD", "01", "77"]
         stripped_line = line_content[7:].lstrip()
         first_token = stripped_line.split()[0].upper() if stripped_line else ""
-        
-        is_area_a_candidate = False
-        if any(keyword in stripped_line.upper() for keyword in area_a_keywords):
-             if "DIVISION" in first_token or "SECTION" in first_token:
-                 is_area_a_candidate = True
-             if first_token in ["FD", "01", "77"]:
-                 is_area_a_candidate = True
         
         # Paragraphs usually don't have keywords but are identifiers ending in dot? 
         # This is hard to regex perfectly without parser.
