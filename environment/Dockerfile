@@ -1,9 +1,21 @@
-FROM maven:3.9-eclipse-temurin-17-alpine
+FROM eclipse-temurin:17-jdk
 
 WORKDIR /app
 
-RUN apk add --no-cache gnucobol python3 py3-pip bash curl \
+# Install Maven, GnuCOBOL, Python, and other dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        maven \
+        gnucobol \
+        python3 \
+        python3-pip \
+        bash \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /logs/verifier
+
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 COPY app/ /app/
 
