@@ -406,8 +406,6 @@ def test_cobol_formatting():
         
         line_content = line.rstrip()
         
-        # Check Area A elements
-        area_a_keywords = ["DIVISION", "SECTION", "FD", "01", "77"]
         stripped_line = line_content[7:].lstrip()
         first_token = stripped_line.split()[0].upper() if stripped_line else ""
         
