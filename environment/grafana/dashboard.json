@@ -86,7 +86,7 @@
             },
             "targets": [
                 {
-                    "expr": "rate(http_requests_total[5m",
+                    "expr": "rate(http_requests_total[5m])",
                     "legendFormat": "{{method}}",
                     "refId": "A"
                 }

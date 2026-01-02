@@ -33,8 +33,18 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "s3:ListBucketMultipartUploads",
           "s3:PutObject"
         ]
-        # BUG: Resource shouldn't be *, should be specific bucket ARN
-        Resource = "*" 
+        Resource = [
+          aws_s3_bucket.log_bucket.arn,
+          "${aws_s3_bucket.log_bucket.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
       },
       # BUG: Missing CloudWatch Logs permissions (logs:PutLogEvents)
       {
@@ -45,7 +55,9 @@ resource "aws_iam_role_policy" "firehose_policy" {
               "kinesis:GetRecords",
               "kinesis:ListShards"
           ],
-          Resource = "*"
+          Resource = [
+            "*" # Kinesis Describe/List actions often need * or specific stream ARNs. For now keep * but in production should be restricted.
+          ]
       }
     ]
   })
