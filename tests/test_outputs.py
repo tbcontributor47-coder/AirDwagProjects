@@ -324,8 +324,15 @@ def test_performance_benchmark():
     with open("benchmark.dat", "w") as f:
         f.write(header)
         for i in range(2000000):
-            # Valid-ish
-            f.write(policy_fmt.format(100000000+i, "Bench User", 10000, 1000, 11000, "3", "US", 9000000000+i, 30))
+            # Generate valid checksum: Use 9-digit base, calc 10th digit
+            base_pol = 100000000 + i
+            # Sum digits 1-9
+            s = sum(int(d) for d in str(base_pol))
+            check_digit = s % 10
+            full_pol = base_pol * 10 + check_digit
+            
+            # Valid-ish record
+            f.write(policy_fmt.format(full_pol, "Bench User", 10000, 1000, 11000, "3", "US", 9000000000+i, 30))
         f.write(trailer_fmt.format(2000000, 20000000000, 2000000000, 22000000000))
         
     # Compile from immutable baseline to prevent gaming the benchmark
