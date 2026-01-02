@@ -16,5 +16,6 @@ RUN apt-get update \
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 COPY app/ /app/
+COPY app/validate.cbl /baseline/validate.cbl
 
 CMD ["mvn", "test"]

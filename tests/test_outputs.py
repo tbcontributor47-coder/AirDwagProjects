@@ -87,7 +87,10 @@ def compile_cobol_baseline():
     """Compiles the COBOL validator from the immutable baseline for performance benchmarking."""
     # Use the pristine baseline COBOL from the Docker image, not the agent's modified version
     # This prevents gaming the benchmark by intentionally slowing down COBOL
-    baseline_path = "/app/validate.cbl"
+    baseline_path = "/baseline/validate.cbl"
+    if not os.path.exists(baseline_path):
+        baseline_path = "/app/validate.cbl"
+    
     if not os.path.exists(baseline_path):
         # Fallback for local testing
         baseline_path = get_source_path()
