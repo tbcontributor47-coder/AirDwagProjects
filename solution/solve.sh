@@ -5,15 +5,15 @@
 echo "Applying fixes..."
 
 # 1. Fix Terraform IAM
-# Replace "*" with specific ARN and add logs permission
-sed -i 's/Resource = "*"/Resource = "${aws_s3_bucket.log_bucket.arn}\/*"/' environment/terraform/iam.tf
-# Note: Adding missing log permission requires inserting lines, simpler to assume agent edits manually
+sed -i 's/Resource = "*"/Resource = [aws_s3_bucket.log_bucket.arn, "${aws_s3_bucket.log_bucket.arn}\/*"]/' environment/terraform/iam.tf
 
-# 2. Fix Firehose Buffer
+# 2. Fix Firehose (Modern AWS Provider)
+sed -i 's/destination = "s3"/destination = "extended_s3"/' environment/terraform/firehose.tf
+sed -i 's/s3_configuration/extended_s3_configuration/' environment/terraform/firehose.tf
 sed -i 's/buffer_size = 1/buffer_size = 5/' environment/terraform/firehose.tf
 
 # 3. Fix CloudWatch Filter
-sed -i 's/\[timestamp, uuid, level, message\]/""/' environment/terraform/cloudwatch.tf
+sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' environment/terraform/cloudwatch.tf
 
 # 4. Fix Prometheus Config
 sed -i "s/'localhost:9090'/'localhost:8080'/" environment/prometheus/prometheus.yml

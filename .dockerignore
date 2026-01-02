@@ -1,0 +1,5 @@
+solution/
+tests/
+.git/
+*.zip
+*.tar.gz

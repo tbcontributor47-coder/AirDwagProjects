@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Install system dependencies
+# System dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
@@ -8,23 +8,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Terraform
-RUN curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip \
-    && unzip terraform_1.5.7_linux_amd64.zip \
-    && mv terraform /usr/local/bin/ \
-    && rm terraform_1.5.7_linux_amd64.zip
-
-# Install Promtool
-RUN curl -LO https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz \
-    && tar xvfz prometheus-2.45.0.linux-amd64.tar.gz \
-    && mv prometheus-2.45.0.linux-amd64/promtool /usr/local/bin/promtool \
-    && rm -rf prometheus-2.45.0.linux-amd64*
-
 # Install Python verification deps
-RUN pip install pyyaml
+RUN pip install pyyaml==6.0.1
 
 WORKDIR /app
 
-COPY . /app/
+# Copy the environment first to keep the solution and tests potentially separate
+COPY environment /app/environment
+COPY tests /app/tests
+
+# Purge solution from the image to prevent cheating
+# (Alternatively, use .dockerignore which is better)
 
 CMD ["bash", "/app/tests/test.sh"]
