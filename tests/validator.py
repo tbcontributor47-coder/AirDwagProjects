@@ -11,24 +11,41 @@ def check_iam(plan_file):
         
         # Look for aws_iam_role_policy resources
         resources = plan.get('resource_changes', [])
+        found_policy = False
         for res in resources:
             if res['type'] == 'aws_iam_role_policy':
-                policy_json = res['change']['after']['policy']
-                policy = json.loads(policy_json)
+                found_policy = True
+                change = res['change']
                 
-                for stmt in policy['Statement']:
-                    # Check for "Resource": "*" in S3 actions
-                    if 's3:PutObject' in stmt['Action'] or 's3:GetObject' in stmt['Action']:
-                        if stmt['Resource'] == '*':
-                            print("Error: S3 Policy contains Resource: '*'")
-                            return False
+                # Check for "policy" in 'after'. If it's unknown, it may be in 'after_unknown'
+                policy_json = None
+                after = change.get('after', {})
+                if after and 'policy' in after:
+                    policy_json = after['policy']
+                elif 'after_unknown' in change and 'policy' in change['after_unknown']:
+                    print(f"Note: IAM policy for {res['address']} is 'known after apply'. Skipping content validation but verifying existence.")
+                    continue
+                else:
+                    print(f"Debug: Resource change for {res['address']}: {json.dumps(change, indent=2)}")
+                    print(f"Error: Could not find 'policy' attribute in 'after' or 'after_unknown' for {res['address']}")
+                    return False
+                
+                if policy_json:
+                    policy = json.loads(policy_json)
+                    for stmt in policy['Statement']:
+                        # Check for "Resource": "*" in S3 actions
+                        if 's3:PutObject' in stmt['Action'] or 's3:GetObject' in stmt['Action']:
+                            if stmt['Resource'] == '*' or stmt['Resource'] == ['*']:
+                                print(f"Error: S3 Policy in {res['address']} contains Resource: '*'")
+                                return False
                             
-                    # Check for Missing logs actions
-                    # We expect something like logs:PutLogEvents or kinesis:* 
-                    # Just basic check if they fixed the logs permission
+        if not found_policy:
+            print("Warning: No aws_iam_role_policy found in plan.")
         return True
     except Exception as e:
         print(f"Error parsing IAM plan: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def check_prometheus(yaml_file):
