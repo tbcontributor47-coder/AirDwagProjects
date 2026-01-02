@@ -86,8 +86,9 @@ resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
     role_arn   = aws_iam_role.firehose_role.arn
     bucket_arn = aws_s3_bucket.log_bucket.arn
     
-    buffer_size = 5
-    buffer_interval = 60
+    # Note: extended_s3_configuration uses 'buffering_size' and 'buffering_interval'
+    buffering_size     = 5
+    buffering_interval = 60
   }
 }
 
