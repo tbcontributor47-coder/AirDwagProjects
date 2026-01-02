@@ -37,11 +37,13 @@ public class Validator {
         String headerDate = line.substring(1, 9);
         String todayDate = LocalDate.now().format(DATE_FMT);
         
-        // DATE_ERR (Priority 1)
+        // BUG 3: Missing Date Check
+        /*
         if (!headerDate.equals(todayDate)) {
             System.out.println("DATE_ERR");
             return 1;
         }
+        */
         
         // Accumulators - use primitives only
         int count = 0;
@@ -70,8 +72,14 @@ public class Validator {
                 char[] account = line.substring(58, 68).toCharArray();
                 int age = parseInt(line, 68, 71);
                 
-                // FORMAT_ERR (Priority 2) - Account must be numeric and start with 9
+                // BUG 1: Removed IS NUMERIC check
+                /*
                 if (!isNumeric(account) || account[0] != '9') {
+                    System.out.println("FORMAT_ERR");
+                    return 1;
+                }
+                */
+                if (account[0] != '9') { // Partial check
                     System.out.println("FORMAT_ERR");
                     return 1;
                 }
@@ -83,7 +91,8 @@ public class Validator {
                 }
                 
                 // AGE_ERR (Priority 4)
-                if (age < 18 || age > 120) {
+                // BUG 4: Wrong upper age limit
+                if (age < 18 || age > 150) {
                     System.out.println("AGE_ERR");
                     return 1;
                 }
@@ -98,7 +107,8 @@ public class Validator {
                 if (risk == '3') {
                     expectedTaxCents = (premCents * 10L + 50L) / 100L;
                 } else if (risk == '2') {
-                    expectedTaxCents = (premCents * 5L + 50L) / 100L;
+                    // BUG 2: Using 4% instead of 5%
+                    expectedTaxCents = (premCents * 4L + 50L) / 100L;
                 }
                 
                 if (taxCents != expectedTaxCents) {

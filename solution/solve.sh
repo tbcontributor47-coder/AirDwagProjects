@@ -170,7 +170,9 @@ public class Validator {
                 byte country2 = buf[57];
                 int age = parseInt(buf, 68, 71);
                 
-                if (!isNumeric(buf, 58, 68) || buf[58] != '9') {
+                if (isNumeric(buf, 58, 68) && buf[58] == '9') {
+                    // Valid format
+                } else {
                     System.out.println("FORMAT_ERR");
                     return 1;
                 }
@@ -185,7 +187,8 @@ public class Validator {
                     return 1;
                 }
                 
-                if (premCents > 10000000L || dueCents != premCents + taxCents) {
+                // FISCAL_ERR (Priority 6)
+                if (premCents > 10000000L || dueCents != (premCents + taxCents)) {
                     if (6 < errorLevel) errorLevel = 6;
                 }
                 
@@ -200,10 +203,8 @@ public class Validator {
                     if (7 < errorLevel) errorLevel = 7;
                 }
                 
-                int checksum = (buf[1] - '0') + (buf[2] - '0') + (buf[3] - '0') +
-                               (buf[4] - '0') + (buf[5] - '0') + (buf[6] - '0') +
-                               (buf[7] - '0') + (buf[8] - '0') + (buf[9] - '0');
-                
+                int checksum = 0;
+                for (int i = 1; i <= 9; i++) checksum += (buf[i] - '0');
                 if ((checksum % 10) != (buf[10] - '0')) {
                     if (8 < errorLevel) errorLevel = 8;
                 }
@@ -214,6 +215,7 @@ public class Validator {
                 totalDueCents += dueCents;
                 
             } else if (recType == 'T') {
+                trFound = true;
                 int trlCount = parseInt(buf, 1, 6);
                 long trlPremCents = parseLong(buf, 6, 18);
                 long trlTaxCents = parseLong(buf, 18, 30);
@@ -231,6 +233,11 @@ public class Validator {
             }
         }
         
+        if (!trFound) {
+            System.out.println("COUNT_ERR");
+            return 1;
+        }
+        
         switch (errorLevel) {
             case 6: System.out.println("FISCAL_ERR"); return 1;
             case 7: System.out.println("TAX_ERR"); return 1;
@@ -239,6 +246,8 @@ public class Validator {
             default: System.out.println("VALID"); return 0;
         }
     }
+    
+    private static boolean trFound = false;
     
     private static int readLine(InputStream in, byte[] buf) throws IOException {
         int pos = 0;

@@ -7,8 +7,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         maven \
         gnucobol \
-        python3 \
-        python3-pip \
         bash \
         curl \
         ca-certificates \

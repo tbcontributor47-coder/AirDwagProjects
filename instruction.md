@@ -14,28 +14,33 @@ The program reads `insurance.dat` (fixed width) and validates it.
 -   **Trailer ('T')**: Count, Total Prem, Total Tax, Total Due.
 
 ### Logic & Checks
-1.  **Header Check**: Date must match system date.
-2.  **Account Check**: Must be 10 digits and start with '9'.
-3.  **Banned Countries**: 'RU', 'KP' are banned.
-4.  **Age Check**: 18-120.
-5.  **Fiscal Integrity**: `Total Due` = `Prem` + `Tax`.
+1.  **Header Check**: Date must match system date (Priority 1).
+2.  **Account Check**: Must be 10 digits and start with '9' (Priority 2).
+3.  **Banned Countries**: 'RU', 'KP' are banned (Priority 3).
+4.  **Age Check**: 18-120 inclusive (Priority 4).
+5.  **Fiscal Integrity**: 
+    -   `Total Due` = `Prem` + `Tax` (Priority 6).
+    -   **Premium Cap**: Any policy with `Prem` > 100,000.00 is a fiscal error (Priority 6).
 6.  **Tax Calculation**:
     -   Risk '3': 10%
     -   Risk '2': 5%
     -   Risk '1': 0%
     -   Rounding: Half-Up. (e.g. 100.05 * 0.10 = 10.005 -> 10.01)
-7.  **Checksum**: Policy No mod 10 check.
-8.  **Trailer**: Counts and Sums must match.
+    -   If tax is incorrect: TAX_ERR (Priority 7).
+7.  **Checksum**: Policy No mod 10 check. The 10th digit must be the sum of the first 9 digits mod 10. (Priority 8).
+8.  **Trailer**: 
+    -   Counts and Sums must match the entire file (Priority 5 for count mismatch, Priority 9 for sum mismatch).
+    -   **Missing Trailer**: If the file ends without a 'T' record, it is a COUNT_ERR (Priority 5).
 9.  **Error Priority**: If multiple errors exist, report the highest priority (lowest code):
-    -   DATE_ERR (1)
-    -   FORMAT_ERR (2)
-    -   BANNED_ERR (3)
-    -   AGE_ERR (4)
-    -   COUNT_ERR (5)
-    -   FISCAL_ERR (6)
-    -   TAX_ERR (7)
-    -   CHECKSUM_ERR (8)
-    -   BATCH_SUM_ERR (9)
+    -   DATE_ERR (1) - Header Date Mismatch
+    -   FORMAT_ERR (2) - Account Number format/digits
+    -   BANNED_ERR (3) - Banned country (RU, KP)
+    -   AGE_ERR (4) - Age out of range (18-120)
+    -   COUNT_ERR (5) - Record count mismatch OR missing trailer
+    -   FISCAL_ERR (6) - Prem+Tax mismatch OR Prem > 100,000.00
+    -   TAX_ERR (7) - Tax calculation mismatch
+    -   CHECKSUM_ERR (8) - Policy Number checksum failure
+    -   BATCH_SUM_ERR (9) - Batch total sum mismatch
 
 ## Intentional Bugs in Baseline Code
 

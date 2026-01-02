@@ -143,7 +143,7 @@ echo "===== Running tests against BUGGY baseline (should have failures) ====="
 docker run --rm \
     -v "$TASK_ABS/tests:/mnt/tests" \
     "$IMAGE_NAME" \
-    /bin/bash -c "pip install -q pytest --break-system-packages 2>&1 >/dev/null && pytest /mnt/tests/test_outputs.py -v --tb=short" \
+    /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends python3 python3-pip && pip install -q pytest --break-system-packages 2>&1 >/dev/null && pytest /mnt/tests/test_outputs.py -v --tb=short" \
     2>&1 | tee logs/baseline-test.log || true
 
 echo ""
@@ -189,6 +189,7 @@ docker run --rm \
             exit 1
         fi
         echo 'Re-running tests after fixer'
+        apt-get update && apt-get install -y --no-install-recommends python3 python3-pip
         pip install -q pytest --break-system-packages 2>&1 >/dev/null
         pytest /mnt/tests/test_outputs.py -v --tb=short --junitxml=/mnt/tests/fix-report.xml || true
     " \

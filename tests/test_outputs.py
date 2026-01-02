@@ -49,24 +49,52 @@ def generate_insurance_file(filename, policies, date_str=None, batch_name="BATCH
         if not omit_trailer:
             f.write(trailer)
 
+# --- Path Configuration ---
+def get_source_path():
+    """Finds the absolute path to validate.cbl."""
+    # This file is in tests/test_outputs.py
+    # validate.cbl is in environment/app/validate.cbl
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base_dir, "environment", "app", "validate.cbl")
+    if os.path.exists(path):
+        return path
+    # Fallback for older structure if needed
+    if os.path.exists("validate.cbl"):
+        return os.path.abspath("validate.cbl")
+    return "validate.cbl"
+
 def compile_cobol():
     """Compiles the COBOL validator."""
-    source_path = "../environment/app/validate.cbl"
-    if not os.path.exists(source_path):
-        # Fallback for different CWD
-        source_path = "environment/app/validate.cbl"
-        if not os.path.exists(source_path):
-             source_path = "validate.cbl" # last resort
-             
+    source_path = get_source_path()
     subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol", source_path], check=True)
+
+def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
+    """Runs the specified validator (COBOL or Java)."""
+    if binary.endswith(".jar"):
+        cmd = ["java", "-jar", binary]
+    else:
+        cmd = [binary]
+    
+    with open(stdin_file, 'rb') as f:
+        return subprocess.run(cmd, input=f.read(), capture_output=True, text=True)
 
 def build_java():
     """Builds the Java validator."""
-    # Assuming mvn is handling the build of the uber jar
-    # We should run this from the project root usually, but here we can try
-    # to run mvn package if jar doesn't exist.
-    # ideally the test environment already built it via test.sh, but we can verify.
-    pass
+    jar_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "target", "validator.jar")
+    if os.path.exists(jar_path):
+        return jar_path
+    if os.path.exists("target/validator.jar"):
+        return os.path.abspath("target/validator.jar")
+    return None
+
+def build_java():
+    """Builds the Java validator."""
+    jar_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "target", "validator.jar")
+    if os.path.exists(jar_path):
+        return jar_path
+    if os.path.exists("target/validator.jar"):
+        return os.path.abspath("target/validator.jar")
+    return None
 
 # --- COBOL Tests ---
 
@@ -109,6 +137,14 @@ def test_banned_country():
     assert res.returncode == 1
     assert res.stdout.strip() == "BANNED_ERR"
 
+def test_banned_country_kp():
+    compile_cobol()
+    p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'KP', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "BANNED_ERR"
+
 def test_age_error():
     compile_cobol()
     p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 15}
@@ -142,6 +178,15 @@ def test_tax_calculation_risk2():
     assert res.returncode == 0
     assert res.stdout.strip() == "VALID"
 
+def test_tax_calculation_risk1():
+    # 0% tax
+    compile_cobol()
+    p = {'no': 123456786, 'holder': 'X', 'prem': 1000.00, 'tax': 0.00, 'due': 1000.00, 'risk': '1', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 0
+    assert res.stdout.strip() == "VALID"
+
 def test_checksum_failure():
     compile_cobol()
     p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
@@ -149,6 +194,23 @@ def test_checksum_failure():
     res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
     assert res.returncode == 1
     assert res.stdout.strip() == "CHECKSUM_ERR"
+
+def test_fiscal_error_due_mismatch():
+    compile_cobol()
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.00, 'tax': 10.00, 'due': 999.99, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "FISCAL_ERR"
+
+def test_error_priority_age_vs_tax():
+    # Age (4) vs Tax (7). Should report AGE_ERR.
+    compile_cobol()
+    p = {'no': 123456786, 'holder': 'X', 'prem': 100.00, 'tax': 99.99, 'due': 199.99, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 10}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "AGE_ERR"
 
 def test_batch_sum_mismatch():
     compile_cobol()
@@ -172,6 +234,33 @@ def test_missing_trailer():
     generate_insurance_file("insurance.dat", [p], omit_trailer=True)
     res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
     assert res.returncode == 1
+    assert res.stdout.strip() == "COUNT_ERR"
+
+# --- Java Correctness Validation ---
+
+def test_java_correctness():
+    """Validates Java implementation against THE ENTIRE TEST SUITE."""
+    jar_path = build_java()
+    if not jar_path:
+        pytest.skip("Java JAR not found")
+    
+    # List of test cases: (policies, expected_out, date_str, kwargs)
+    test_cases = [
+        ([{'no': 123456786, 'holder': 'Valid', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "VALID", None, {}),
+        ([], "DATE_ERR", "19990101", {}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 8876543210, 'age': 30}], "FORMAT_ERR", None, {}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'KP', 'acc': 9876543210, 'age': 30}], "BANNED_ERR", None, {}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 150}], "AGE_ERR", None, {}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100000.01, 'tax': 10000.00, 'due': 110000.01, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "FISCAL_ERR", None, {}),
+        ([{'no': 123456786, 'holder': 'X', 'prem': 1000.0, 'tax': 0.0, 'due': 1000.0, 'risk': '1', 'country': 'US', 'acc': 9876543210, 'age': 30}], "VALID", None, {}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 50.0, 'due': 150.0, 'risk': '2', 'country': 'US', 'acc': 9876543210, 'age': 10}], "AGE_ERR", None, {}), # Age(4) vs Tax(7)
+        ([{'no': 123456786, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "COUNT_ERR", None, {'corrupt_trl_count': 99}),
+    ]
+    
+    for policies, expected, d_str, kwargs in test_cases:
+        generate_insurance_file("insurance.dat", policies, date_str=d_str, **kwargs)
+        res = run_validator(jar_path)
+        assert res.stdout.strip() == expected, f"Java failed for {expected}. Got {res.stdout.strip()}"
 
 # --- Performance Benchmark ---
 
