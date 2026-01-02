@@ -11,7 +11,10 @@ echo "Applying fixes..."
 # 1. Fix Terraform IAM
 cat <<'EOF' > /app/environment/terraform/iam.tf
 provider "aws" {
-  region = "us-east-1"
+  region                      = "us-east-1"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
 }
 
 resource "aws_iam_role" "firehose_role" {
