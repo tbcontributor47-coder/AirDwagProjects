@@ -41,6 +41,10 @@ sed -i 's/^      \*                     DISPLAY "FORMAT_ERR"$/                  
 sed -i 's/^      \*                     STOP RUN RETURNING 1$/                            STOP RUN RETURNING 1/' "$COBOL_FILE"
 sed -i 's/^      \*                 END-IF$/                        END-IF/' "$COBOL_FILE"
 
+# BUG FIX 4: Fix age upper limit from 150 to 120
+sed -i 's/IF POL-AGE < 18 OR POL-AGE > 150/IF POL-AGE < 18 OR POL-AGE > 120/' "$COBOL_FILE"
+sed -i '/\* BUG 4: Wrong upper age limit/d' "$COBOL_FILE"
+
 echo "COBOL bugs fixed!"
 
 # FIX THE FLAWED BENCHMARK TEST

@@ -37,11 +37,16 @@ The program reads `insurance.dat` (fixed width) and validates it.
     -   CHECKSUM_ERR (8)
     -   BATCH_SUM_ERR (9)
 
-## The Bugs (Hint)
-The provided `validate.cbl` has known issues:
--   It might miss some format checks.
--   Tax calculations for certain risk categories might be wrong.
--   Header validation might be skipped.
+## Intentional Bugs in Baseline Code
+
+The provided `validate.cbl` contains **4 intentional bugs** that you must identify and fix:
+
+1. **Missing Date Validation** (Priority 1): The header date check against the system date is commented out, allowing invalid dates to pass validation.
+2. **Missing Account Numeric Check** (Priority 2): The validation to ensure the account field contains only numeric digits is commented out, allowing non-numeric characters.
+3. **Incorrect Tax Rate for Risk '2'** (Priority 7): The tax calculation uses 4% (0.04) instead of the correct 5% (0.05) for Risk category '2'.
+4. **Wrong Age Upper Limit** (Priority 4): The age validation uses an upper limit of 150 instead of the correct 120.
+
+**Your Task**: Fix all 4 bugs in the COBOL code and implement the corrected logic in Java.
 
 ## Java Requirements
 -   **Class**: `com.tbench.insurance.Validator`
