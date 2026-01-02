@@ -43,7 +43,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
         ]
         Resource = [
           aws_s3_bucket.log_bucket.arn,
-          "${aws_s3_bucket.log_bucket.arn}/*"
+          format("%s/*", aws_s3_bucket.log_bucket.arn)
         ]
       },
       {
@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
+        Resource = format("%s:*", aws_cloudwatch_log_group.app_logs.arn)
       },
       {
           Effect = "Allow",
