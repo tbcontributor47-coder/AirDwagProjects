@@ -5,8 +5,15 @@
 
 echo "Applying fixes..."
 
+# Ensure we are in the correct directory or use absolute paths
+# Jenkins maps the task to /app
+
 # 1. Fix Terraform IAM
 cat <<'EOF' > /app/environment/terraform/iam.tf
+provider "aws" {
+  region = "us-east-1"
+}
+
 resource "aws_iam_role" "firehose_role" {
   name = "firehose_delivery_role"
 
@@ -43,7 +50,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
         ]
         Resource = [
           aws_s3_bucket.log_bucket.arn,
-          format("%s/*", aws_s3_bucket.log_bucket.arn)
+          "${aws_s3_bucket.log_bucket.arn}/*"
         ]
       },
       {
@@ -52,7 +59,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = format("%s:*", aws_cloudwatch_log_group.app_logs.arn)
+        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
       },
       {
           Effect = "Allow",
@@ -79,8 +86,8 @@ resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
     role_arn   = aws_iam_role.firehose_role.arn
     bucket_arn = aws_s3_bucket.log_bucket.arn
     
-    buffering_size     = 5
-    buffering_interval = 60
+    buffer_size = 5
+    buffer_interval = 60
   }
 }
 
