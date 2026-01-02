@@ -19,6 +19,6 @@ RUN pip3 install pyyaml
 
 WORKDIR /app
 
-COPY environment/ /app/
+COPY . /app/
 
-CMD ["bash", "../tests/test.sh"]
+CMD ["bash", "/app/tests/test.sh"]

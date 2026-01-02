@@ -23,7 +23,7 @@ fi
 # We export plan to JSON and verify with python script
 if terraform plan -out=tfplan > /dev/null 2>&1; then
     terraform show -json tfplan > tfplan.json
-    if python3 ../../tests/validator.py --check-iam tfplan.json; then
+    if python3 /app/tests/validator.py --check-iam tfplan.json; then
         echo "PASS (IAM Policy)"
     else
         echo "FAIL (IAM Policy - Too Permissive)"
@@ -55,7 +55,7 @@ fi
 # 4. Grafana JSON Validation
 echo -n "Checking Grafana JSON... "
 cd /app/grafana
-if python3 ../../tests/validator.py --check-grafana dashboard.json; then
+if python3 /app/tests/validator.py --check-grafana dashboard.json; then
     echo "PASS"
 else
     echo "FAIL (Grafana JSON/PromQL)"
