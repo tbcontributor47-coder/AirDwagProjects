@@ -6,7 +6,7 @@
 echo "Applying fixes..."
 
 # 1. Fix Terraform IAM
-cat <<EOF > /app/environment/terraform/iam.tf
+cat <<'EOF' > /app/environment/terraform/iam.tf
 resource "aws_iam_role" "firehose_role" {
   name = "firehose_delivery_role"
 
@@ -43,7 +43,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
         ]
         Resource = [
           aws_s3_bucket.log_bucket.arn,
-          "\${aws_s3_bucket.log_bucket.arn}/*"
+          "${aws_s3_bucket.log_bucket.arn}/*"
         ]
       },
       {
@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "\${aws_cloudwatch_log_group.app_logs.arn}:*"
+        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
       },
       {
           Effect = "Allow",
@@ -70,7 +70,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
 EOF
 
 # 2. Fix Firehose
-cat <<EOF > /app/environment/terraform/firehose.tf
+cat <<'EOF' > /app/environment/terraform/firehose.tf
 resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
   name        = "app-logs-delivery-stream"
   destination = "extended_s3"
