@@ -45,7 +45,7 @@ fi
 # 2. Check IAM Policies (Manual check for wildcard resource)
 # We export plan to JSON and verify with python script
 # Use -refresh=false to skip state refresh (no credentials needed)
-if terraform plan -refresh=false -out=tfplan > /dev/null 2>&1; then
+if terraform plan -refresh=false -out=tfplan > tfplan.out 2>&1; then
     terraform show -json tfplan > tfplan.json
     if python3 ../../tests/validator.py --check-iam tfplan.json; then
         echo "PASS (IAM Policy)"
@@ -55,6 +55,7 @@ if terraform plan -refresh=false -out=tfplan > /dev/null 2>&1; then
     fi
 else
     echo "FAIL (terraform plan)"
+    cat tfplan.out
     FAILURES=$((FAILURES+1))
 fi
 
