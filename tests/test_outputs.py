@@ -299,6 +299,42 @@ def test_error_priority_checksum_vs_batch():
     assert res.returncode == 1
     assert res.stdout.strip() == "CHECKSUM_ERR"
 
+def test_no_external_dependencies():
+    """Enforces the 'Only standard Java libraries allowed' constraint."""
+    pom_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "pom.xml")
+    if not os.path.exists(pom_path):
+        pom_path = "/app/pom.xml"
+    
+    if not os.path.exists(pom_path):
+        pytest.skip("pom.xml not found for dependency audit")
+
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(pom_path)
+    root = tree.getroot()
+    
+    # Namespaces can be tricky in POMs
+    ns = {'mvn': 'http://maven.apache.org/POM/4.0.0'}
+    
+    deps = root.findall(".//mvn:dependency", ns)
+    if not deps:
+        # Fallback if no namespace is declared
+        deps = root.findall(".//dependency")
+
+    for dep in deps:
+        group = dep.find("mvn:groupId", ns)
+        if group is None: group = dep.find("groupId")
+        artifact = dep.find("mvn:artifactId", ns)
+        if artifact is None: artifact = dep.find("artifactId")
+        scope = dep.find("mvn:scope", ns)
+        if scope is None: scope = dep.find("scope")
+        
+        scope_text = scope.text.strip().lower() if scope is not None else "compile"
+        
+        # We allow test scope dependencies (JUnit, etc.)
+        if scope_text != "test":
+            pytest.fail(f"Banned external dependency found: {group.text}:{artifact.text} with scope {scope_text}. "
+                        "Instructions allow ONLY standard Java libraries.")
+
 # --- Java Correctness Validation ---
 
 def test_java_correctness():
