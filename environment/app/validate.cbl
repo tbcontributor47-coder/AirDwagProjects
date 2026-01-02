@@ -87,11 +87,10 @@
                STOP RUN RETURNING 1
            END-IF
            
-      * BUG 3: Missing Date Check
-      *     IF HDR-DATE NOT = WS-SYS-DATE
-      *         DISPLAY "DATE_ERR"
-      *         STOP RUN RETURNING 1
-      *     END-IF
+            IF HDR-DATE NOT = WS-SYS-DATE
+                DISPLAY "DATE_ERR"
+                STOP RUN RETURNING 1
+            END-IF
            
            PERFORM UNTIL WS-EOF = 'Y'
                READ INS-FILE AT END MOVE 'Y' TO WS-EOF
@@ -100,11 +99,10 @@
                        MOVE INS-REC TO WS-POL-REC
                        
       * FORMAT_ERR (Priority 2): Acct starts 9, 10 digs
-      * BUG 1: Removed IS NUMERIC check
-      *                 IF INS-REC(59:10) IS NOT NUMERIC
-      *                     DISPLAY "FORMAT_ERR"
-      *                     STOP RUN RETURNING 1
-      *                 END-IF
+                        IF INS-REC(59:10) IS NOT NUMERIC
+                            DISPLAY "FORMAT_ERR"
+                            STOP RUN RETURNING 1
+                        END-IF
 
                        MOVE 0 TO WS-HAS-SPACES
                        MOVE INS-REC(59:10) TO WORK-POL-STR
@@ -147,7 +145,7 @@
                            COMPUTE WORK-TAX-CALC = POL-PREM * 0.10
                        ELSE IF POL-RISK = '2'
       * BUG 2: Context is 5% (0.05), but we use 0.04 here
-                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.04
+                           COMPUTE WORK-TAX-CALC = POL-PREM * 0.05
                        ELSE
                            MOVE 0 TO WORK-TAX-CALC
                        END-IF END-IF

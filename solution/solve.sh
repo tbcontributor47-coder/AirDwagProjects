@@ -21,23 +21,31 @@ fi
 
 echo "Found COBOL file at: $COBOL_FILE"
 
-# Use sed with more robust patterns
+# Convert to Unix line endings first for easier processing
+dos2unix "$COBOL_FILE" 2>/dev/null || sed -i 's/\r$//' "$COBOL_FILE"
+
 # BUG FIX 1: Uncomment date validation (lines 90-94)
-sed -i '/BUG 3: Missing Date Check/d' "$COBOL_FILE"
-sed -i 's|^       \*     IF HDR-DATE NOT = WS-SYS-DATE$|            IF HDR-DATE NOT = WS-SYS-DATE|' "$COBOL_FILE"
-sed -i 's|^       \*         DISPLAY "DATE_ERR"$|                DISPLAY "DATE_ERR"|' "$COBOL_FILE"
-sed -i 's|^       \*         STOP RUN RETURNING 1$|                STOP RUN RETURNING 1|' "$COBOL_FILE"
-sed -i 's|^       \*     END-IF$|            END-IF|' "$COBOL_FILE"
+# Remove the "BUG 3" comment line
+sed -i '/\* BUG 3: Missing Date Check/d' "$COBOL_FILE"
+
+# Uncomment the date check lines - exact pattern matching
+sed -i 's/^      \*     IF HDR-DATE NOT = WS-SYS-DATE$/            IF HDR-DATE NOT = WS-SYS-DATE/' "$COBOL_FILE"
+sed -i 's/^      \*         DISPLAY "DATE_ERR"$/                DISPLAY "DATE_ERR"/' "$COBOL_FILE"
+sed -i 's/^      \*         STOP RUN RETURNING 1$/                STOP RUN RETURNING 1/' "$COBOL_FILE"
+sed -i 's/^      \*     END-IF$/            END-IF/' "$COBOL_FILE"
 
 # BUG FIX 2: Fix tax rate for Risk '2' from 0.04 to 0.05
 sed -i 's/COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04/COMPUTE WORK-TAX-CALC = POL-PREM * 0.05/' "$COBOL_FILE"
 
 # BUG FIX 3: Uncomment numeric validation (lines 104-107)
-sed -i '/BUG 1: Removed IS NUMERIC check/d' "$COBOL_FILE"
-sed -i 's|^       \*                 IF INS-REC(59:10) IS NOT NUMERIC$|                        IF INS-REC(59:10) IS NOT NUMERIC|' "$COBOL_FILE"
-sed -i 's|^       \*                     DISPLAY "FORMAT_ERR"$|                            DISPLAY "FORMAT_ERR"|' "$COBOL_FILE"
-sed -i 's|^       \*                     STOP RUN RETURNING 1$|                            STOP RUN RETURNING 1|' "$COBOL_FILE"
-sed -i 's|^       \*                 END-IF$|                        END-IF|' "$COBOL_FILE"
+# Remove the "BUG 1" comment line
+sed -i '/\* BUG 1: Removed IS NUMERIC check/d' "$COBOL_FILE"
+
+# Uncomment the numeric check lines - exact pattern matching
+sed -i 's/^      \*                 IF INS-REC(59:10) IS NOT NUMERIC$/                        IF INS-REC(59:10) IS NOT NUMERIC/' "$COBOL_FILE"
+sed -i 's/^      \*                     DISPLAY "FORMAT_ERR"$/                            DISPLAY "FORMAT_ERR"/' "$COBOL_FILE"
+sed -i 's/^      \*                     STOP RUN RETURNING 1$/                            STOP RUN RETURNING 1/' "$COBOL_FILE"
+sed -i 's/^      \*                 END-IF$/                        END-IF/' "$COBOL_FILE"
 
 echo "COBOL bugs fixed!"
 
