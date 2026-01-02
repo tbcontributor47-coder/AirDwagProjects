@@ -47,6 +47,8 @@ The provided `validate.cbl` has known issues:
 -   **Class**: `com.tbench.insurance.Validator`
 -   **Input**: Read from `stdin` or file args (match COBOL behavior).
 -   **Output**: `STDOUT` (exactly matching error codes or "VALID").
+-   **Build**: Maven will package the application as an uber JAR at `target/validator.jar` using the maven-shade-plugin.
+-   **Invocation**: `java -jar target/validator.jar [optional-file-path]`
 -   **Performance**: Use efficient I/O (Buffered), avoid heavy regex where simple char checks suffice, and use `BigDecimal` efficiently or long/int for fixed-point math if precise.
 
 ## Verification

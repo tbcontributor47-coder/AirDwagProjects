@@ -50,7 +50,7 @@ fi
 
 uvx \
   -p 3.11 \
-  -w pytest \
+  -w pytest==9.0.2 \
   pytest test_outputs.py -rA
 
 final_status=$?
