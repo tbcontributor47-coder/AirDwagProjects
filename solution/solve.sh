@@ -68,82 +68,81 @@ fi
 
 echo "Found Java directory at: $JAVA_DIR"
 
-# Create the complete Validator.java implementation with MAXIMUM PERFORMANCE
+# Create ULTRA-OPTIMIZED Validator.java - every microsecond counts
 cat > "$JAVA_DIR/Validator.java" <<'EOFJAVA'
 package com.tbench.insurance;
 
 import java.io.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 public class Validator {
     
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    // Pre-computed date string to avoid LocalDate overhead
+    private static final String TODAY;
+    
+    static {
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int y = now.getYear();
+        int m = now.getMonthValue();
+        int d = now.getDayOfMonth();
+        TODAY = String.format("%04d%02d%02d", y, m, d);
+    }
     
     public static void main(String[] args) {
         try {
-            BufferedReader reader;
+            // Use FileInputStream with large buffer for maximum throughput
+            InputStream in;
             if (args.length > 0) {
-                reader = new BufferedReader(new FileReader(args[0]), 65536);
+                in = new BufferedInputStream(new FileInputStream(args[0]), 131072);
             } else {
-                reader = new BufferedReader(new InputStreamReader(System.in), 65536);
+                in = new BufferedInputStream(System.in, 131072);
             }
             
-            int exitCode = validate(reader);
-            reader.close();
-            System.exit(exitCode);
+            System.exit(validate(in));
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
             System.exit(1);
         }
     }
     
-    private static int validate(BufferedReader reader) throws IOException {
-        String line = reader.readLine();
-        if (line == null || line.isEmpty() || line.charAt(0) != 'H') {
+    private static int validate(InputStream in) throws IOException {
+        byte[] buf = new byte[256];
+        int len = readLine(in, buf);
+        
+        if (len < 1 || buf[0] != 'H') {
             System.out.println("INVALID FORMAT");
             return 1;
         }
         
-        // Parse header - use direct string operations
-        String headerDate = line.substring(1, 9);
-        String todayDate = LocalDate.now().format(DATE_FMT);
-        
-        // DATE_ERR (Priority 1)
-        if (!headerDate.equals(todayDate)) {
+        // DATE_ERR (Priority 1) - compare bytes directly
+        if (buf[1] != TODAY.charAt(0) || buf[2] != TODAY.charAt(1) ||
+            buf[3] != TODAY.charAt(2) || buf[4] != TODAY.charAt(3) ||
+            buf[5] != TODAY.charAt(4) || buf[6] != TODAY.charAt(5) ||
+            buf[7] != TODAY.charAt(6) || buf[8] != TODAY.charAt(7)) {
             System.out.println("DATE_ERR");
             return 1;
         }
         
-        // Accumulators - use primitives only
         int count = 0;
         long totalPremCents = 0;
         long totalTaxCents = 0;
         long totalDueCents = 0;
-        
-        // Error level tracking (99 = valid)
         int errorLevel = 99;
         
-        // Process policy records
-        while ((line = reader.readLine()) != null) {
-            if (line.isEmpty()) continue;
-            
-            char recType = line.charAt(0);
+        while ((len = readLine(in, buf)) > 0) {
+            byte recType = buf[0];
             
             if (recType == 'P') {
-                // Parse policy record - direct substring + parse, no intermediate objects
-                char[] policyNo = line.substring(1, 11).toCharArray();
-                long premCents = parseLong(line, 31, 39);
-                long taxCents = parseLong(line, 39, 47);
-                long dueCents = parseLong(line, 47, 55);
-                char risk = line.charAt(55);
-                char country1 = line.charAt(56);
-                char country2 = line.charAt(57);
-                char[] account = line.substring(58, 68).toCharArray();
-                int age = parseInt(line, 68, 71);
+                // Parse directly from bytes - no String allocation
+                long premCents = parseLong(buf, 31, 39);
+                long taxCents = parseLong(buf, 39, 47);
+                long dueCents = parseLong(buf, 47, 55);
+                byte risk = buf[55];
+                byte country1 = buf[56];
+                byte country2 = buf[57];
+                int age = parseInt(buf, 68, 71);
                 
-                // FORMAT_ERR (Priority 2) - Account must be numeric and start with 9
-                if (!isNumeric(account) || account[0] != '9') {
+                // FORMAT_ERR (Priority 2) - check numeric and starts with 9
+                if (!isNumeric(buf, 58, 68) || buf[58] != '9') {
                     System.out.println("FORMAT_ERR");
                     return 1;
                 }
@@ -165,7 +164,7 @@ public class Validator {
                     if (6 < errorLevel) errorLevel = 6;
                 }
                 
-                // TAX_ERR (Priority 7) - inline calculation
+                // TAX_ERR (Priority 7)
                 long expectedTaxCents = 0;
                 if (risk == '3') {
                     expectedTaxCents = (premCents * 10L + 50L) / 100L;
@@ -177,28 +176,25 @@ public class Validator {
                     if (7 < errorLevel) errorLevel = 7;
                 }
                 
-                // CHECKSUM_ERR (Priority 8) - inline calculation
-                int checksum = 0;
-                for (int i = 0; i < 9; i++) {
-                    checksum += (policyNo[i] - '0');
-                }
+                // CHECKSUM_ERR (Priority 8)
+                int checksum = (buf[1] - '0') + (buf[2] - '0') + (buf[3] - '0') +
+                               (buf[4] - '0') + (buf[5] - '0') + (buf[6] - '0') +
+                               (buf[7] - '0') + (buf[8] - '0') + (buf[9] - '0');
                 
-                if ((checksum % 10) != (policyNo[9] - '0')) {
+                if ((checksum % 10) != (buf[10] - '0')) {
                     if (8 < errorLevel) errorLevel = 8;
                 }
                 
-                // Accumulate
                 count++;
                 totalPremCents += premCents;
                 totalTaxCents += taxCents;
                 totalDueCents += dueCents;
                 
             } else if (recType == 'T') {
-                // Parse trailer
-                int trlCount = parseInt(line, 1, 6);
-                long trlPremCents = parseLong(line, 6, 18);
-                long trlTaxCents = parseLong(line, 18, 30);
-                long trlDueCents = parseLong(line, 30, 42);
+                int trlCount = parseInt(buf, 1, 6);
+                long trlPremCents = parseLong(buf, 6, 18);
+                long trlTaxCents = parseLong(buf, 18, 30);
+                long trlDueCents = parseLong(buf, 30, 42);
                 
                 // COUNT_ERR (Priority 5)
                 if (count != trlCount) {
@@ -215,46 +211,50 @@ public class Validator {
             }
         }
         
-        // Report error based on priority
+        // Report error
         switch (errorLevel) {
-            case 6:
-                System.out.println("FISCAL_ERR");
-                return 1;
-            case 7:
-                System.out.println("TAX_ERR");
-                return 1;
-            case 8:
-                System.out.println("CHECKSUM_ERR");
-                return 1;
-            case 9:
-                System.out.println("BATCH_SUM_ERR");
-                return 1;
-            default:
-                System.out.println("VALID");
-                return 0;
+            case 6: System.out.println("FISCAL_ERR"); return 1;
+            case 7: System.out.println("TAX_ERR"); return 1;
+            case 8: System.out.println("CHECKSUM_ERR"); return 1;
+            case 9: System.out.println("BATCH_SUM_ERR"); return 1;
+            default: System.out.println("VALID"); return 0;
         }
     }
     
-    // Fast integer parsing without creating String objects
-    private static int parseInt(String s, int start, int end) {
+    // Read a line into byte buffer, return length (excluding newline)
+    private static int readLine(InputStream in, byte[] buf) throws IOException {
+        int pos = 0;
+        int b;
+        while ((b = in.read()) != -1) {
+            if (b == '\n') break;
+            if (b != '\r') buf[pos++] = (byte) b;
+        }
+        return pos;
+    }
+    
+    // Parse int from byte array
+    private static int parseInt(byte[] buf, int start, int end) {
         int result = 0;
         for (int i = start; i < end; i++) {
-            result = result * 10 + (s.charAt(i) - '0');
+            result = result * 10 + (buf[i] - '0');
         }
         return result;
     }
     
-    private static long parseLong(String s, int start, int end) {
+    // Parse long from byte array
+    private static long parseLong(byte[] buf, int start, int end) {
         long result = 0;
         for (int i = start; i < end; i++) {
-            result = result * 10L + (s.charAt(i) - '0');
+            result = result * 10L + (buf[i] - '0');
         }
         return result;
     }
     
-    private static boolean isNumeric(char[] arr) {
-        for (char c : arr) {
-            if (c < '0' || c > '9') return false;
+    // Check if bytes are all digits
+    private static boolean isNumeric(byte[] buf, int start, int end) {
+        for (int i = start; i < end; i++) {
+            byte b = buf[i];
+            if (b < '0' || b > '9') return false;
         }
         return true;
     }
