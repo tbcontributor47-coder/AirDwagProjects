@@ -6,7 +6,7 @@
 echo "Applying fixes..."
 
 # 1. Fix Terraform IAM
-cat <<EOF > environment/terraform/iam.tf
+cat <<EOF > /app/environment/terraform/iam.tf
 resource "aws_iam_role" "firehose_role" {
   name = "firehose_delivery_role"
 
@@ -70,7 +70,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
 EOF
 
 # 2. Fix Firehose
-cat <<EOF > environment/terraform/firehose.tf
+cat <<EOF > /app/environment/terraform/firehose.tf
 resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
   name        = "app-logs-delivery-stream"
   destination = "extended_s3"
@@ -90,17 +90,17 @@ resource "aws_s3_bucket" "log_bucket" {
 EOF
 
 # 3. Fix CloudWatch Filter
-sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' environment/terraform/cloudwatch.tf
+sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' /app/environment/terraform/cloudwatch.tf
 
 # 4. Fix Prometheus Config
-sed -i "s/'localhost:9090'/'localhost:8080'/" environment/prometheus/prometheus.yml
-sed -i 's/replacment/replacement/' environment/prometheus/prometheus.yml
+sed -i "s/'localhost:9090'/'localhost:8080'/" /app/environment/prometheus/prometheus.yml
+sed -i 's/replacment/replacement/' /app/environment/prometheus/prometheus.yml
 
 # 5. Fix Alert Rules
-sed -i 's/rate(http_requests_total{status=~"5.."}\[])/rate(http_requests_total{status=~"5.."}[5m])/' environment/prometheus/alerts.yml
-sed -i 's/for: 0s/for: 1m/' environment/prometheus/alerts.yml
+sed -i 's/rate(http_requests_total{status=~"5.."}\[])/rate(http_requests_total{status=~"5.."}[5m])/' /app/environment/prometheus/alerts.yml
+sed -i 's/for: 0s/for: 1m/' /app/environment/prometheus/alerts.yml
 
 # 6. Fix Grafana Dashboard
-sed -i 's/rate(http_requests_total\[5m/rate(http_requests_total[5m])/' environment/grafana/dashboard.json
+sed -i 's/rate(http_requests_total\[5m/rate(http_requests_total[5m])/' /app/environment/grafana/dashboard.json
 
 echo "Fixes applied!"
