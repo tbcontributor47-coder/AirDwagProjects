@@ -5,8 +5,7 @@ set -eu
 
 echo "Fixing COBOL validator bugs..."
 
-# Fix the COBOL file (validate.cbl)
-# We need to navigate to the right location - could be /app or /environment/app
+# Find the COBOL file
 if [ -f "validate.cbl" ]; then
     COBOL_FILE="validate.cbl"
 elif [ -f "environment/app/validate.cbl" ]; then
@@ -22,24 +21,57 @@ fi
 
 echo "Found COBOL file at: $COBOL_FILE"
 
-# BUG FIX 1: Uncomment the date validation (lines 90-94)
-# Replace the commented-out date check with active code
-sed -i 's/^       \* BUG 3: Missing Date Check$//' "$COBOL_FILE"
-sed -i 's/^       \*     IF HDR-DATE NOT = WS-SYS-DATE$/            IF HDR-DATE NOT = WS-SYS-DATE/' "$COBOL_FILE"
-sed -i 's/^       \*         DISPLAY "DATE_ERR"$/                DISPLAY "DATE_ERR"/' "$COBOL_FILE"
-sed -i 's/^       \*         STOP RUN RETURNING 1$/                STOP RUN RETURNING 1/' "$COBOL_FILE"
-sed -i 's/^       \*     END-IF$/            END-IF/' "$COBOL_FILE"
+# Create a temporary file for the fixed COBOL
+TEMP_COBOL=$(mktemp)
 
-# BUG FIX 2: Fix tax rate for Risk '2' from 0.04 to 0.05 (line 150)
-sed -i 's/COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04/COMPUTE WORK-TAX-CALC = POL-PREM * 0.05/' "$COBOL_FILE"
+# Process the file line by line to fix the bugs
+while IFS= read -r line || [ -n "$line" ]; do
+    # BUG FIX 1: Uncomment date validation (lines 90-94)
+    if [ "$line" = "       * BUG 3: Missing Date Check" ]; then
+        # Skip this comment line - don't output it
+        continue
+    elif [ "$line" = "       *     IF HDR-DATE NOT = WS-SYS-DATE" ]; then
+        echo "            IF HDR-DATE NOT = WS-SYS-DATE" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *         DISPLAY \"DATE_ERR\"" ]; then
+        echo "                DISPLAY \"DATE_ERR\"" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *         STOP RUN RETURNING 1" ]; then
+        echo "                STOP RUN RETURNING 1" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *     END-IF" ]; then
+        echo "            END-IF" >> "$TEMP_COBOL"
+        continue
+    
+    # BUG FIX 2: Fix tax rate for Risk '2' from 0.04 to 0.05
+    elif echo "$line" | grep -q "COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04"; then
+        echo "$line" | sed 's/0\.04/0.05/' >> "$TEMP_COBOL"
+        continue
+    
+    # BUG FIX 3: Uncomment numeric validation (lines 103-107)
+    elif [ "$line" = "       * BUG 1: Removed IS NUMERIC check" ]; then
+        # Skip this comment line
+        continue
+    elif [ "$line" = "       *                 IF INS-REC(59:10) IS NOT NUMERIC" ]; then
+        echo "                        IF INS-REC(59:10) IS NOT NUMERIC" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *                     DISPLAY \"FORMAT_ERR\"" ]; then
+        echo "                            DISPLAY \"FORMAT_ERR\"" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *                     STOP RUN RETURNING 1" ]; then
+        echo "                            STOP RUN RETURNING 1" >> "$TEMP_COBOL"
+        continue
+    elif [ "$line" = "       *                 END-IF" ]; then
+        echo "                        END-IF" >> "$TEMP_COBOL"
+        continue
+    fi
+    
+    # Output the line as-is if no match
+    echo "$line" >> "$TEMP_COBOL"
+done < "$COBOL_FILE"
 
-# BUG FIX 3: Uncomment numeric validation for account field (lines 104-107)
-# Remove the comments for the numeric check
-sed -i 's/^       \* BUG 1: Removed IS NUMERIC check$//' "$COBOL_FILE"
-sed -i 's/^       \*                 IF INS-REC(59:10) IS NOT NUMERIC$/                        IF INS-REC(59:10) IS NOT NUMERIC/' "$COBOL_FILE"
-sed -i 's/^       \*                     DISPLAY "FORMAT_ERR"$/                            DISPLAY "FORMAT_ERR"/' "$COBOL_FILE"
-sed -i 's/^       \*                     STOP RUN RETURNING 1$/                            STOP RUN RETURNING 1/' "$COBOL_FILE"
-sed -i 's/^       \*                 END-IF$/                        END-IF/' "$COBOL_FILE"
+# Replace the original file with the fixed version
+mv "$TEMP_COBOL" "$COBOL_FILE"
 
 echo "COBOL bugs fixed!"
 
@@ -228,12 +260,6 @@ public class Validator {
             }
         }
         
-        // Check for missing trailer
-        if (count > 0 && errorLevel == 99) {
-            // If we processed policies but never hit trailer, error
-            // Actually, let's check if we properly found the trailer
-        }
-        
         // Report error based on priority
         switch (errorLevel) {
             case 6:
@@ -274,4 +300,32 @@ public class Validator {
 EOFJAVA
 
 echo "Java validator implementation complete!"
+
+# Build the Java JAR if we can find Maven
+if command -v mvn &> /dev/null; then
+    echo "Building Java JAR with Maven..."
+    
+    # Find pom.xml
+    if [ -f "pom.xml" ]; then
+        POM_DIR="."
+    elif [ -f "environment/app/pom.xml" ]; then
+        POM_DIR="environment/app"
+    elif [ -f "../environment/app/pom.xml" ]; then
+        POM_DIR="../environment/app"
+    elif [ -f "/app/pom.xml" ]; then
+        POM_DIR="/app"
+    else
+        echo "WARNING: Cannot find pom.xml, skipping Maven build"
+        POM_DIR=""
+    fi
+    
+    if [ -n "$POM_DIR" ]; then
+        cd "$POM_DIR"
+        mvn clean package -DskipTests -q
+        echo "Java JAR built successfully at $POM_DIR/target/validator.jar"
+    fi
+else
+    echo "WARNING: Maven not found, skipping Java build"
+fi
+
 echo "All fixes applied successfully."
