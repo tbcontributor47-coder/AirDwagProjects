@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import shutil
 import datetime
 import pytest
 import time
@@ -291,7 +292,7 @@ def test_performance_benchmark():
     """Confirms Java implementation is within 1.5x of COBOL execution time on 500k records."""
     # 1. Generate 500k records
     print("\nGenerating benchmark data...")
-    header = "H20231001BENCHMARK NY\n"
+    header = f"H{datetime.datetime.now().strftime('%Y%m%d')}BENCHMARK NY\n"
     policy_fmt = "P{:010d}{:<20}{:08d}{:08d}{:08d}{}{:2}{:010d}{:03d}\n"
     trailer_fmt = "T{:05d}{:012d}{:012d}{:012d}\n"
     
@@ -306,18 +307,15 @@ def test_performance_benchmark():
     
     # 2. Measure COBOL
     print("Running COBOL Benchmark...")
+    shutil.copy("benchmark.dat", "insurance.dat")
     start = time.time()
     subprocess.run(["./validator_cobol"], stdin=open("benchmark.dat"), stdout=subprocess.DEVNULL)
     cobol_time = time.time() - start
     print(f"COBOL Time: {cobol_time:.4f}s")
     
     # 3. Measure Java (must exist)
-    jar_path = "../environment/app/target/validator.jar"
-    # Fallback path if we are in environment/app
-    if not os.path.exists(jar_path):
-         jar_path = "target/validator.jar"
-    
-    if not os.path.exists(jar_path):
+    jar_path = build_java()
+    if not jar_path:
         pytest.fail("Java validator JAR not found. Build failed or skipped.")
         
     print("Running Java Benchmark...")
