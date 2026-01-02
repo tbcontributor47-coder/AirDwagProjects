@@ -33,7 +33,7 @@ FAILURES=0
 
 # 1. Terraform Validation
 echo -n "Checking Terraform... "
-cd environment/terraform
+cd /app/environment/terraform
 terraform init -backend=false > /dev/null 2>&1
 if terraform validate > /dev/null; then
   echo "PASS"

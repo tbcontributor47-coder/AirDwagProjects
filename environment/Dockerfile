@@ -11,9 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy files
-# We only copy the environment and tests. 
-# solution/ is excluded via .dockerignore to prevent cheating.
-COPY environment /app/environment
-COPY tests /app/tests
+# Context is the environment directory. We copy it to /app/environment
+# to match the paths expected by the tests and solution.
+COPY . /app/environment/
 
 CMD ["bash", "/app/tests/test.sh"]
