@@ -90,7 +90,16 @@ def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
         cmd = [binary]
     
     with open(stdin_file, 'rb') as f:
-        return subprocess.run(cmd, input=f.read(), capture_output=True)
+        result = subprocess.run(cmd, input=f.read(), capture_output=True)
+    
+    # Decode bytes to strings for compatibility with test assertions
+    class Result:
+        def __init__(self, returncode, stdout, stderr):
+            self.returncode = returncode
+            self.stdout = stdout.decode('utf-8') if isinstance(stdout, bytes) else stdout
+            self.stderr = stderr.decode('utf-8') if isinstance(stderr, bytes) else stderr
+    
+    return Result(result.returncode, result.stdout, result.stderr)
 
 def build_java():
     """Builds the Java validator."""
