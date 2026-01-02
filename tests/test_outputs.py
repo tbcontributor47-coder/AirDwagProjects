@@ -83,6 +83,16 @@ def compile_cobol():
     source_path = get_source_path()
     subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol", source_path], check=True)
 
+def compile_cobol_baseline():
+    """Compiles the COBOL validator from the immutable baseline for performance benchmarking."""
+    # Use the pristine baseline COBOL from the Docker image, not the agent's modified version
+    # This prevents gaming the benchmark by intentionally slowing down COBOL
+    baseline_path = "/app/validate.cbl"
+    if not os.path.exists(baseline_path):
+        # Fallback for local testing
+        baseline_path = get_source_path()
+    subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol_baseline", baseline_path], check=True)
+
 def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
     """Runs the specified validator (COBOL or Java)."""
     if binary.endswith(".jar"):
@@ -303,13 +313,14 @@ def test_performance_benchmark():
             f.write(policy_fmt.format(100000000+i, "Bench User", 10000, 1000, 11000, "3", "US", 9000000000+i, 30))
         f.write(trailer_fmt.format(500000, 5000000000, 500000000, 5500000000))
         
-    compile_cobol()
+    # Compile from immutable baseline to prevent gaming the benchmark
+    compile_cobol_baseline()
     
-    # 2. Measure COBOL
+    # 2. Measure COBOL (using baseline)
     print("Running COBOL Benchmark...")
     shutil.copy("benchmark.dat", "insurance.dat")
     start = time.time()
-    subprocess.run(["./validator_cobol"], stdin=open("benchmark.dat"), stdout=subprocess.DEVNULL)
+    subprocess.run(["./validator_cobol_baseline"], stdin=open("benchmark.dat"), stdout=subprocess.DEVNULL)
     cobol_time = time.time() - start
     print(f"COBOL Time: {cobol_time:.4f}s")
     
