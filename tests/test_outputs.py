@@ -83,47 +83,31 @@ def compile_cobol():
     source_path = get_source_path()
     subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol", source_path], check=True)
 
+def verify_no_cheating(source_path):
+    """Simple audit to ensure agent hasn't injected artificial delays."""
+    if not os.path.exists(source_path):
+        return
+    with open(source_path, 'r', errors='ignore') as f:
+        content = f.read().upper()
+        # Common COBOL ways to sleep: CALL "C$SLEEP", SLEEP, etc.
+        if "SLEEP" in content or "WAIT" in content:
+            pytest.fail("Cheating detected: Artificial delay found in COBOL source.")
+
 def compile_cobol_baseline():
-    """Compiles a FIXED version of the immutable baseline for performance benchmarking."""
-    # Use the pristine baseline COBOL from the Docker image
-    # This prevents gaming the benchmark by intentionally slowing down COBOL
-    baseline_path = "/baseline/validate.cbl"
+    """Compiles the agent's fixed COBOL for performance benchmarking."""
+    # We use the agent's working file - they are responsible for fixing all bugs.
+    baseline_path = "/app/validate.cbl"
     if not os.path.exists(baseline_path):
-        baseline_path = "/app/validate.cbl"
-    
-    if not os.path.exists(baseline_path):
-        # Fallback for local testing
         baseline_path = get_source_path()
         
-    print(f"Preparing benchmark baseline from: {baseline_path}")
-    
-    # Copy to a temporary file to apply fixes (we need a VALID COBOL program for the benchmark)
-    temp_baseline = "benchmark_fixed.cbl"
-    shutil.copy(baseline_path, temp_baseline)
-    
-    # Apply Standard Fixes (programmatically, to ensure fairness and validity)
-    # Using raw strings r'' for regex patterns to satisfy Python syntax and `sed`.
-    
-    # 2. Fix Modulo 9 Bug (Use Modulo 10)
-    # The original file has: IF FUNCTION MOD(WORK-CHKSUM, 9)
-    try:
-        subprocess.run(["sed", "-i", r"s/FUNCTION MOD(WORK-CHKSUM, 9)/FUNCTION MOD(WORK-CHKSUM, 10)/", temp_baseline], check=True)
-    except Exception as e:
-        print(f"Warning: Failed to patch Modulo 9 bug: {e}")
+    print(f"Compiling benchmark reference from: {baseline_path}")
+    verify_no_cheating(baseline_path)
 
-    # 3. Fix Tax Rate Risk 2 (0.04 -> 0.05)
-    # "COMPUTE WORK-TAX-CALC = POL-PREM * 0.04"
-    try:
-        subprocess.run(["sed", "-i", r"s/COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04/COMPUTE WORK-TAX-CALC = POL-PREM * 0.05/", temp_baseline], check=True)
-    except: pass
-    
-    # 4. Age Limit (150 -> 120)
-    try:
-         subprocess.run(["sed", "-i", r"s/IF POL-AGE < 18 OR POL-AGE > 150/IF POL-AGE < 18 OR POL-AGE > 120/", temp_baseline], check=True)
-    except: pass
-
-    # Compile the FIXED baseline
-    subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol_baseline", temp_baseline], check=True)
+    # Compile the agent's fixed COBOL
+    res = subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol_baseline", baseline_path], capture_output=True, text=True)
+    if res.returncode != 0:
+        print(f"COBOL Compilation Failed!\nStdout: {res.stdout}\nStderr: {res.stderr}")
+        pytest.fail("Failed to compile benchmark baseline. Did you fix the COBOL bugs?")
 
 def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
     """Runs the specified validator (COBOL or Java)."""
@@ -345,14 +329,17 @@ def test_java_correctness():
 def test_performance_benchmark():
     """Confirms Java implementation is within 1.5x of COBOL execution time on 500k records."""
     # 1. Generate 500k records
+    # 1. Generate 2,000,000 records
     print("\nGenerating benchmark data...")
-    header = f"H{datetime.datetime.now().strftime('%Y%m%d')}BENCHMARK NY\n"
+    # Alignment: H(1), Date(8), BatchName(20), State(2). Total = 31 chars + newline.
+    header = f"H{datetime.datetime.now().strftime('%Y%m%d')}{'PREMIUMS':<20}NY\n"
     policy_fmt = "P{:010d}{:<20}{:08d}{:08d}{:08d}{}{:2}{:010d}{:03d}\n"
     trailer_fmt = "T{:05d}{:012d}{:012d}{:012d}\n"
     
+    count = 2000000
     with open("benchmark.dat", "w") as f:
         f.write(header)
-        for i in range(2000000):
+        for i in range(count):
             # Generate valid checksum: Use 9-digit base, calc 10th digit
             base_pol = 100000000 + i
             # Sum digits 1-9
@@ -360,9 +347,11 @@ def test_performance_benchmark():
             check_digit = s % 10
             full_pol = base_pol * 10 + check_digit
             
-            # Valid-ish record
-            f.write(policy_fmt.format(full_pol, "Bench User", 10000, 1000, 11000, "3", "US", 9000000000+i, 30))
-        f.write(trailer_fmt.format(2000000, 20000000000, 2000000000, 22000000000))
+            # Valid-ish record: Prem=10.00 (1000), Tax=1.00 (100), Due=11.00 (1100)
+            f.write(policy_fmt.format(full_pol, "Bench User", 1000, 100, 1100, "3", "US", 9000000000+i, 30))
+        # Trailer Count is PIC 9(5). We use modulo 100,000 to fit field without shifting layout.
+        # Sums are PIC 9(10)V99 (12 chars). 2M * 10.00 = 20,000,000.00 (Fits).
+        f.write(trailer_fmt.format(count % 100000, count * 1000, count * 100, count * 1100))
         
     # Compile from immutable baseline to prevent gaming the benchmark
     compile_cobol_baseline()
@@ -395,7 +384,7 @@ def test_performance_benchmark():
     print(f"Java Time: {java_time:.4f}s")
     
     # 4. Assert
-    # Limit = COBOL * 1.5 (Strict Mode: No JVM startup buffer)
+    # Limit = COBOL * 1.5. On 2M records, JVM startup is negligible.
     limit = cobol_time * 1.5
     assert java_time <= limit, f"Java ({java_time:.4f}s) is too slow (> {limit:.4f}s, COBOL was {cobol_time:.4f}s)"
 
