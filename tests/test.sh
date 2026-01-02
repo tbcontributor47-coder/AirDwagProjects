@@ -11,7 +11,6 @@ build_status=$?
 
 if [ $build_status -ne 0 ]; then
     echo "Java Build Failed"
-    echo 0 > /logs/verifier/reward.txt
     exit 1
 fi
 
@@ -24,7 +23,6 @@ if [ $test_status -ne 0 ]; then
     # Usually we want full feedback, but if unit tests fail, migration likely invalid.
     # But let's let the main python suite decide final fate or strict fail here.
     # Let's be strict.
-    echo 0 > /logs/verifier/reward.txt
     exit 1
 fi
 
@@ -53,9 +51,7 @@ uvx \
   -w pytest==9.0.2 \
   pytest test_outputs.py -rA
 
-final_status=$?
-
-if [ $final_status -eq 0 ]; then
+if [ $? -eq 0 ]; then
   echo 1 > /logs/verifier/reward.txt
 else
   echo 0 > /logs/verifier/reward.txt
