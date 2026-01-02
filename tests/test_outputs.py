@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 import datetime
 import pytest
 import time
@@ -52,15 +53,28 @@ def generate_insurance_file(filename, policies, date_str=None, batch_name="BATCH
 # --- Path Configuration ---
 def get_source_path():
     """Finds the absolute path to validate.cbl."""
-    # This file is in tests/test_outputs.py
-    # validate.cbl is in environment/app/validate.cbl
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = os.path.join(base_dir, "environment", "app", "validate.cbl")
-    if os.path.exists(path):
-        return path
-    # Fallback for older structure if needed
-    if os.path.exists("validate.cbl"):
-        return os.path.abspath("validate.cbl")
+    paths_to_check = [
+        # Check relative to this script
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "validate.cbl"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "validate.cbl"),
+        # Check standard Docker/CI locations
+        "/app/validate.cbl",
+        "/app/environment/app/validate.cbl",
+        "/tmp/project/validate.cbl",
+        # Check relative to current working directory
+        os.path.abspath("validate.cbl"),
+        os.path.abspath("../validate.cbl"),
+        os.path.abspath("environment/app/validate.cbl"),
+        os.path.abspath("../environment/app/validate.cbl")
+    ]
+    
+    for path in paths_to_check:
+        if os.path.exists(path):
+            print(f"Found COBOL source at: {path}", file=sys.stderr)
+            return path
+            
+    print(f"ERROR: Could not find validate.cbl. Checked: {paths_to_check}", file=sys.stderr)
+    # Return "validate.cbl" as last resort so cobc error is clear
     return "validate.cbl"
 
 def compile_cobol():
