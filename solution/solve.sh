@@ -1,27 +1,93 @@
 #!/bin/bash
 
 # This script applies the fixes to the buggy configuration files
+# using cat to ensure exact content and avoid sed regex issues.
 
 echo "Applying fixes..."
 
 # 1. Fix Terraform IAM
-# Replace "Resource = \"*\"" with specific ARN and add logs permission
-sed -i 's/Resource = "\*"/Resource = [aws_s3_bucket.log_bucket.arn, "${aws_s3_bucket.log_bucket.arn}\/*"]/' environment/terraform/iam.tf
-# Add the missing CloudWatch Logs permissions block if it's missing (it usually is in the buggy version)
-# For simplicity, we assume the agent would add this. But solve.sh should be automated.
-# Let's insert the missing block after the first statement.
-sed -i '/"${aws_s3_bucket.log_bucket.arn}\/\*"]/a \
-      },\
-      {\
-        Effect = "Allow"\
-        Action = [\
-          "logs:CreateLogStream",\
-          "logs:PutLogEvents"\
-        ]\
-        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"' environment/terraform/iam.tf
+cat <<EOF > environment/terraform/iam.tf
+resource "aws_iam_role" "firehose_role" {
+  name = "firehose_delivery_role"
 
-# 2. Fix Firehose Buffer
-sed -i 's/buffer_size = 1/buffer_size = 5/' environment/terraform/firehose.tf
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "firehose.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "firehose_policy" {
+  name = "firehose_delivery_policy"
+  role = aws_iam_role.firehose_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:AbortMultipartUpload",
+          "s3:GetBucketLocation",
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:ListBucketMultipartUploads",
+          "s3:PutObject"
+        ]
+        Resource = [
+          aws_s3_bucket.log_bucket.arn,
+          "\${aws_s3_bucket.log_bucket.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "\${aws_cloudwatch_log_group.app_logs.arn}:*"
+      },
+      {
+          Effect = "Allow",
+          Action = [
+              "kinesis:DescribeStream",
+              "kinesis:GetShardIterator",
+              "kinesis:GetRecords",
+              "kinesis:ListShards"
+          ],
+          Resource = "*"
+      }
+    ]
+  })
+}
+EOF
+
+# 2. Fix Firehose
+cat <<EOF > environment/terraform/firehose.tf
+resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
+  name        = "app-logs-delivery-stream"
+  destination = "extended_s3"
+
+  extended_s3_configuration {
+    role_arn   = aws_iam_role.firehose_role.arn
+    bucket_arn = aws_s3_bucket.log_bucket.arn
+    
+    buffer_size = 5
+    buffer_interval = 60
+  }
+}
+
+resource "aws_s3_bucket" "log_bucket" {
+  bucket = "app-observability-logs-bucket"
+}
+EOF
 
 # 3. Fix CloudWatch Filter
 sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' environment/terraform/cloudwatch.tf
