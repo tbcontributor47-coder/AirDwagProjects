@@ -86,6 +86,7 @@ def compile_cobol():
 def compile_cobol_baseline():
     """Compiles a FIXED version of the immutable baseline for performance benchmarking."""
     # Use the pristine baseline COBOL from the Docker image
+    # This prevents gaming the benchmark by intentionally slowing down COBOL
     baseline_path = "/baseline/validate.cbl"
     if not os.path.exists(baseline_path):
         baseline_path = "/app/validate.cbl"
@@ -101,25 +102,24 @@ def compile_cobol_baseline():
     shutil.copy(baseline_path, temp_baseline)
     
     # Apply Standard Fixes (programmatically, to ensure fairness and validity)
-    # 1. Date Check: Uncomment logic (if commented) or ensure it works? 
-    # Actually, the baseline has date check active.
+    # Using raw strings r'' for regex patterns to satisfy Python syntax and `sed`.
     
     # 2. Fix Modulo 9 Bug (Use Modulo 10)
-    # The original file has: FUNCTION MOD(WORK-CHKSUM, 9)
+    # The original file has: IF FUNCTION MOD(WORK-CHKSUM, 9)
     try:
-        subprocess.run(["sed", "-i", "s/FUNCTION MOD(WORK-CHKSUM, 9)/FUNCTION MOD(WORK-CHKSUM, 10)/", temp_baseline], check=True)
+        subprocess.run(["sed", "-i", r"s/FUNCTION MOD(WORK-CHKSUM, 9)/FUNCTION MOD(WORK-CHKSUM, 10)/", temp_baseline], check=True)
     except Exception as e:
         print(f"Warning: Failed to patch Modulo 9 bug: {e}")
 
-    # 3. Fix Tax Rate Risk 2 (0.04 -> 0.05) - Nice to have for correctness, but less critical for crash usage.
-    # But let's be thorough so it processes data exactly as Java does.
+    # 3. Fix Tax Rate Risk 2 (0.04 -> 0.05)
+    # "COMPUTE WORK-TAX-CALC = POL-PREM * 0.04"
     try:
-        subprocess.run(["sed", "-i", "s/COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04/COMPUTE WORK-TAX-CALC = POL-PREM * 0.05/", temp_baseline], check=True)
+        subprocess.run(["sed", "-i", r"s/COMPUTE WORK-TAX-CALC = POL-PREM \* 0\.04/COMPUTE WORK-TAX-CALC = POL-PREM * 0.05/", temp_baseline], check=True)
     except: pass
     
     # 4. Age Limit (150 -> 120)
     try:
-         subprocess.run(["sed", "-i", "s/IF POL-AGE < 18 OR POL-AGE > 150/IF POL-AGE < 18 OR POL-AGE > 120/", temp_baseline], check=True)
+         subprocess.run(["sed", "-i", r"s/IF POL-AGE < 18 OR POL-AGE > 150/IF POL-AGE < 18 OR POL-AGE > 120/", temp_baseline], check=True)
     except: pass
 
     # Compile the FIXED baseline
@@ -139,9 +139,9 @@ def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
     class Result:
         def __init__(self, returncode, stdout, stderr):
             self.returncode = returncode
-            self.stdout = stdout.decode('utf-8') if isinstance(stdout, bytes) else stdout
-            self.stderr = stderr.decode('utf-8') if isinstance(stderr, bytes) else stderr
-    
+            self.stdout = stdout.decode('utf-8', errors='replace') if isinstance(stdout, bytes) else stdout
+            self.stderr = stderr.decode('utf-8', errors='replace') if isinstance(stderr, bytes) else stderr
+            
     return Result(result.returncode, result.stdout, result.stderr)
 
 def build_java():
@@ -375,6 +375,7 @@ def test_performance_benchmark():
     proc = subprocess.run(["./validator_cobol_baseline"], stdin=open("benchmark.dat"), capture_output=True)
     if proc.returncode != 0:
         print(f"COBOL Failed! Stderr: {proc.stderr.decode()}", file=sys.stderr)
+        print(f"COBOL Failed! Stdout: {proc.stdout.decode()}", file=sys.stderr)
         pytest.fail(f"COBOL benchmark failed with RC {proc.returncode}")
     cobol_time = time.time() - start
     print(f"COBOL Time: {cobol_time:.4f}s")
