@@ -13,7 +13,7 @@ def generate_insurance_file(filename, policies, date_str=None, batch_name="BATCH
     if date_str is None:
         date_str = datetime.datetime.now().strftime("%Y%m%d")
     
-    header = f"{header_type}{date_str}{batch_name.ljust(10)}{state[:2]}\n"
+    header = f"{header_type}{date_str}{batch_name.ljust(20)}{state[:2]}\n"
     
     total_prem = 0
     total_tax = 0
@@ -83,31 +83,23 @@ def compile_cobol():
     source_path = get_source_path()
     subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol", source_path], check=True)
 
-def verify_no_cheating(source_path):
-    """Simple audit to ensure agent hasn't injected artificial delays."""
-    if not os.path.exists(source_path):
-        return
-    with open(source_path, 'r', errors='ignore') as f:
-        content = f.read().upper()
-        # Common COBOL ways to sleep: CALL "C$SLEEP", SLEEP, etc.
-        if "SLEEP" in content or "WAIT" in content:
-            pytest.fail("Cheating detected: Artificial delay found in COBOL source.")
-
 def compile_cobol_baseline():
-    """Compiles the agent's fixed COBOL for performance benchmarking."""
-    # We use the agent's working file - they are responsible for fixing all bugs.
-    baseline_path = "/app/validate.cbl"
-    if not os.path.exists(baseline_path):
-        baseline_path = get_source_path()
+    """Points to the pre-compiled Golden Reference COBOL."""
+    # The reference is baked into the Docker image as a system binary.
+    # This is 100% cheat-proof and the source code is purged from the image.
+    baseline_bin = "/usr/bin/insurance_validator_ref"
         
-    print(f"Compiling benchmark reference from: {baseline_path}")
-    verify_no_cheating(baseline_path)
+    if not os.path.exists(baseline_bin):
+        # Fallback for local development
+        print("Golden reference binary not found. Attempting local compilation of hidden source...")
+        hidden_source = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", ".oracle_ref.cbl")
+        if os.path.exists(hidden_source):
+             subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol_baseline", hidden_source], check=True)
+             return
+        pytest.fail("Benchmark baseline binary not found and hidden source missing.")
 
-    # Compile the agent's fixed COBOL
-    res = subprocess.run(["cobc", "-x", "-O2", "-o", "validator_cobol_baseline", baseline_path], capture_output=True, text=True)
-    if res.returncode != 0:
-        print(f"COBOL Compilation Failed!\nStdout: {res.stdout}\nStderr: {res.stderr}")
-        pytest.fail("Failed to compile benchmark baseline. Did you fix the COBOL bugs?")
+    # In Docker, we just copy the pre-baked binary to the local name for the test runner.
+    shutil.copy(baseline_bin, "validator_cobol_baseline")
 
 def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
     """Runs the specified validator (COBOL or Java)."""
@@ -262,6 +254,16 @@ def test_error_priority_age_vs_tax():
     assert res.returncode == 1
     assert res.stdout.strip() == "AGE_ERR"
 
+def test_tax_error_isolation():
+    # Tax ERR in isolation (Priority 7)
+    compile_cobol()
+    # Correct Tax for Risk 3 (10%) of 1000.00 is 100.00. We provide 99.99.
+    p = {'no': 123456786, 'holder': 'X', 'prem': 1000.00, 'tax': 99.99, 'due': 1099.99, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    generate_insurance_file("insurance.dat", [p])
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "TAX_ERR"
+
 def test_batch_sum_mismatch():
     compile_cobol()
     p = {'no': 123456786, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
@@ -315,6 +317,7 @@ def test_java_correctness():
         ([{'no': 123456781, 'holder': 'X', 'prem': 100000.01, 'tax': 10000.00, 'due': 110000.01, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "FISCAL_ERR", None, {}),
         ([{'no': 123456786, 'holder': 'X', 'prem': 1000.0, 'tax': 0.0, 'due': 1000.0, 'risk': '1', 'country': 'US', 'acc': 9876543210, 'age': 30}], "VALID", None, {}),
         ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 50.0, 'due': 150.0, 'risk': '2', 'country': 'US', 'acc': 9876543210, 'age': 10}], "AGE_ERR", None, {}), # Age(4) vs Tax(7)
+        ([{'no': 123456786, 'holder': 'X', 'prem': 1000.0, 'tax': 99.99, 'due': 1099.99, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "TAX_ERR", None, {}),
         ([{'no': 123456786, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "COUNT_ERR", None, {'corrupt_trl_count': 99}),
         ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "CHECKSUM_ERR", None, {'corrupt_trl_prem': 999.99}), # Checksum(8) vs Batch(9)
     ]
@@ -331,8 +334,9 @@ def test_performance_benchmark():
     # 1. Generate 500k records
     # 1. Generate 2,000,000 records
     print("\nGenerating benchmark data...")
-    # Alignment: H(1), Date(8), BatchName(20), State(2). Total = 31 chars + newline.
-    header = f"H{datetime.datetime.now().strftime('%Y%m%d')}{'PREMIUMS':<20}NY\n"
+    # Alignment: H(1), Date(8), BatchName(10), State(2). Total = 21 chars + newline.
+    header = f"H{datetime.datetime.now().strftime('%Y%m%d')}{'PREMIUMS':<10}NY\n"
+    # P(1) No(10) Name(20) Prem(8) Tax(8) Due(8) Risk(1) Ctry(2) Acc(10) Age(3) = 71 chars
     policy_fmt = "P{:010d}{:<20}{:08d}{:08d}{:08d}{}{:2}{:010d}{:03d}\n"
     trailer_fmt = "T{:05d}{:012d}{:012d}{:012d}\n"
     
@@ -340,20 +344,15 @@ def test_performance_benchmark():
     with open("benchmark.dat", "w") as f:
         f.write(header)
         for i in range(count):
-            # Generate valid checksum: Use 9-digit base, calc 10th digit
             base_pol = 100000000 + i
-            # Sum digits 1-9
             s = sum(int(d) for d in str(base_pol))
             check_digit = s % 10
             full_pol = base_pol * 10 + check_digit
             
-            # Valid-ish record: Prem=10.00 (1000), Tax=1.00 (100), Due=11.00 (1100)
+            # Using 10.00 Prem, 1.00 Tax, 11.00 Due. Risk 3.
             f.write(policy_fmt.format(full_pol, "Bench User", 1000, 100, 1100, "3", "US", 9000000000+i, 30))
-        # Trailer Count is PIC 9(5). We use modulo 100,000 to fit field without shifting layout.
-        # Sums are PIC 9(10)V99 (12 chars). 2M * 10.00 = 20,000,000.00 (Fits).
         f.write(trailer_fmt.format(count % 100000, count * 1000, count * 100, count * 1100))
         
-    # Compile from immutable baseline to prevent gaming the benchmark
     compile_cobol_baseline()
     
     # 2. Measure COBOL (using baseline)

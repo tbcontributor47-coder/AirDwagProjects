@@ -183,68 +183,50 @@ public class Validator {
             
             if (recType == 'P') {
                 // P(0) 10(1-10) 20(11-30) 8(31-38) 8(39-46) 8(47-54) 1(55) 2(56-57) 10(58-67) 3(68-70)
-                // Offset relative to 'P' at index 0. 
-                // We advance buffer as we go.
-                // Or better, peek using absolute get? Buffer position moves.
-                // We just read 'P'. Current pos is at PolicyNo.
-                // Fixed format means we can skip or read exactly.
-                
-                // Read into a temp buffer for current record?
-                // Record len = 1+10+20+8+8+8+1+2+10+3 = 71 chars?
-                // Wait. 150 chars in COBOL def? 
-                // "ORGANIZATION IS LINE SEQUENTIAL". Line length varies.
-                // Benchmark data is compact.
-                // Let's read until newline.
+                // Offset calculation (0-based):
+                // Pos 1: Index 0 (P)
+                // Pos 2-11: No (1-10)
+                // Pos 12-31: Name (11-30)
+                // Pos 32-39: Prem (31-38)
+                // Pos 40-47: Tax (39-46)
+                // Pos 48-55: Due (47-54)
+                // Pos 56: Risk (55)
+                // Pos 57-58: Ctry (56-57)
+                // Pos 59-68: Acc (58-67)
+                // Pos 69-71: Age (68-70)
                 
                 int startPos = buf.position();
-                int endPos = startPos;
                 while (buf.hasRemaining() && buf.get() != '\n'); 
-                endPos = buf.position() - 1; // before \n
-                // If EOF without \n?
-                if (buf.position() > 0 && buf.get(buf.position()-1) != '\n') endPos = buf.position(); 
+                int length = buf.position() - startPos;
                 
-                int length = endPos - startPos;
+                if (length < 70) { System.out.println("FORMAT_ERR"); return 1; }
                 
-                // Parsing from absolute positions in buffer relative to startPos
-                // PolicyNo: 0..9 (10 chars)
-                // Holder: 10..29 (20 chars)
-                // Prem: 30..37 (8 chars)
-                // Tax: 38..45 (8 chars)
-                // Due: 46..53 (8 chars)
-                // Risk: 54 (1 char)
-                // Country: 55..56 (2 chars)
-                // Acc: 57..66 (10 chars)
-                // Age: 67..69 (3 chars)
-                
-                // Format Check (Account): 57..66
-                // Must be 10 digits and start with '9'
-                if (length < 67) { System.out.println("FORMAT_ERR"); return 1; }
-                
-                if (buf.get(startPos + 57) != '9') {
+                // Account Check: Pos 59 (Idx 58)
+                if (buf.get(startPos + 58) != '9') {
                     System.out.println("FORMAT_ERR"); return 1;
                 }
-                for (int i = 57; i < 67; i++) {
+                for (int i = 58; i < 68; i++) {
                     byte b = buf.get(startPos + i);
                     if (b < '0' || b > '9') { System.out.println("FORMAT_ERR"); return 1; }
                 }
 
-                // Banned Check: 55..56
-                byte c1 = buf.get(startPos + 55);
-                byte c2 = buf.get(startPos + 56);
+                // Banned Check: Pos 57 (Idx 56)
+                byte c1 = buf.get(startPos + 56);
+                byte c2 = buf.get(startPos + 57);
                 if ((c1 == 'R' && c2 == 'U') || (c1 == 'K' && c2 == 'P')) {
                     System.out.println("BANNED_ERR"); return 1;
                 }
                 
-                // Age Check: 67..69
-                int age = parseInt(buf, startPos + 67, 3);
+                // Age Check: Pos 69 (Idx 68)
+                int age = parseInt(buf, startPos + 68, 3);
                 if (age < 18 || age > 120) {
                     System.out.println("AGE_ERR"); return 1;
                 }
                 
-                long premCents = parseLong(buf, startPos + 30, 8);
-                long taxCents = parseLong(buf, startPos + 38, 8);
-                long dueCents = parseLong(buf, startPos + 46, 8);
-                byte risk = buf.get(startPos + 54);
+                long premCents = parseLong(buf, startPos + 31, 8);
+                long taxCents = parseLong(buf, startPos + 39, 8);
+                long dueCents = parseLong(buf, startPos + 47, 8);
+                byte risk = buf.get(startPos + 55);
                 
                 // Fiscal
                 if (premCents > 10000000L || dueCents != (premCents + taxCents)) {
@@ -260,12 +242,10 @@ public class Validator {
                     if (7 < errorLevel) errorLevel = 7;
                 }
                 
-                // Checksum
-                // Policy digits 1-9 sum. Mod 10 == digit 10.
-                // Policy is startPos + 0..9.
+                // Checksum (Idx 1-9 sum, Idx 10 check)
                 int csum = 0;
-                for (int i = 0; i < 9; i++) csum += (buf.get(startPos + i) - '0');
-                int d10 = buf.get(startPos + 9) - '0';
+                for (int i = 1; i < 10; i++) csum += (buf.get(startPos + i) - '0');
+                int d10 = buf.get(startPos + 10) - '0';
                 if ((csum % 10) != d10) {
                     if (8 < errorLevel) errorLevel = 8;
                 }
@@ -277,14 +257,10 @@ public class Validator {
                 
             } else if (recType == 'T') {
                 trFound = true;
-                // T(0) Count(1-5) Prem(6-17) Tax(18-29) Due(30-41)
-                
-                // Skip to next line logic managed by outer loop?
-                // Logic above does "while != \n".
                 int startPos = buf.position();
                 while (buf.hasRemaining() && buf.get() != '\n');
-                // startPos points to first char AFTER 'T'.
                 
+                // T(0) Count(1-5) Prem(6-17) Tax(18-29) Due(30-41)
                 int trlCount = parseInt(buf, startPos, 5);
                 long trlPremCents = parseLong(buf, startPos + 5, 12);
                 long trlTaxCents = parseLong(buf, startPos + 17, 12);
