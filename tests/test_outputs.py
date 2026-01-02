@@ -270,6 +270,17 @@ def test_missing_trailer():
     assert res.returncode == 1
     assert res.stdout.strip() == "COUNT_ERR"
 
+def test_error_priority_checksum_vs_batch():
+    # Checksum (8) vs Batch Sum (9). Should report CHECKSUM_ERR.
+    compile_cobol()
+    # Policy with inner checksum fail (123456781 -> 36%10=6!=1)
+    p = {'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}
+    # And corrupt trailer to trigger BATCH_SUM_ERR
+    generate_insurance_file("insurance.dat", [p], corrupt_trl_prem=999.99)
+    res = subprocess.run(["./validator_cobol"], capture_output=True, text=True)
+    assert res.returncode == 1
+    assert res.stdout.strip() == "CHECKSUM_ERR"
+
 # --- Java Correctness Validation ---
 
 def test_java_correctness():
@@ -289,6 +300,7 @@ def test_java_correctness():
         ([{'no': 123456786, 'holder': 'X', 'prem': 1000.0, 'tax': 0.0, 'due': 1000.0, 'risk': '1', 'country': 'US', 'acc': 9876543210, 'age': 30}], "VALID", None, {}),
         ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 50.0, 'due': 150.0, 'risk': '2', 'country': 'US', 'acc': 9876543210, 'age': 10}], "AGE_ERR", None, {}), # Age(4) vs Tax(7)
         ([{'no': 123456786, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "COUNT_ERR", None, {'corrupt_trl_count': 99}),
+        ([{'no': 123456781, 'holder': 'X', 'prem': 100.0, 'tax': 10.0, 'due': 110.0, 'risk': '3', 'country': 'US', 'acc': 9876543210, 'age': 30}], "CHECKSUM_ERR", None, {'corrupt_trl_prem': 999.99}), # Checksum(8) vs Batch(9)
     ]
     
     for policies, expected, d_str, kwargs in test_cases:

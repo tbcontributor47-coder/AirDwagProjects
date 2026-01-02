@@ -1,67 +1,79 @@
 # COBOL to Java Migration: Insurance Validator
 
 ## Task Overview
-1.  **Fix Bugs in COBOL**: A legacy COBOL program (`validate.cbl`) validates insurance premium batch files. It contains several critical bugs (logic and validation gaps). You must find and fix them to make the COBOL tests pass.
-2.  **Migrate to Java**: Port the fixed logic to a modern Java 17 application. The Java version must function identically to the fixed COBOL version.
-3.  **Performance Optimization**: The Java implementation must be highly optimized. Its execution time must be **almost equal** to the COBOL version (within a 1.5x factor) when processing large datasets.
+1.  **Audit and Fix Legacy COBOL**: You are provided with a legacy COBOL program (`validate.cbl`) that validates insurance premium batch files. **The code is known to have multiple critical bugs and deviations from the specification.** You must strictly audit the code against the "Validation Rules" below, identify all logic errors, and fix them.
+2.  **Migrate to Java**: Once the COBOL logic is verified and fixed, port it to a modern Java 17 application (`com.tbench.insurance.Validator`).
+3.  **Performance Optimization**: The Java implementation must be highly optimized. Its execution time must be **within 1.5x** of the fixed COBOL version when processing large datasets (500k+ records).
 
-## validation Rules (The Source of Truth)
-The program reads `insurance.dat` (fixed width) and validates it.
+## Record Formats (Fixed Width)
 
-### Record Formats
--   **Header ('H')**: Date (YYYYMMDD), Batch Name, State.
--   **Policy ('P')**: Policy No (10), Name (20), Prem (8), Tax (8), Total (8), Risk (1), Country (2), Account (10), Age (3).
--   **Trailer ('T')**: Count, Total Prem, Total Tax, Total Due.
+The input `insurance.dat` contains three record types:
 
-### Logic & Checks
-1.  **Header Check**: Date must match system date (Priority 1).
-2.  **Account Check**: Must be 10 digits and start with '9' (Priority 2).
-3.  **Banned Countries**: 'RU', 'KP' are banned (Priority 3).
-4.  **Age Check**: 18-120 inclusive (Priority 4).
-5.  **Fiscal Integrity**: 
-    -   `Total Due` = `Prem` + `Tax` (Priority 6).
-    -   **Premium Cap**: Any policy with `Prem` > 100,000.00 is a fiscal error (Priority 6).
-6.  **Tax Calculation**:
-    -   Risk '3': 10%
-    -   Risk '2': 5%
-    -   Risk '1': 0%
-    -   Rounding: Half-Up. (e.g. 100.05 * 0.10 = 10.005 -> 10.01)
-    -   If tax is incorrect: TAX_ERR (Priority 7).
-7.  **Checksum**: Policy No mod 10 check. The 10th digit must be the sum of the first 9 digits mod 10. (Priority 8).
-8.  **Trailer**: 
-    -   Counts and Sums must match the entire file (Priority 5 for count mismatch, Priority 9 for sum mismatch).
-    -   **Missing Trailer**: If the file ends without a 'T' record, it is a COUNT_ERR (Priority 5).
-9.  **Error Priority**: If multiple errors exist, report the highest priority (lowest code):
-    -   DATE_ERR (1) - Header Date Mismatch
-    -   FORMAT_ERR (2) - Account Number format/digits
-    -   BANNED_ERR (3) - Banned country (RU, KP)
-    -   AGE_ERR (4) - Age out of range (18-120)
-    -   COUNT_ERR (5) - Record count mismatch OR missing trailer
-    -   FISCAL_ERR (6) - Prem+Tax mismatch OR Prem > 100,000.00
-    -   TAX_ERR (7) - Tax calculation mismatch
-    -   CHECKSUM_ERR (8) - Policy Number checksum failure
-    -   BATCH_SUM_ERR (9) - Batch total sum mismatch
+### Header Record (Type 'H')
+| Field | Position | Length | Format |
+|-------|----------|--------|--------|
+| Type | 1 | 1 | 'H' |
+| Date | 2-9 | 8 | YYYYMMDD |
+| Batch Name | 10-19 | 10 | Alphanumeric |
+| State Code | 20-21 | 2 | Alphanumeric |
 
-## Intentional Bugs in Baseline Code
+### Policy Record (Type 'P')
+| Field | Position | Length | Format |
+|-------|----------|--------|--------|
+| Type | 1 | 1 | 'P' |
+| Policy No | 2-11 | 10 | 9(10) |
+| Holder Name| 12-31 | 20 | Alphanumeric |
+| Base Premium| 32-39 | 8 | 9(6)V99 |
+| Tax Amount | 40-47 | 8 | 9(6)V99 |
+| Total Due | 48-55 | 8 | 9(6)V99 |
+| Risk Cat | 56 | 1 | '1', '2', or '3' |
+| Country | 57-58 | 2 | Alphanumeric |
+| Account No | 59-68 | 10 | 9(10) |
+| Age | 69-71 | 3 | 9(3) |
 
-The provided `validate.cbl` contains **4 intentional bugs** that you must identify and fix:
+### Trailer Record (Type 'T')
+| Field | Position | Length | Format |
+|-------|----------|--------|--------|
+| Type | 1 | 1 | 'T' |
+| Policy Count| 2-6 | 5 | 9(5) |
+| Total Prem | 7-18 | 12 | 9(10)V99 |
+| Total Tax | 19-30 | 12 | 9(10)V99 |
+| Total Due | 31-42 | 12 | 9(10)V99 |
 
-1. **Missing Date Validation** (Priority 1): The header date check against the system date is commented out, allowing invalid dates to pass validation.
-2. **Missing Account Numeric Check** (Priority 2): The validation to ensure the account field contains only numeric digits is commented out, allowing non-numeric characters.
-3. **Incorrect Tax Rate for Risk '2'** (Priority 7): The tax calculation uses 4% (0.04) instead of the correct 5% (0.05) for Risk category '2'.
-4. **Wrong Age Upper Limit** (Priority 4): The age validation uses an upper limit of 150 instead of the correct 120.
+## Validation Rules (The Source of Truth)
 
-**Your Task**: Fix all 4 bugs in the COBOL code and implement the corrected logic in Java.
+The program must output **exactly one** error code to `STDOUT` if validation fails, based on the priority below (1 is highest). If multiple errors occur, report the highest priority one.
+
+| Priority | Error Code | Condition |
+| :--- | :--- | :--- |
+| 1 | `DATE_ERR` | Header Date must match the current system date. |
+| 2 | `FORMAT_ERR` | `Account No` must be exactly 10 digits and **must start with '9'**. |
+| 3 | `BANNED_ERR` | Transactions from countries **'RU'** or **'KP'** are prohibited. |
+| 4 | `AGE_ERR` | `Age` must be between **18** and **120** inclusive. |
+| 5 | `COUNT_ERR` | Trailer `Policy Count` must match actual record count. OR missing trailer. |
+| 6 | `FISCAL_ERR` | `Total Due` must equal `Base Premium + Tax Amount`. <br> **Premium Cap**: `Base Premium` must not exceed **$100,000.00**. |
+| 7 | `TAX_ERR` | Tax must match calculated value based on Risk Category: <br> - Risk '3': 10% <br> - Risk '2': 5% <br> - Risk '1': 0% <br> **Rounding**: Half-Up (e.g., 0.005 -> 0.01). |
+| 8 | `CHECKSUM_ERR` | Policy No check: `Sum(digits 1-9) modulo 10` must equal `digit 10`. |
+| 9 | `BATCH_SUM_ERR` | Trailer totals (Prem, Tax, Due) must match sum of all valid policies. |
+
+**Success**: If all checks pass, output `VALID`.
+
+## Legacy Code Audit
+The file `/app/validate.cbl` is an older version of the validator. It implements *most* of the logic but is **known to be defective**.
+- Do NOT assume the COBOL code is correct.
+- You must verify every rule above against the Code.
+- Fix ANY logic that contradicts the "Validation Rules".
 
 ## Java Requirements
 -   **Class**: `com.tbench.insurance.Validator`
 -   **Input**: Read from `stdin` or file args (match COBOL behavior).
--   **Output**: `STDOUT` (exactly matching error codes or "VALID").
--   **Build**: Maven will package the application as an uber JAR at `target/validator.jar` using the maven-shade-plugin.
+-   **Output**: `STDOUT` (Error Code or `VALID`).
+-   **Build**: Uber-jar at `target/validator.jar`.
 -   **Invocation**: `java -jar target/validator.jar [optional-file-path]`
--   **Performance**: Use efficient I/O (Buffered), avoid heavy regex where simple char checks suffice, and use `BigDecimal` efficiently or long/int for fixed-point math if precise.
+-   **Performance**: Must be within 1.5x of the (fixed) COBOL runtime.
+-   **Dependencies**: Only standard Java libraries allowed (no external rules engines).
 
-## Verification
--   `tests/test_cobol.py`: Verifies the COBOL fix.
--   `tests/test_java.sh`: Verifies the Java correctness.
--   `tests/benchmark.sh`: Compares execution speed on 500k records. Java Time <= 1.5 * COBOL Time.
+## Deliverables
+1.  **Fixed COBOL**: `/app/validate.cbl` (Passing all tests).
+2.  **Java Source**: `src/main/java/com/tbench/insurance/Validator.java`.
+3.  **Build Config**: `pom.xml`.
