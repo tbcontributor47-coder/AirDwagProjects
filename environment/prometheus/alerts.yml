@@ -1,0 +1,12 @@
+groups:
+  - name: app_alerts
+    rules:
+      - alert: HighErrorRate
+        # BUG: Syntax error in PromQL, 'http_requests_total' vector mismatch
+        # BUG: Missing [5m] in rate()
+        expr: rate(http_requests_total{status=~"5.."}[]) > 0.05
+        for: 0s # BUG: Should check for a duration (e.g. 1m) to avoid flapping
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"

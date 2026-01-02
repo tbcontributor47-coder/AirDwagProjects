@@ -1,0 +1,13 @@
+[task]
+name = "aws-observability-stack"
+category = "software-engineering"
+difficulty = "hard"
+description = "Fix a broken AWS observability stack with monitoring, logging, and alerting issues"
+
+[environment]
+type = "dockerfile"
+path = "environment/Dockerfile"
+
+[scoring]
+test_command = "bash ../tests/test.sh"
+oracle_command = "bash ../solution/solve.sh"
