@@ -104,20 +104,20 @@ def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
 
 def build_java():
     """Builds the Java validator."""
-    jar_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "target", "validator.jar")
-    if os.path.exists(jar_path):
-        return jar_path
-    if os.path.exists("target/validator.jar"):
-        return os.path.abspath("target/validator.jar")
-    return None
-
-def build_java():
-    """Builds the Java validator."""
-    jar_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "target", "validator.jar")
-    if os.path.exists(jar_path):
-        return jar_path
-    if os.path.exists("target/validator.jar"):
-        return os.path.abspath("target/validator.jar")
+    paths_to_check = [
+        # Relative to test file location
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "environment", "app", "target", "validator.jar"),
+        # Oracle/Docker environment
+        "/app/target/validator.jar",
+        # Relative to CWD
+        "target/validator.jar",
+        os.path.abspath("target/validator.jar")
+    ]
+    
+    for jar_path in paths_to_check:
+        if os.path.exists(jar_path):
+            return jar_path
+    
     return None
 
 # --- COBOL Tests ---
