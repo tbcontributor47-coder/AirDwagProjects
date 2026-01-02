@@ -6,6 +6,10 @@ export AWS_SECRET_ACCESS_KEY=testing
 export AWS_DEFAULT_REGION=us-east-1
 
 # 0. Tool Installation (Self-contained environment)
+if ! python3 -c "import yaml" &> /dev/null; then
+    echo "Installing pyyaml..."
+    pip install pyyaml==6.0.1 >/dev/null 2>&1
+fi
 if ! command -v terraform &> /dev/null; then
     echo "Installing Terraform..."
     curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip >/dev/null 2>&1
