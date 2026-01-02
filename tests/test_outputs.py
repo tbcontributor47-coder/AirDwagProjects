@@ -322,11 +322,14 @@ def test_no_external_dependencies():
 
     for dep in deps:
         group = dep.find("mvn:groupId", ns)
-        if group is None: group = dep.find("groupId")
+        if group is None:
+            group = dep.find("groupId")
         artifact = dep.find("mvn:artifactId", ns)
-        if artifact is None: artifact = dep.find("artifactId")
+        if artifact is None:
+            artifact = dep.find("artifactId")
         scope = dep.find("mvn:scope", ns)
-        if scope is None: scope = dep.find("scope")
+        if scope is None:
+            scope = dep.find("scope")
         
         scope_text = scope.text.strip().lower() if scope is not None else "compile"
         
