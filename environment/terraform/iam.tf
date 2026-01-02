@@ -33,18 +33,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "s3:ListBucketMultipartUploads",
           "s3:PutObject"
         ]
-        Resource = [
-          aws_s3_bucket.log_bucket.arn,
-          "${aws_s3_bucket.log_bucket.arn}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
+        Resource = "*"
       },
       # BUG: Missing CloudWatch Logs permissions (logs:PutLogEvents)
       {

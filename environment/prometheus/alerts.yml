@@ -4,8 +4,8 @@ groups:
       - alert: HighErrorRate
         # BUG: Syntax error in PromQL, 'http_requests_total' vector mismatch
         # BUG: Missing [5m] in rate()
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
-        for: 1m
+        expr: rate(http_requests_total{status=~"5.."}[]) > 0.05
+        for: 0s
         labels:
           severity: critical
         annotations:

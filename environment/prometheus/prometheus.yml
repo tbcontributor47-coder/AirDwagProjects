@@ -4,7 +4,7 @@ global:
 scrape_configs:
   - job_name: 'backend-services'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:9090']
 
   - job_name: 'node-exporter'
     static_configs:
@@ -15,4 +15,4 @@ scrape_configs:
       - source_labels: [__address__]
         regex: '(.*):9100'
         target_label: instance
-        replacement: '${1}' 
+        replacment: '${1}' 

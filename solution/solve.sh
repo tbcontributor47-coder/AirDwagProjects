@@ -5,11 +5,22 @@
 echo "Applying fixes..."
 
 # 1. Fix Terraform IAM
-sed -i 's/Resource = "*"/Resource = [aws_s3_bucket.log_bucket.arn, "${aws_s3_bucket.log_bucket.arn}\/*"]/' environment/terraform/iam.tf
+# Replace "Resource = \"*\"" with specific ARN and add logs permission
+sed -i 's/Resource = "\*"/Resource = [aws_s3_bucket.log_bucket.arn, "${aws_s3_bucket.log_bucket.arn}\/*"]/' environment/terraform/iam.tf
+# Add the missing CloudWatch Logs permissions block if it's missing (it usually is in the buggy version)
+# For simplicity, we assume the agent would add this. But solve.sh should be automated.
+# Let's insert the missing block after the first statement.
+sed -i '/"${aws_s3_bucket.log_bucket.arn}\/\*"]/a \
+      },\
+      {\
+        Effect = "Allow"\
+        Action = [\
+          "logs:CreateLogStream",\
+          "logs:PutLogEvents"\
+        ]\
+        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"' environment/terraform/iam.tf
 
-# 2. Fix Firehose (Modern AWS Provider)
-sed -i 's/destination = "s3"/destination = "extended_s3"/' environment/terraform/firehose.tf
-sed -i 's/s3_configuration/extended_s3_configuration/' environment/terraform/firehose.tf
+# 2. Fix Firehose Buffer
 sed -i 's/buffer_size = 1/buffer_size = 5/' environment/terraform/firehose.tf
 
 # 3. Fix CloudWatch Filter
