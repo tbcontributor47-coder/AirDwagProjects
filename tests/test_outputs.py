@@ -379,6 +379,7 @@ def test_performance_benchmark():
     proc_java = subprocess.run(["java", "-jar", jar_path], stdin=open("benchmark.dat"), capture_output=True)
     if proc_java.returncode != 0:
          print(f"Java Failed! Stderr: {proc_java.stderr.decode()}", file=sys.stderr)
+         print(f"Java Failed! Stdout: {proc_java.stdout.decode()}", file=sys.stderr)
          pytest.fail(f"Java benchmark failed with RC {proc_java.returncode}")
     java_time = time.time() - start
     print(f"Java Time: {java_time:.4f}s")

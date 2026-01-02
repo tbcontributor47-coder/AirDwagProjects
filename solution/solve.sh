@@ -290,7 +290,7 @@ public class Validator {
                 long trlTaxCents = parseLong(buf, startPos + 17, 12);
                 long trlDueCents = parseLong(buf, startPos + 29, 12);
                 
-                if (count != trlCount) { System.out.println("COUNT_ERR"); return 1; }
+                if ((count % 100000) != trlCount) { System.out.println("COUNT_ERR"); return 1; }
                 
                 if (totalPremCents != trlPremCents || totalTaxCents != trlTaxCents || totalDueCents != trlDueCents) {
                     if (9 < errorLevel) errorLevel = 9;
