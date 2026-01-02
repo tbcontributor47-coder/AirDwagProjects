@@ -90,7 +90,7 @@ def run_validator(binary="./validator_cobol", stdin_file="insurance.dat"):
         cmd = [binary]
     
     with open(stdin_file, 'rb') as f:
-        return subprocess.run(cmd, input=f.read(), capture_output=True, text=True)
+        return subprocess.run(cmd, input=f.read(), capture_output=True)
 
 def build_java():
     """Builds the Java validator."""
