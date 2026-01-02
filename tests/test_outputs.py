@@ -13,7 +13,7 @@ def generate_insurance_file(filename, policies, date_str=None, batch_name="BATCH
     if date_str is None:
         date_str = datetime.datetime.now().strftime("%Y%m%d")
     
-    header = f"{header_type}{date_str}{batch_name.ljust(20)}{state[:2]}\n"
+    header = f"{header_type}{date_str}{batch_name.ljust(10)}{state[:2]}\n"
     
     total_prem = 0
     total_tax = 0

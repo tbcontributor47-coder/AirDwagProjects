@@ -182,24 +182,14 @@ public class Validator {
             if (recType == '\n') continue; // Empty line?
             
             if (recType == 'P') {
-                // P(0) 10(1-10) 20(11-30) 8(31-38) 8(39-46) 8(47-54) 1(55) 2(56-57) 10(58-67) 3(68-70)
-                // Offset calculation (0-based):
-                // Pos 1: Index 0 (P)
-                // Pos 2-11: No (1-10)
-                // Pos 12-31: Name (11-30)
-                // Pos 32-39: Prem (31-38)
-                // Pos 40-47: Tax (39-46)
-                // Pos 48-55: Due (47-54)
-                // Pos 56: Risk (55)
-                // Pos 57-58: Ctry (56-57)
-                // Pos 59-68: Acc (58-67)
-                // Pos 69-71: Age (68-70)
-                
-                int startPos = buf.position();
+                // startPos points to the 'P' (Index 0 relative to record start)
+                int startPos = buf.position() - 1;
                 while (buf.hasRemaining() && buf.get() != '\n'); 
-                int length = buf.position() - startPos;
+                int endPos = buf.position(); // points AFTER the \n
+                int length = endPos - startPos;
                 
-                if (length < 70) { System.out.println("FORMAT_ERR"); return 1; }
+                // Spec record length: P(1)+10+20+8+8+8+1+2+10+3 = 71 chars + \n = 72
+                if (length < 71) { System.out.println("FORMAT_ERR"); return 1; }
                 
                 // Account Check: Pos 59 (Idx 58)
                 if (buf.get(startPos + 58) != '9') {
@@ -223,9 +213,13 @@ public class Validator {
                     System.out.println("AGE_ERR"); return 1;
                 }
                 
+                // Base Prem: Pos 32 (Idx 31)
                 long premCents = parseLong(buf, startPos + 31, 8);
+                // Tax: Pos 40 (Idx 39)
                 long taxCents = parseLong(buf, startPos + 39, 8);
+                // Due: Pos 48 (Idx 47)
                 long dueCents = parseLong(buf, startPos + 47, 8);
+                // Risk: Pos 56 (Idx 55)
                 byte risk = buf.get(startPos + 55);
                 
                 // Fiscal
@@ -242,7 +236,7 @@ public class Validator {
                     if (7 < errorLevel) errorLevel = 7;
                 }
                 
-                // Checksum (Idx 1-9 sum, Idx 10 check)
+                // Checksum: Policy No (Pos 2-11) is Index 1-10. Sum 1-9 (Idx 1-9), Check Dig 10 (Idx 10).
                 int csum = 0;
                 for (int i = 1; i < 10; i++) csum += (buf.get(startPos + i) - '0');
                 int d10 = buf.get(startPos + 10) - '0';
@@ -257,14 +251,14 @@ public class Validator {
                 
             } else if (recType == 'T') {
                 trFound = true;
-                int startPos = buf.position();
+                int startPos = buf.position() - 1;
                 while (buf.hasRemaining() && buf.get() != '\n');
                 
                 // T(0) Count(1-5) Prem(6-17) Tax(18-29) Due(30-41)
-                int trlCount = parseInt(buf, startPos, 5);
-                long trlPremCents = parseLong(buf, startPos + 5, 12);
-                long trlTaxCents = parseLong(buf, startPos + 17, 12);
-                long trlDueCents = parseLong(buf, startPos + 29, 12);
+                int trlCount = parseInt(buf, startPos + 1, 5);
+                long trlPremCents = parseLong(buf, startPos + 6, 12);
+                long trlTaxCents = parseLong(buf, startPos + 18, 12);
+                long trlDueCents = parseLong(buf, startPos + 30, 12);
                 
                 if ((count % 100000) != trlCount) { System.out.println("COUNT_ERR"); return 1; }
                 
