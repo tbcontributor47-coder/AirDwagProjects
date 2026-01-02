@@ -323,10 +323,10 @@ def test_performance_benchmark():
     
     with open("benchmark.dat", "w") as f:
         f.write(header)
-        for i in range(500000):
+        for i in range(2000000):
             # Valid-ish
             f.write(policy_fmt.format(100000000+i, "Bench User", 10000, 1000, 11000, "3", "US", 9000000000+i, 30))
-        f.write(trailer_fmt.format(500000, 5000000000, 500000000, 5500000000))
+        f.write(trailer_fmt.format(2000000, 20000000000, 2000000000, 22000000000))
         
     # Compile from immutable baseline to prevent gaming the benchmark
     compile_cobol_baseline()
@@ -335,7 +335,11 @@ def test_performance_benchmark():
     print("Running COBOL Benchmark...")
     shutil.copy("benchmark.dat", "insurance.dat")
     start = time.time()
-    subprocess.run(["./validator_cobol_baseline"], stdin=open("benchmark.dat"), stdout=subprocess.DEVNULL)
+    # Check return code to ensure COBOL actually ran and didn't crash
+    proc = subprocess.run(["./validator_cobol_baseline"], stdin=open("benchmark.dat"), capture_output=True)
+    if proc.returncode != 0:
+        print(f"COBOL Failed! Stderr: {proc.stderr.decode()}", file=sys.stderr)
+        pytest.fail(f"COBOL benchmark failed with RC {proc.returncode}")
     cobol_time = time.time() - start
     print(f"COBOL Time: {cobol_time:.4f}s")
     
@@ -346,13 +350,15 @@ def test_performance_benchmark():
         
     print("Running Java Benchmark...")
     start = time.time()
-    subprocess.run(["java", "-jar", jar_path], stdin=open("benchmark.dat"), stdout=subprocess.DEVNULL)
+    proc_java = subprocess.run(["java", "-jar", jar_path], stdin=open("benchmark.dat"), capture_output=True)
+    if proc_java.returncode != 0:
+         print(f"Java Failed! Stderr: {proc_java.stderr.decode()}", file=sys.stderr)
+         pytest.fail(f"Java benchmark failed with RC {proc_java.returncode}")
     java_time = time.time() - start
     print(f"Java Time: {java_time:.4f}s")
     
     # 4. Assert
-    # Limit = COBOL * 1.5 + JVM Startup Buffer (1.5s)
-    # We allow 1.5s for JVM startup/overhead to prevent false positives on slow CI runners.
-    limit = (cobol_time * 1.5) + 1.5
+    # Limit = COBOL * 1.5 (Strict Mode: No JVM startup buffer)
+    limit = cobol_time * 1.5
     assert java_time <= limit, f"Java ({java_time:.4f}s) is too slow (> {limit:.4f}s, COBOL was {cobol_time:.4f}s)"
 

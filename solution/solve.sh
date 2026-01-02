@@ -108,12 +108,15 @@ cat > "$JAVA_DIR/Validator.java" <<'EOFJAVA'
 package com.tbench.insurance;
 
 import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.time.LocalDate;
 
 public class Validator {
     
     private static final String TODAY;
     static {
-        java.time.LocalDate now = java.time.LocalDate.now();
+        LocalDate now = LocalDate.now();
         int y = now.getYear();
         int m = now.getMonthValue();
         int d = now.getDayOfMonth();
@@ -122,35 +125,49 @@ public class Validator {
     
     public static void main(String[] args) {
         try {
-            InputStream in;
             if (args.length > 0) {
-                in = new BufferedInputStream(new FileInputStream(args[0]), 131072);
+                try (FileChannel channel = new FileInputStream(args[0]).getChannel()) {
+                    long size = channel.size();
+                    MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                    System.exit(validate(buffer));
+                }
             } else {
-                in = new BufferedInputStream(System.in, 131072);
+                // Fallback for stdin (pipe): read to byte array buffer
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = System.in.read(buf)) != -1) {
+                    baos.write(buf, 0, n);
+                }
+                System.exit(validate(ByteBuffer.wrap(baos.toByteArray())));
             }
-            System.exit(validate(in));
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
             System.exit(1);
         }
     }
     
-    private static int validate(InputStream in) throws IOException {
-        byte[] buf = new byte[256];
-        int len = readLine(in, buf);
+    private static int validate(ByteBuffer buf) {
+        int len = buf.remaining();
+        if (len < 1) return 0;
         
-        if (len < 1 || buf[0] != 'H') {
+        // Header
+        // HYYYMMDDBBATCH...
+        if (buf.get() != 'H') {
             System.out.println("INVALID FORMAT");
             return 1;
         }
         
-        if (buf[1] != TODAY.charAt(0) || buf[2] != TODAY.charAt(1) ||
-            buf[3] != TODAY.charAt(2) || buf[4] != TODAY.charAt(3) ||
-            buf[5] != TODAY.charAt(4) || buf[6] != TODAY.charAt(5) ||
-            buf[7] != TODAY.charAt(6) || buf[8] != TODAY.charAt(7)) {
-            System.out.println("DATE_ERR");
-            return 1;
+        // Date check: H(0) Y(1)Y(2)Y(3)Y(4) M(5)M(6) D(7)D(8)
+        for (int i = 0; i < 8; i++) {
+             if (buf.get() != TODAY.charAt(i)) {
+                 System.out.println("DATE_ERR");
+                 return 1;
+             }
         }
+        
+        // Skip rest of header line
+        while (buf.hasRemaining() && buf.get() != '\n');
         
         int count = 0;
         long totalPremCents = 0;
@@ -158,54 +175,98 @@ public class Validator {
         long totalDueCents = 0;
         int errorLevel = 99;
         
-        while ((len = readLine(in, buf)) > 0) {
-            byte recType = buf[0];
+        boolean trFound = false;
+        
+        while (buf.hasRemaining()) {
+            byte recType = buf.get();
+            if (recType == '\n') continue; // Empty line?
             
             if (recType == 'P') {
-                long premCents = parseLong(buf, 31, 39);
-                long taxCents = parseLong(buf, 39, 47);
-                long dueCents = parseLong(buf, 47, 55);
-                byte risk = buf[55];
-                byte country1 = buf[56];
-                byte country2 = buf[57];
-                int age = parseInt(buf, 68, 71);
+                // P(0) 10(1-10) 20(11-30) 8(31-38) 8(39-46) 8(47-54) 1(55) 2(56-57) 10(58-67) 3(68-70)
+                // Offset relative to 'P' at index 0. 
+                // We advance buffer as we go.
+                // Or better, peek using absolute get? Buffer position moves.
+                // We just read 'P'. Current pos is at PolicyNo.
+                // Fixed format means we can skip or read exactly.
                 
-                if (isNumeric(buf, 58, 68) && buf[58] == '9') {
-                    // Valid format
-                } else {
-                    System.out.println("FORMAT_ERR");
-                    return 1;
+                // Read into a temp buffer for current record?
+                // Record len = 1+10+20+8+8+8+1+2+10+3 = 71 chars?
+                // Wait. 150 chars in COBOL def? 
+                // "ORGANIZATION IS LINE SEQUENTIAL". Line length varies.
+                // Benchmark data is compact.
+                // Let's read until newline.
+                
+                int startPos = buf.position();
+                int endPos = startPos;
+                while (buf.hasRemaining() && buf.get() != '\n'); 
+                endPos = buf.position() - 1; // before \n
+                // If EOF without \n?
+                if (buf.position() > 0 && buf.get(buf.position()-1) != '\n') endPos = buf.position(); 
+                
+                int length = endPos - startPos;
+                
+                // Parsing from absolute positions in buffer relative to startPos
+                // PolicyNo: 0..9 (10 chars)
+                // Holder: 10..29 (20 chars)
+                // Prem: 30..37 (8 chars)
+                // Tax: 38..45 (8 chars)
+                // Due: 46..53 (8 chars)
+                // Risk: 54 (1 char)
+                // Country: 55..56 (2 chars)
+                // Acc: 57..66 (10 chars)
+                // Age: 67..69 (3 chars)
+                
+                // Format Check (Account): 57..66
+                // Must be 10 digits and start with '9'
+                if (length < 67) { System.out.println("FORMAT_ERR"); return 1; }
+                
+                if (buf.get(startPos + 57) != '9') {
+                    System.out.println("FORMAT_ERR"); return 1;
+                }
+                for (int i = 57; i < 67; i++) {
+                    byte b = buf.get(startPos + i);
+                    if (b < '0' || b > '9') { System.out.println("FORMAT_ERR"); return 1; }
+                }
+
+                // Banned Check: 55..56
+                byte c1 = buf.get(startPos + 55);
+                byte c2 = buf.get(startPos + 56);
+                if ((c1 == 'R' && c2 == 'U') || (c1 == 'K' && c2 == 'P')) {
+                    System.out.println("BANNED_ERR"); return 1;
                 }
                 
-                if ((country1 == 'R' && country2 == 'U') || (country1 == 'K' && country2 == 'P')) {
-                    System.out.println("BANNED_ERR");
-                    return 1;
-                }
-                
+                // Age Check: 67..69
+                int age = parseInt(buf, startPos + 67, 3);
                 if (age < 18 || age > 120) {
-                    System.out.println("AGE_ERR");
-                    return 1;
+                    System.out.println("AGE_ERR"); return 1;
                 }
                 
-                // FISCAL_ERR (Priority 6)
+                long premCents = parseLong(buf, startPos + 30, 8);
+                long taxCents = parseLong(buf, startPos + 38, 8);
+                long dueCents = parseLong(buf, startPos + 46, 8);
+                byte risk = buf.get(startPos + 54);
+                
+                // Fiscal
                 if (premCents > 10000000L || dueCents != (premCents + taxCents)) {
                     if (6 < errorLevel) errorLevel = 6;
                 }
                 
+                // Tax
                 long expectedTaxCents = 0;
-                if (risk == '3') {
-                    expectedTaxCents = (premCents * 10L + 50L) / 100L;
-                } else if (risk == '2') {
-                    expectedTaxCents = (premCents * 5L + 50L) / 100L;
-                }
+                if (risk == '3') expectedTaxCents = (premCents * 10L + 50L) / 100L;
+                else if (risk == '2') expectedTaxCents = (premCents * 5L + 50L) / 100L;
                 
                 if (taxCents != expectedTaxCents) {
                     if (7 < errorLevel) errorLevel = 7;
                 }
                 
-                int checksum = 0;
-                for (int i = 1; i <= 9; i++) checksum += (buf[i] - '0');
-                if ((checksum % 10) != (buf[10] - '0')) {
+                // Checksum
+                // Policy digits 1-9 sum. Mod 10 == digit 10.
+                // Policy is startPos + 0..9.
+                int csum = 0;
+                for (int i = 0; i < 9; i++) csum += (buf.get(startPos + i) - '0');
+                int d10 = buf.get(startPos + 9) - '0';
+                if ((csum % 10) != d10) {
                     if (8 < errorLevel) errorLevel = 8;
                 }
                 
@@ -216,15 +277,20 @@ public class Validator {
                 
             } else if (recType == 'T') {
                 trFound = true;
-                int trlCount = parseInt(buf, 1, 6);
-                long trlPremCents = parseLong(buf, 6, 18);
-                long trlTaxCents = parseLong(buf, 18, 30);
-                long trlDueCents = parseLong(buf, 30, 42);
+                // T(0) Count(1-5) Prem(6-17) Tax(18-29) Due(30-41)
                 
-                if (count != trlCount) {
-                    System.out.println("COUNT_ERR");
-                    return 1;
-                }
+                // Skip to next line logic managed by outer loop?
+                // Logic above does "while != \n".
+                int startPos = buf.position();
+                while (buf.hasRemaining() && buf.get() != '\n');
+                // startPos points to first char AFTER 'T'.
+                
+                int trlCount = parseInt(buf, startPos, 5);
+                long trlPremCents = parseLong(buf, startPos + 5, 12);
+                long trlTaxCents = parseLong(buf, startPos + 17, 12);
+                long trlDueCents = parseLong(buf, startPos + 29, 12);
+                
+                if (count != trlCount) { System.out.println("COUNT_ERR"); return 1; }
                 
                 if (totalPremCents != trlPremCents || totalTaxCents != trlTaxCents || totalDueCents != trlDueCents) {
                     if (9 < errorLevel) errorLevel = 9;
@@ -247,40 +313,21 @@ public class Validator {
         }
     }
     
-    private static boolean trFound = false;
-    
-    private static int readLine(InputStream in, byte[] buf) throws IOException {
-        int pos = 0;
-        int b;
-        while ((b = in.read()) != -1) {
-            if (b == '\n') break;
-            if (b != '\r') buf[pos++] = (byte) b;
+    // Fast parses. No validation, assumes digits.
+    private static int parseInt(ByteBuffer buf, int offset, int len) {
+        int r = 0;
+        for (int i=0; i<len; i++) {
+            r = r * 10 + (buf.get(offset + i) - '0');
         }
-        return pos;
+        return r;
     }
     
-    private static int parseInt(byte[] buf, int start, int end) {
-        int result = 0;
-        for (int i = start; i < end; i++) {
-            result = result * 10 + (buf[i] - '0');
+    private static long parseLong(ByteBuffer buf, int offset, int len) {
+        long r = 0;
+        for (int i=0; i<len; i++) {
+            r = r * 10L + (buf.get(offset + i) - '0');
         }
-        return result;
-    }
-    
-    private static long parseLong(byte[] buf, int start, int end) {
-        long result = 0;
-        for (int i = start; i < end; i++) {
-            result = result * 10L + (buf[i] - '0');
-        }
-        return result;
-    }
-    
-    private static boolean isNumeric(byte[] buf, int start, int end) {
-        for (int i = start; i < end; i++) {
-            byte b = buf[i];
-            if (b < '0' || b > '9') return false;
-        }
-        return true;
+        return r;
     }
 }
 EOFJAVA

@@ -3,7 +3,7 @@
 ## Task Overview
 1.  **Audit and Fix Legacy COBOL**: You are provided with a legacy COBOL program (`validate.cbl`) that validates insurance premium batch files. **The code is known to have multiple critical bugs and deviations from the specification.** You must strictly audit the code against the "Validation Rules" below, identify all logic errors, and fix them.
 2.  **Migrate to Java**: Once the COBOL logic is verified and fixed, port it to a modern Java 17 application (`com.tbench.insurance.Validator`).
-3.  **Performance Optimization**: The Java implementation must be highly optimized. Its execution time must be **within 1.5x** of the fixed COBOL version when processing large datasets (500k+ records).
+3.  **Performance Optimization**: The Java implementation must be highly optimized. Its execution time must be **within 1.5x** of the fixed COBOL version when processing large datasets (2,000,000+ records).
 
 ## Record Formats (Fixed Width)
 
