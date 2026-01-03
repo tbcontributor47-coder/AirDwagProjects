@@ -56,12 +56,12 @@ Fix the buggy script `/app/reconcile.py` so it:
 ```
 
 ## Critical Requirements
-- **Rounding**: Use banker's rounding (round half to even) for all currency conversions. In Python, this is `ROUND_HALF_EVEN`.
+- **Rounding**: Use banker's rounding (round half to even) for all currency conversions.
 - **Sorting**: Accounts must be sorted by `account_id` using standard ASCII string comparison (case-sensitive).
 - **Deduplication**: Transactions with identical `id`, `amount`, `currency`, AND `timestamp` are duplicates. Keep the first occurrence.
 - **Performance**: Must process 10,000 transactions in under 2 seconds.
 - **Precision**: All USD amounts must have exactly 2 decimal places in the string representation.
-- **JSON Serialization**: Use `json.dumps` with `sort_keys=True` to ensure consistent key ordering.
+- **JSON Serialization**: Ensure all keys in the root JSON object and account objects are in alphabetical order.
 
 ## CLI Usage
 ```bash

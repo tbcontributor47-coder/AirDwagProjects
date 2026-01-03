@@ -9,10 +9,12 @@ from pathlib import Path
 
 def run_reconcile(ledger_data):
     """Helper to run reconcile.py with temporary input file"""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        json.dump(ledger_data, f)
-        temp_path = f.name
-    
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(ledger_data, f)
+            temp_path = f.name
+        
         # Standard container path for evaluation
         reconcile_path = '/app/reconcile.py'
         cmd = [sys.executable, reconcile_path, temp_path]
@@ -24,7 +26,7 @@ def run_reconcile(ledger_data):
         )
         return result.stdout.strip(), result.returncode, result.stderr
     finally:
-        if os.path.exists(temp_path):
+        if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
 
 def parse_output(output_str):
@@ -283,3 +285,39 @@ def test_case_sensitive_sorting_trap():
     data = parse_output(output)
     account_ids = [acc["account_id"] for acc in data["accounts"]]
     assert account_ids == ["A003", "B002", "a001"]
+
+def test_keep_first_occurrence():
+    """Test that the first occurrence of a duplicate transaction is kept (determines account_id)."""
+    ledger = {
+        "exchange_rates": {},
+        "transactions": [
+            {"id": "tx1", "account_id": "ORIGINAL", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00Z"},
+            {"id": "tx1", "account_id": "DUPLICATE", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00Z"}
+        ]
+    }
+    output, code, _ = run_reconcile(ledger)
+    data = parse_output(output)
+    assert data["total_transactions"] == 1
+    assert data["duplicate_count"] == 1
+    # Only ORIGINAL account should have the balance
+    accounts = {acc["account_id"]: acc["balance_usd"] for acc in data["accounts"]}
+    assert "ORIGINAL" in accounts
+    assert accounts["ORIGINAL"] == "100.00"
+    assert "DUPLICATE" not in accounts
+
+def test_timestamp_standardization_variants():
+    """Test that various ISO-8601 UTC formats are standardized and deduplicated."""
+    ledger = {
+        "exchange_rates": {},
+        "transactions": [
+            {"id": "tx1", "account_id": "A1", "amount": "10.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00Z"},
+            {"id": "tx1", "account_id": "A1", "amount": "10.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00+00:00"},
+            {"id": "tx1", "account_id": "A1", "amount": "10.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00.000Z"}
+        ]
+    }
+    output, code, _ = run_reconcile(ledger)
+    data = parse_output(output)
+    # All three represent the same point in time and should collapse to ONE transaction
+    assert data["total_transactions"] == 1
+    assert data["duplicate_count"] == 2
+    assert data["accounts"][0]["balance_usd"] == "10.00"
