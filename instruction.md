@@ -102,12 +102,13 @@ All tests must pass by meeting these specific requirements:
   - `backend-services` job must scrape `localhost:8080`.
   - The `node-exporter` relabeling typo must be corrected to `replacement`.
   - The CloudWatch subscription `filter_pattern` must be explicitly set to an empty string (`""`).
+  - Any Prometheus alert rule using the `rate()` function must use a `[5m]` range vector.
   - Alerts must use `> 0.05` thresholds and have a `1m` duration.
   - Alerts must include the `severity: critical` label.
 - **Grafana Dashboards**:
   - Dashboard JSON must be valid with its title set to `App Metrics`.
   - Panels must use the `Prometheus-Main` datasource.
-  - PromQL expressions for RPS must be functionally correct (e.g., using `rate(...[5m])`).
+  - Every dashboard panel query must contain the exact expression `rate(http_requests_total[5m])`.
   - A template variable named `job` must be present using the `label_values(http_requests_total, job)` query syntax.
 
 ## Constraints
