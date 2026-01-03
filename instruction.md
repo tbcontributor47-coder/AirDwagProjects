@@ -34,13 +34,13 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 **CRITICAL: All output files must adhere to the exact format specified below. These are not examples; they are strict machine-parsable requirements. Any deviation in line count, line length, or label text will result in total failure.**
 
 ### Balanced Report (balanced_report.txt)
-If the batch satisfies all integrity checks, the report must contain **exactly 3 lines**. Each line must be exactly **100 characters** wide (including the labels, padded with trailing spaces).
+If the batch satisfies all integrity checks, the report must contain **exactly 3 lines**, each separated by a system line break (`\n` or `\r\n`). Each line must be exactly **100 characters** wide (including the labels, padded with trailing spaces).
 
 1. `BALANCED REPORT SUMMARY`
 2. `TOTAL COUNT: NNNNN` (where `NNNNN` is a 5-digit zero-padded count of valid transactions)
 3. `TOTAL NET: SNNNNNNNNNNNNNNN` (where `S` is the sign `+` or `-`, followed by 15 digits including 2 implied decimals)
 
-If the batch is rejected (due to trailer mismatch), the report must contain **exactly 1 line** of 100 characters:
+If the batch is rejected (due to trailer mismatch), the report must contain **exactly 1 line** of 100 characters (with no trailing newline required for the final line, but allowed):
 `BATCH REJECTED`
 
 ### High-Value Report (high_value.dat)
@@ -82,3 +82,4 @@ The task is successful if the `reconcile.cbl` is fixed such that:
 1. COBOL arithmetic precision matters—be careful with intermediate results.
 2. The Modulo 97 check can be implemented by treating the Account ID string as a large numeric field.
 3. Check the `OCCURS` clause size in the working storage.
+4. To ensure exact 100-character line widths for reports, consider using `ORGANIZATION IS SEQUENTIAL` instead of `LINE SEQUENTIAL` if your compiler strips trailing spaces on write.

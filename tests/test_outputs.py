@@ -42,9 +42,10 @@ def check_fixed_width(filename, expected_lines=None):
     
     for i, line in enumerate(lines, 1):
         clean = line.replace("\r", "").replace("\n", "")
-        # GnuCOBOL strips trailing spaces in LINE SEQUENTIAL.
-        # We check total length <= 100 and that labels exist.
-        assert len(clean) <= 100, f"{filename} line {i} is {len(clean)} chars, exceeds 100"
+        # The specification requires EXACTLY 100 characters.
+        # Note: Agents using LINE SEQUENTIAL must ensure they preserve trailing spaces if applicable,
+        # otherwise they should use ORGANIZATION IS SEQUENTIAL.
+        assert len(clean) == 100, f"{filename} line {i} is {len(clean)} chars, must be exactly 100"
     return lines
 
 def test_standard_reconciliation():
