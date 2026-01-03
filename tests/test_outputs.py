@@ -80,7 +80,7 @@ def test_large_batch_overflow():
     # Acc: 0000000098 (98 mod 97 = 1)
     for i in range(1000):
         records.append(f"020000000098000000000000100CREF{i:03d}")
-    records.append("0301000+00000000000100000") # 1000 records, +1000.00 net
+    records.append("0301000+000000000100000") # 1000 records, +1000.00 net
     
     generate_input(records)
     
@@ -94,5 +94,11 @@ def test_large_batch_overflow():
 
 def test_formats():
     """Strict check on fixed-width formats."""
-    # Already partially covered, but ensure report labels are exact
-    pass
+    # Verify input.dat has exactly 100 chars per line (+ newline)
+    if os.path.exists("input.dat"):
+        with open("input.dat", "r") as f:
+            for i, line in enumerate(f, 1):
+                # We strip newline but expect 100 or 101 (if \r\n) or 100 if we strip carefully
+                clean = line.replace("\r", "").replace("\n", "")
+                if clean:
+                    assert len(clean) == 100, f"Line {i} is {len(clean)} chars, expected 100"

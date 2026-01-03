@@ -26,18 +26,18 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 ### Trailer Record (Type 03)
 - `RE-TYPE` (01-02): Always "03"
 - `RE-COUNT` (03-07): Total count of Type 02 records
-- `RE-NET-BALANCE` (08-22): Net Balance (Credits - Debits). 13 digits, 2 decimals implied.
-- `FILLER` (23-100)
+- `RE-NET-BALANCE` (08-23): Net Balance (Credits - Debits). 15 digits total (13 integer, 2 decimal), sign is leading separate.
+- `FILLER` (24-100)
 
 ## Output Format
 
 All output files must use **fixed-width** records (100 characters per line, including labels).
 
 ### Balanced Report (balanced_report.txt)
-If the batch is valid, the report must contain:
-1. `BALANCED REPORT SUMMARY` (Line 1)
-2. `TOTAL COUNT: NNNNN` (Line 2, where NNNNN is 5-digit padded count of **valid** transactions)
-3. `TOTAL NET: SNNNNNNNNNNNNNN` (Line 3, where S is sign `+` or `-` and 13 digits for amount with 2 implied decimals)
+If the batch is valid, the report must contain exactly these 3 lines (each 100 characters wide, padded with spaces):
+1. `BALANCED REPORT SUMMARY`
+2. `TOTAL COUNT: NNNNN` (where NNNNN is 5-digit zero-padded count of valid transactions)
+3. `TOTAL NET: SNNNNNNNNNNNNNNN` (where S is sign `+` or `-` and 15 digits for amount with 2 implied decimals)
 
 If the batch is invalid (trailer mismatch), the report must contain exactly:
 `BATCH REJECTED`
