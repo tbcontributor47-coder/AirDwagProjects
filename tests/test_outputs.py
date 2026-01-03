@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 
 def run_reconcile():
@@ -101,8 +100,8 @@ def test_batch_rejection():
     lines = check_fixed_width("balanced_report.txt", expected_lines=1)
     assert "BATCH REJECTED" in lines[0]
 
-def test_trailer_count_mismatch():
-    """Tests that a mismatch in trailer count rejects the batch."""
+def test_batch_rejection_count_mismatch():
+    """Tests that a mismatch in trailer count (RE-COUNT) rejects the batch."""
     records = [
         "01BATCH0000220240103",
         "020000000971000000000050000CREF001",
