@@ -29,24 +29,27 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 - `RE-NET-BALANCE` (08-23): Net Balance (Credits - Debits). 15 digits total (13 integer, 2 decimal), sign is leading separate.
 - `FILLER` (24-100)
 
-## Output Format
+## Mandatory Output Contract
 
-All output files must use **fixed-width** records (100 characters per line, including labels).
+**CRITICAL: All output files must adhere to the exact format specified below. These are not examples; they are strict machine-parsable requirements. Any deviation in line count, line length, or label text will result in total failure.**
 
 ### Balanced Report (balanced_report.txt)
-If the batch is valid, the report must contain exactly these 3 lines (each 100 characters wide, padded with spaces):
-1. `BALANCED REPORT SUMMARY`
-2. `TOTAL COUNT: NNNNN` (where NNNNN is 5-digit zero-padded count of valid transactions)
-3. `TOTAL NET: SNNNNNNNNNNNNNNN` (where S is sign `+` or `-` and 15 digits for amount with 2 implied decimals)
+If the batch satisfies all integrity checks, the report must contain **exactly 3 lines**. Each line must be exactly **100 characters** wide (including the labels, padded with trailing spaces).
 
-If the batch is invalid (trailer mismatch), the report must contain exactly:
+1. `BALANCED REPORT SUMMARY`
+2. `TOTAL COUNT: NNNNN` (where `NNNNN` is a 5-digit zero-padded count of valid transactions)
+3. `TOTAL NET: SNNNNNNNNNNNNNNN` (where `S` is the sign `+` or `-`, followed by 15 digits including 2 implied decimals)
+
+If the batch is rejected (due to trailer mismatch), the report must contain **exactly 1 line** of 100 characters:
 `BATCH REJECTED`
 
 ### High-Value Report (high_value.dat)
-- Contains the full Type 02 record for every valid transaction where the amount is strictly greater than **10,000.00**.
+- **STRICT REQUIREMENT**: Every line must be exactly 100 characters long.
+- Contains the original Type 02 record (the full 100-character line) for every valid transaction where the amount is strictly greater than **10,000.00**.
 
 ### Anomaly Log (anomalies.dat)
-- Contains the full Type 02 record for every transaction that failed the IBAN checksum.
+- **STRICT REQUIREMENT**: Every line must be exactly 100 characters long.
+- Contains the original Type 02 record (the full 100-character line) for every transaction that failed the Modulo 97 checksum.
 
 ## Task
 Fix the `reconcile.cbl` program located in `/app/environment/app/` to correctly implement the following business logic:
@@ -64,9 +67,9 @@ Fix the `reconcile.cbl` program located in `/app/environment/app/` to correctly 
 
 ## Success Criteria
 The task is successful if the `reconcile.cbl` is fixed such that:
-- It produces a `balanced_report.txt` with the correct final statistics.
+- It produces a `balanced_report.txt` with the correct final statistics following the **strict 3-line schema**.
 - It correctly identifies and writes transactions > 10,000.00 to `high_value.dat`.
-- it rejects batches with incorrect trailers.
+- It rejects batches with incorrect trailers by writing `BATCH REJECTED` to the report.
 - It identifies invalid Account IDs (checksum fail) and logs them to `anomalies.dat`.
 - The program compiles and runs without memory errors for batches of up to 1,000 transactions.
 
