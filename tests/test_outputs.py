@@ -3,10 +3,16 @@ import sys
 import subprocess
 
 def test_validate():
+    # Source is copied to /app/environment/app/reconcile.cbl in Dockerfile
+    # We re-compile here to ensure any changes from solve.sh are picked up.
+    print("Compiling reconcile.cbl...")
+    comp = subprocess.run(["cobc", "-x", "-o", "/app/reconcile_app", "/app/environment/app/reconcile.cbl"], capture_output=True, text=True)
+    if comp.returncode != 0:
+        print(f"Compilation failed:\n{comp.stderr}")
+        assert False, "COBOL Compilation failed"
+
     print("Running reconcile_app...")
-    # The app is compiled in the Dockerfile into /app/reconcile_app
-    # We run it here to ensure outputs are generated.
-    # We don't check=True because the baseline is BUGGY and might exit with non-zero.
+    # The app expects input.dat in the CWD. Symlink is created in Dockerfile.
     subprocess.run(["/app/reconcile_app"], capture_output=True)
 
     print("Starting logic validation...")

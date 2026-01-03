@@ -29,6 +29,20 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 - `RE-NET-BALANCE` (08-22): Net Balance (Credits - Debits). 13 digits, 2 decimals implied.
 - `FILLER` (23-100)
 
+## Output Format
+
+### Balanced Report (balanced_report.txt)
+A summary report containing:
+1. A header line: `BALANCED REPORT SUMMARY`
+2. Total valid record count: `TOTAL COUNT: NNNNN` (5-digit padded)
+3. Net balance: `TOTAL NET: SNNNNNNNNNNNNNN` (Sign followed by 13 digits, 2 decimals implied)
+
+### High-Value Report (high_value.dat)
+- Fixed-width records of Type 02 format for all transactions > 10,000.00.
+
+### Anomaly Log (anomalies.dat)
+- Fixed-width records of Type 02 format for all transactions that failed checksum.
+
 ## Task
 Fix the `reconcile.cbl` program located in `/app/environment/app/` to correctly implement the following business logic:
 
