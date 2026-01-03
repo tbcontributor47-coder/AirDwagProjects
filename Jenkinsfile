@@ -149,7 +149,7 @@ echo "===== Running tests against BUGGY baseline (should have failures) ====="
 docker run --rm \
     -v "$TASK_ABS/tests:/mnt/tests" \
     "$IMAGE_NAME" \
-    /bin/bash -c "pip install -q pytest 2>&1 >/dev/null && pytest /mnt/tests/test_outputs.py -vv --tb=short" \
+    /bin/bash -c "bash /mnt/tests/test.sh --junitxml=/mnt/tests/baseline-report.xml" \
     2>&1 | tee logs/baseline-test.log || true
 
 echo ""
@@ -203,8 +203,7 @@ docker run --rm \
             exit 1
         fi
         echo "Re-running tests after fixer"
-        pip install -q pytest 2>&1 >/dev/null
-        pytest /mnt/tests/test_outputs.py -vv --tb=short --junitxml=/mnt/tests/fix-report.xml || true
+        bash /mnt/tests/test.sh --junitxml=/mnt/tests/fix-report.xml && cp reward.txt /mnt/tests/reward.txt || true
     ' \
     2>&1 | tee logs/fix-and-verify.log || true
 

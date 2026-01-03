@@ -25,5 +25,5 @@ timeout_sec = 900
 timeout_sec = 900
 
 [evaluation]
-test_command = "bash tests/test.sh"
-oracle_command = "bash solution/solve.sh && bash tests/test.sh"
+test_command = "bash ../tests/test.sh"
+oracle_command = "bash ../solution/solve.sh && bash ../tests/test.sh"
