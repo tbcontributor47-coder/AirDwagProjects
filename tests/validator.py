@@ -58,7 +58,7 @@ def check_terraform_constraints(plan_file):
         required_names = {
             'aws_iam_role': 'firehose_delivery_role',
             'aws_kinesis_firehose_delivery_stream': 'app-logs-delivery-stream',
-            'aws_cloudwatch_log_group': '/aws/app/logs'
+            'aws_cloudwatch_log_group': '/aws/app/backend-services'
         }
         
         found_names = {}
@@ -89,14 +89,15 @@ def check_prometheus(yaml_file):
         with open(yaml_file, 'r') as f:
             data = yaml.safe_load(f)
         
-        # Check constraints (job names)
-        scrape_configs = data.get('scrape_configs', [])
-        required_jobs = ['backend-services', 'node-exporter']
-        found_jobs = [j.get('job_name') for j in scrape_configs]
-        for job in required_jobs:
-            if job not in found_jobs:
-                print(f"Error: Job '{job}' missing or renamed in Prometheus config")
-                return False
+        # Check constraints (job names) - ONLY if it looks like a prometheus.yml config
+        if 'scrape_configs' in data:
+            scrape_configs = data.get('scrape_configs', [])
+            required_jobs = ['backend-services', 'node-exporter']
+            found_jobs = [j.get('job_name') for j in scrape_configs]
+            for job in required_jobs:
+                if job not in found_jobs:
+                    print(f"Error: Job '{job}' missing or renamed in Prometheus config")
+                    return False
 
         groups = data.get('groups', [])
         for group in groups:

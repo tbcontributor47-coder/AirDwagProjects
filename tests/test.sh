@@ -85,7 +85,7 @@ fi
 # 3. Prometheus Validation
 echo -n "Checking Prometheus Config... "
 cd "$ENV_DIR/prometheus"
-if promtool check config prometheus.yml > /dev/null 2>&1; then
+if promtool check config prometheus.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/validator.py" --check-prometheus prometheus.yml; then
   echo "PASS"
 else
   echo "FAIL (promtool check config)"
