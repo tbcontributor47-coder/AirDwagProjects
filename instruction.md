@@ -51,18 +51,22 @@ Alerts are either not firing or creating false positives.
 Fix all configuration files so that:
 
 1. ✅ Terraform validates and plans successfully
+   - Maintain existing resource names: `firehose_delivery_role`, `app-logs-delivery-stream`, and `/aws/app/backend-services`.
 2. ✅ IAM policies grant correct permissions (least privilege)
    - Firehose role must use `firehose.amazonaws.com` service principal.
    - S3 and CloudWatch permissions must be scoped to specific resource ARNs, not `*`.
+   - The CloudWatch subscription filter must have both `destination_arn` and `role_arn` correctly configured.
 3. ✅ Prometheus configuration is valid (`promtool check config`)
    - `backend-services` must scrape `localhost:8080`.
    - `node-exporter` relabeling must fix the `replacment` typo to `replacement`.
+   - CloudWatch subscription `filter_pattern` must be set to an empty string (`""`).
 4. ✅ PromQL queries return correct results
    - Alerts threshold for `HighErrorRate` must be `> 0.05` for the `5..` status codes.
    - Grafana dashboard panels must use the `Prometheus-Main` datasource.
 5. ✅ Grafana dashboard JSON is valid
    - Dashboard title must be `App Metrics`.
    - RPS panel must use the correct `rate()` expression with `[5m]` interval.
+   - Add a dashboard query variable named `job` using the syntax `label_values(http_requests_total, job)`.
 6. ✅ Alert rules fire at correct thresholds
    - Alerts must have a `severity: critical` label.
    - Alert duration (`for`) must be exactly `1m`.
@@ -84,13 +88,27 @@ environment/
 
 ## Success Criteria
 
-All tests must pass:
-- Terraform validation and planning
-- IAM policy compliance checks
-- Prometheus configuration validation
-- PromQL query correctness
-- Grafana dashboard validation
-- Alert threshold verification
+All tests must pass by meeting these specific requirements:
+
+- **Terraform & Infrastructure**:
+  - `terraform validate` and `terraform plan` must succeed without errors.
+  - Maintain exact resource names: `firehose_delivery_role`, `app-logs-delivery-stream`, and `/aws/app/backend-services`.
+  - The CloudWatch subscription filter must be correctly linked using `destination_arn` and `role_arn`.
+- **IAM (Least Privilege)**:
+  - Firehose role must use the `firehose.amazonaws.com` service principal.
+  - S3 and CloudWatch Logs permissions must be scoped to specific resource ARNs, avoiding `*` wildcards.
+- **Prometheus & Alerts**:
+  - `promtool check config` must pass.
+  - `backend-services` job must scrape `localhost:8080`.
+  - The `node-exporter` relabeling typo must be corrected to `replacement`.
+  - The CloudWatch subscription `filter_pattern` must be explicitly set to an empty string (`""`).
+  - Alerts must use `> 0.05` thresholds and have a `1m` duration.
+  - Alerts must include the `severity: critical` label.
+- **Grafana Dashboards**:
+  - Dashboard JSON must be valid with its title set to `App Metrics`.
+  - Panels must use the `Prometheus-Main` datasource.
+  - PromQL expressions for RPS must be functionally correct (e.g., using `rate(...[5m])`).
+  - A template variable named `job` must be present using the `label_values(http_requests_total, job)` query syntax.
 
 ## Constraints
 

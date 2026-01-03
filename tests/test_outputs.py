@@ -91,7 +91,7 @@ def check_terraform_constraints(plan_file):
                     return False
 
             # Deep Link Logic: Verify Firehose/CloudWatch Integration
-            if r_type == 'aws_cloudwatch_log_subscription_filter':
+            if r_type == 'aws_cloudwatch_log_subscription_filter' and after:
                 found_sub_filter = True
                 change = res['change']
                 a_un = change.get('after_unknown', {})
@@ -213,8 +213,16 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     success = True
-    if args.check_iam and not check_iam(args.check_iam): success = False
-    if args.check_constraints and not check_terraform_constraints(args.check_constraints): success = False
-    if args.check_grafana and not check_grafana(args.check_grafana): success = False
-    if args.check_prometheus and not check_prometheus(args.check_prometheus): success = False
+    if args.check_iam:
+        if not check_iam(args.check_iam):
+            success = False
+    if args.check_constraints:
+        if not check_terraform_constraints(args.check_constraints):
+            success = False
+    if args.check_grafana:
+        if not check_grafana(args.check_grafana):
+            success = False
+    if args.check_prometheus:
+        if not check_prometheus(args.check_prometheus):
+            success = False
     sys.exit(0 if success else 1)

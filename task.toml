@@ -1,6 +1,7 @@
+version = "1.0.0"
+
 [task]
 name = "aws-observability-stack"
-version = "1.0.0"
 category = "software-engineering"
 difficulty = "hard"
 description = "Fix a broken AWS observability stack with monitoring, logging, and alerting issues"
