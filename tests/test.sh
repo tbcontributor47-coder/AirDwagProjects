@@ -14,6 +14,8 @@ elif [ -f "/mnt/tests/test_outputs.py" ]; then
     TEST_FILE="/mnt/tests/test_outputs.py"
 elif [ -f "tests/test_outputs.py" ]; then
     TEST_FILE="tests/test_outputs.py"
+elif [ -f "../tests/test_outputs.py" ]; then
+    TEST_FILE="../tests/test_outputs.py"
 else
     echo "ERROR: test_outputs.py not found!"
     exit 1

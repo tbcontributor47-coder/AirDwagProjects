@@ -1,4 +1,4 @@
-id = "reconcile-ledger-001"
+id = "reconcile_ledger_001"
 version = "1.0.0"
 title = "Multi-Ledger Currency Reconciliation"
 description = "Fix a financial reconciliation engine with currency conversion, deduplication, and strict output formatting bugs"

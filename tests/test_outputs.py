@@ -17,6 +17,9 @@ def run_reconcile(ledger_data):
         
         # Standard container path for evaluation
         reconcile_path = '/app/reconcile.py'
+        if not os.path.exists(reconcile_path):
+            reconcile_path = os.path.join(os.getcwd(), 'reconcile.py')
+            
         cmd = [sys.executable, reconcile_path, temp_path]
         result = subprocess.run(
             cmd,
