@@ -1,0 +1,19 @@
+version = "1.0.0"
+
+[task]
+name = "cobol-banking-engine"
+category = "COBOL"
+difficulty = "hard"
+description = "Fix a COBOL banking reconciliation engine that processes batch transaction files, performs balancing, and identifies high-value fraud patterns."
+
+[environment]
+type = "docker"
+path = "environment"
+
+[scoring]
+test_command = "bash tests/test.sh"
+oracle_command = "bash solution/solve.sh && bash tests/test.sh"
+
+[metadata]
+author = "Antigravity"
+tags = ["cobol", "banking", "finance", "data-processing", "reconciliation"]
