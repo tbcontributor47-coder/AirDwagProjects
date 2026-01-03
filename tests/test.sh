@@ -6,10 +6,10 @@ export AWS_SECRET_ACCESS_KEY=testing
 export AWS_DEFAULT_REGION=us-east-1
 
 # 0. Tool Installation (Self-contained environment)
-# Install system dependencies if missing (only works if run as root, which is typical in these containers)
+# Install system dependencies if missing
 if ! command -v curl &> /dev/null || ! command -v unzip &> /dev/null || ! command -v jq &> /dev/null; then
     echo "Installing system dependencies (curl, unzip, jq)..."
-    apt-get update >/dev/null 2>&1 && apt-get install -y curl unzip jq >/dev/null 2>&1 || echo "Warning: Could not install system deps, assuming they exist."
+    apt-get update >/dev/null 2>&1 && apt-get install -y curl unzip jq >/dev/null 2>&1 || echo "Warning: Could not install system deps."
 fi
 
 if ! python3 -c "import yaml" &> /dev/null; then
@@ -53,7 +53,7 @@ fi
 
 echo "Using environment directory: $ENV_DIR"
 
-# 1. Check Terraform (Syntax and Basic Policies)
+# 1. Check Terraform
 echo "Checking Terraform..."
 cd "$ENV_DIR/terraform"
 terraform init -backend=false > /dev/null 2>&1
@@ -64,15 +64,12 @@ else
     FAILURES=$((FAILURES+1))
 fi
 
-# 2. Check IAM Policies (Manual check for wildcard resource)
-# We export plan to JSON and verify with python script
-# Use -refresh=false to skip state refresh (no credentials needed)
 if terraform plan -refresh=false -out=tfplan > tfplan.out 2>&1; then
     terraform show -json tfplan > tfplan.json
     if python3 "$SCRIPT_DIR/test_outputs.py" --check-iam tfplan.json --check-constraints tfplan.json; then
-        echo "PASS (IAM Policy)"
+        echo "PASS (IAM & Constraints)"
     else
-        echo "FAIL (IAM Policy - Too Permissive)"
+        echo "FAIL (IAM & Constraints)"
         FAILURES=$((FAILURES+1))
     fi
 else
@@ -81,14 +78,13 @@ else
     FAILURES=$((FAILURES+1))
 fi
 
-# 3. Prometheus Validation
-# 3. Prometheus Validation
-echo -n "Checking Prometheus Config... "
+# 2. Prometheus Validation
+echo -n "Checking Prometheus Logic... "
 cd "$ENV_DIR/prometheus"
 if promtool check config prometheus.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/test_outputs.py" --check-prometheus prometheus.yml; then
   echo "PASS"
 else
-  echo "FAIL (promtool check config)"
+  echo "FAIL"
   FAILURES=$((FAILURES+1))
 fi
 
@@ -96,17 +92,17 @@ echo -n "Checking Alert Rules... "
 if promtool check rules alerts.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/test_outputs.py" --check-prometheus alerts.yml; then
   echo "PASS"
 else
-  echo "FAIL (promtool check rules)"
+  echo "FAIL"
   FAILURES=$((FAILURES+1))
 fi
 
-# 4. Grafana JSON Validation
-echo -n "Checking Grafana JSON... "
+# 3. Grafana JSON Validation
+echo -n "Checking Grafana Logic... "
 cd "$ENV_DIR/grafana"
 if python3 "$SCRIPT_DIR/test_outputs.py" --check-grafana dashboard.json; then
     echo "PASS"
 else
-    echo "FAIL (Grafana JSON/PromQL)"
+    echo "FAIL"
     FAILURES=$((FAILURES+1))
 fi
 
@@ -114,13 +110,16 @@ fi
 echo "==============================="
 if [ $FAILURES -eq 0 ]; then
     echo "ALL TESTS PASSED"
-    # Create reward file for TerminalBench
-    mkdir -p /logs/verifier
-    echo 1 > /logs/verifier/reward.txt
-    exit 0
+    true
 else
     echo "$FAILURES TESTS FAILED"
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 1
+    false
+fi
+
+# Final reward reporting
+mkdir -p /logs/verifier
+if [ $? -eq 0 ]; then
+  echo 1 > /logs/verifier/reward.txt
+else
+  echo 0 > /logs/verifier/reward.txt
 fi

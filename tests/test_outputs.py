@@ -1,7 +1,6 @@
 import sys
 import json
 import argparse
-import re
 import yaml
 
 def check_iam(plan_file):
@@ -11,35 +10,55 @@ def check_iam(plan_file):
         
         resources = plan.get('resource_changes', [])
         found_policy = False
+        found_logs_permission = False
+        
         for res in resources:
+            change = res['change']
+            after = change.get('after', {})
+            
+            # 1. Verify AssumeRole Service Principal (Architecture Constraint)
+            if res['type'] == 'aws_iam_role':
+                if after:
+                    policy = json.loads(after.get('assume_role_policy', '{}'))
+                    statements = policy.get('Statement', [])
+                    if not any(s.get('Principal', {}).get('Service') == 'firehose.amazonaws.com' for s in statements):
+                        print("Error: Firehose role missing correct service principal")
+                        return False
+
+            # 2. Verify Policy Contents (Least Privilege)
             if res['type'] == 'aws_iam_role_policy':
                 found_policy = True
-                change = res['change']
-                
-                # Check for "policy" in 'after'. If it's unknown, it may be in 'after_unknown'
-                policy_json = None
-                after = change.get('after', {})
-                if after and 'policy' in after:
-                    policy_json = after['policy']
-                elif 'after_unknown' in change and 'policy' in change['after_unknown']:
-                    print(f"Note: IAM policy for {res['address']} is 'known after apply'. Skipping content validation.")
+                policy_json = after.get('policy')
+                if not policy_json and 'after_unknown' in change and 'policy' in change['after_unknown']:
+                    print(f"Note: Policy for {res['address']} is known after apply. Skipping content verify.")
                     continue
-                else:
-                    return False
                 
                 if policy_json:
                     policy = json.loads(policy_json)
-                    for stmt in policy['Statement']:
-                        # Deep Logic: Resource: "*" in S3 actions is forbidden
+                    for stmt in policy.get('Statement', []):
+                        # Strict S3 scoping
                         if any(act in str(stmt['Action']) for act in ['s3:PutObject', 's3:GetObject']):
-                            if stmt['Resource'] == '*' or stmt['Resource'] == ['*']:
-                                print(f"Error: S3 Policy in {res['address']} contains Resource: '*'")
+                            res_val = stmt.get('Resource', '')
+                            if res_val == '*' or res_val == ['*']:
+                                print(f"Error: S3 action in {res['address']} is not restricted to specific bucket")
                                 return False
                         
-                        # Deep Logic: Must have CloudWatch Logs permissions
+                        # Verify CloudWatch Logs addition
                         if 'logs:PutLogEvents' in str(stmt['Action']):
-                            found_logs = True
-                            
+                            found_logs_permission = True
+                            # Must be scoped to the log group
+                            res_val = str(stmt.get('Resource', ''))
+                            if 'app_logs' not in res_val and 'backend-services' not in res_val:
+                                print(f"Error: logs:PutLogEvents in {res['address']} lacks proper Resource scoping")
+                                return False
+                                
+        if not found_policy:
+            print("Error: No IAM role policy found")
+            return False
+        if not found_logs_permission:
+            print("Error: Missing logs:PutLogEvents permission in Firehose policy")
+            return False
+            
         return True
     except Exception as e:
         print(f"Error parsing IAM plan: {e}")
@@ -59,20 +78,18 @@ def check_terraform_constraints(plan_file):
         
         for res in resources:
             r_type = res['type']
-            if r_type in required_names:
-                after = res['change'].get('after', {})
-                if after and 'name' in after:
-                    if after['name'] != required_names[r_type]:
-                        print(f"Error: Resource {r_type} name changed from '{required_names[r_type]}' to '{after['name']}'")
-                        return False
+            after = res['change'].get('after', {})
+            if r_type in required_names and after:
+                if after.get('name') != required_names[r_type]:
+                    print(f"Error: Resource {r_type} name changed from '{required_names[r_type]}' to '{after.get('name')}'")
+                    return False
 
-            # Deep Logic: CloudWatch Subscription Filter details
-            if r_type == 'aws_cloudwatch_log_subscription_filter':
-                after = res['change'].get('after', {})
-                if after:
-                    if after.get('filter_pattern') != '':
-                        print(f"Error: CloudWatch subscription filter pattern should be empty (fixed), found '{after.get('filter_pattern')}'")
-                        return False
+            # Strict check for Subscription Filter
+            if r_type == 'aws_cloudwatch_log_subscription_filter' and after:
+                # Must fix the filter_pattern to be empty or valid
+                if after.get('filter_pattern') != '':
+                    print("Error: CloudWatch subscription filter pattern not empty/reset")
+                    return False
         return True
     except Exception as e:
         print(f"Error checking Terraform constraints: {e}")
@@ -83,36 +100,37 @@ def check_prometheus(yaml_file):
         with open(yaml_file, 'r') as f:
             data = yaml.safe_load(f)
         
-        # Deep Logic: Scrape targets in main config
+        # 1. Scrape Config Logic
         if 'scrape_configs' in data:
-            configs = data.get('scrape_configs', [])
-            for cfg in configs:
+            for cfg in data.get('scrape_configs', []):
                 if cfg['job_name'] == 'backend-services':
-                    targets = cfg.get('static_configs', [{}])[0].get('targets', [])
-                    if 'localhost:8080' not in targets:
-                        print(f"Error: backend-services target should be localhost:8080, found {targets}")
+                    t = cfg.get('static_configs', [{}])[0].get('targets', [])
+                    if 'localhost:8080' not in t:
+                        print(f"Error: backend-services target wrong: {t}")
                         return False
                 if cfg['job_name'] == 'node-exporter':
-                    # Deep Logic: relabel_configs correctness
-                    rlc = cfg.get('relabel_configs', [])
-                    if not any('replacement' in r for r in rlc):
-                        print("Error: node-exporter missing 'replacement' in relabel_configs (typo fix check)")
+                    rlc = str(cfg.get('relabel_configs', ''))
+                    if 'replacement' not in rlc:
+                        print("Error: node-exporter missing relabel typo fix")
                         return False
 
-        # Deep Logic: Alert Rules
-        groups = data.get('groups', [])
-        for group in groups:
+        # 2. Alert Rule Logic (Threshold & Duration)
+        for group in data.get('groups', []):
             for rule in group.get('rules', []):
                 if 'alert' in rule:
                     expr = rule.get('expr', '')
-                    if 'rate(' in expr and '[5m]' not in expr:
-                        print(f"Error: Alert '{rule['alert']}' PromQL missing [5m] range")
+                    # MUST verify threshold logic
+                    if '> 0.05' not in expr:
+                        print(f"Error: Alert '{rule['alert']}' has wrong threshold/logic: {expr}")
                         return False
-                    if rule.get('for') == '0s':
-                        print(f"Error: Alert '{rule['alert']}' has 0s duration")
+                    if '[5m]' not in expr:
+                        print(f"Error: Alert '{rule['alert']}' missing [5m] range vector")
+                        return False
+                    if rule.get('for') != '1m':
+                        print(f"Error: Alert '{rule['alert']}' must have '1m' duration (found {rule.get('for')})")
                         return False
                     if rule.get('labels', {}).get('severity') != 'critical':
-                        print(f"Error: Alert '{rule['alert']}' missing or wrong severity label")
+                        print(f"Error: Alert '{rule['alert']}' missing critical severity")
                         return False
         return True
     except Exception as e:
@@ -130,16 +148,15 @@ def check_grafana(json_file):
 
         panels = data.get('panels', [])
         for panel in panels:
-            # Deep Logic: Datasource correctness
             if panel.get('datasource') != 'Prometheus-Main':
-                print(f"Error: Panel '{panel.get('title')}' has wrong datasource: {panel.get('datasource')}")
+                print(f"Error: Panel '{panel.get('title')}' uses wrong datasource")
                 return False
             
-            # Deep Logic: PromQL Correctness
             for target in panel.get('targets', []):
                 expr = target.get('expr', '')
-                if 'rate(' in expr and '[5m])' not in expr:
-                    print(f"Error: Invalid PromQL rate expression in panel '{panel.get('title')}': {expr}")
+                # Verify PromQL functional correctness
+                if 'rate(http_requests_total[5m])' not in expr:
+                    print(f"Error: Invalid RPS query in panel '{panel.get('title')}': {expr}")
                     return False
         return True
     except Exception as e:
@@ -148,10 +165,10 @@ def check_grafana(json_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--check-iam', help='Path to terraform plan json')
-    parser.add_argument('--check-grafana', help='Path to grafana dashboard json')
-    parser.add_argument('--check-prometheus', help='Path to prometheus yaml')
-    parser.add_argument('--check-constraints', help='Path to terraform plan json')
+    parser.add_argument('--check-iam', help='Path to plan json')
+    parser.add_argument('--check-grafana', help='Path to grafana json')
+    parser.add_argument('--check-prometheus', help='Path to prometheus/alerts yaml')
+    parser.add_argument('--check-constraints', help='Path to plan json')
     
     args = parser.parse_args()
     success = True
