@@ -51,9 +51,10 @@ Alerts are either not firing or creating false positives.
 Fix all configuration files so that:
 
 1. ✅ Terraform validates and plans successfully
-   - Maintain existing resource names: `firehose_delivery_role`, `app-logs-delivery-stream`, and `/aws/app/backend-services`.
+   - Maintain existing AWS resource names (the `name` attribute values): The IAM role must have `name = "firehose_delivery_role"`, the Firehose stream must have `name = "app-logs-delivery-stream"`, and the CloudWatch log group must have `name = "/aws/app/backend-services"`.
 2. ✅ IAM policies grant correct permissions (least privilege)
-   - Firehose role must use `firehose.amazonaws.com` service principal.
+   - The IAM role's assume role policy must specify `Principal.Service = "firehose.amazonaws.com"` (exactly this value).
+   - The IAM role resource must have `name = "firehose_delivery_role"` (exactly this value as the AWS resource name).
    - S3 and CloudWatch permissions must be scoped to specific resource ARNs, not `*`.
    - The CloudWatch subscription filter must have both `destination_arn` and `role_arn` correctly configured.
 3. ✅ Prometheus configuration is valid (`promtool check config`)
@@ -92,10 +93,11 @@ All tests must pass by meeting these specific requirements:
 
 - **Terraform & Infrastructure**:
   - `terraform validate` and `terraform plan` must succeed without errors.
-  - Maintain exact resource names: `firehose_delivery_role`, `app-logs-delivery-stream`, and `/aws/app/backend-services`.
+  - Maintain exact AWS resource names (the `name` attribute values): IAM role `name = "firehose_delivery_role"`, Firehose stream `name = "app-logs-delivery-stream"`, and CloudWatch log group `name = "/aws/app/backend-services"`.
   - The CloudWatch subscription filter must be correctly linked using `destination_arn` and `role_arn`.
 - **IAM (Least Privilege)**:
-  - Firehose role must use the `firehose.amazonaws.com` service principal.
+  - The IAM role resource must have exactly `name = "firehose_delivery_role"` as its AWS resource name.
+  - The IAM role's assume role policy must use exactly `Principal.Service = "firehose.amazonaws.com"` (no variations).
   - S3 and CloudWatch Logs permissions must be scoped to specific resource ARNs, avoiding `*` wildcards.
 - **Prometheus & Alerts**:
   - `promtool check config` must pass.
