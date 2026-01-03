@@ -203,7 +203,7 @@ docker run --rm \
             exit 1
         fi
         echo "Re-running tests after fixer"
-        bash /mnt/tests/test.sh --junitxml=/mnt/tests/fix-report.xml && cp reward.txt /mnt/tests/reward.txt || true
+        bash /mnt/tests/test.sh --junitxml=/mnt/tests/fix-report.xml && cp /logs/verifier/reward.txt /mnt/tests/reward.txt || true
     ' \
     2>&1 | tee logs/fix-and-verify.log || true
 
