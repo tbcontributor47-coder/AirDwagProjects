@@ -1,5 +1,5 @@
 #!/bin/bash
-# Oracle solution for Banking Reconciliation Engine - Final Standardized Version
+# Oracle solution for Banking Reconciliation Engine - Final Robust Version
 
 APP_DIR="environment/app"
 mkdir -p $APP_DIR
@@ -146,7 +146,8 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
            
            COMPUTE WS-CALC-NET = WS-TOTAL-CREDITS - WS-TOTAL-DEBITS
            
-           IF WS-CALC-NET NOT = WS-TR-AMT OR WS-FILE-COUNT NOT = WS-TR-CNT
+           IF WS-CALC-NET NOT = WS-TR-AMT 
+               OR WS-FILE-COUNT NOT = WS-TR-CNT
                MOVE 'Y' TO WS-REJECTED
            END-IF.
 
