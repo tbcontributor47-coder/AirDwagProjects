@@ -1,4 +1,5 @@
 import json
+import sys
 import subprocess
 import tempfile
 import os
@@ -12,9 +13,9 @@ def run_reconcile(ledger_data):
         json.dump(ledger_data, f)
         temp_path = f.name
     
-    try:
-        # Assuming app is in /app inside the container
-        cmd = ['python3', '/app/reconcile.py', temp_path]
+        # Standard container path for evaluation
+        reconcile_path = '/app/reconcile.py'
+        cmd = [sys.executable, reconcile_path, temp_path]
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -78,6 +79,33 @@ def test_bankers_rounding():
     balances = {acc["account_id"]: acc["balance_usd"] for acc in data["accounts"]}
     assert balances["A001"] == "10.12"
     assert balances["A002"] == "10.14"
+
+def test_missing_exchange_rate_default():
+    """Test that missing exchange rate defaults to 1.0."""
+    ledger = {
+        "exchange_rates": {}, # No EUR rate provided
+        "transactions": [
+            {"id": "tx1", "account_id": "A001", "amount": "100.00", "currency": "EUR", "timestamp": "2024-01-01T12:00:00Z"}
+        ]
+    }
+    output, code, _ = run_reconcile(ledger)
+    data = parse_output(output)
+    assert data["accounts"][0]["balance_usd"] == "100.00"
+
+def test_timestamp_standardization_z():
+    """Test that timestamps with +00:00 are recognized as duplicates of Z."""
+    ledger = {
+        "exchange_rates": {},
+        "transactions": [
+            {"id": "tx1", "account_id": "A001", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00Z"},
+            {"id": "tx1", "account_id": "A001", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T12:00:00+00:00"}
+        ]
+    }
+    output, code, _ = run_reconcile(ledger)
+    data = parse_output(output)
+    # They refer to the same point in time, so they SHOULD be deduplicated if standardization works
+    assert data["duplicate_count"] == 1
+    assert data["total_transactions"] == 1
 
 def test_duplicate_detection():
     """Test deduplication requiring exact match of ID, amount, currency, AND timestamp."""
@@ -143,12 +171,22 @@ def test_json_key_order():
         ]
     }
     output, code, _ = run_reconcile(ledger)
-    # Check that keys are in alphabetical order in the raw output
     try:
-        keys = list(json.loads(output).keys())
-        assert keys == sorted(keys)
+        # Check root keys
+        root_data = json.loads(output)
+        root_keys = list(root_data.keys())
+        assert root_keys == sorted(root_keys), f"Root keys not sorted: {root_keys}"
+        
+        # Check account object keys
+        if root_data["accounts"]:
+            account_keys = list(root_data["accounts"][0].keys())
+            assert account_keys == sorted(account_keys), f"Account keys not sorted: {account_keys}"
+            
+        # Check processing_time_ms is integer
+        assert isinstance(root_data["processing_time_ms"], int), "processing_time_ms must be an integer"
+        
     except Exception as e:
-        pytest.fail(f"Key ordering check failed: {e}")
+        pytest.fail(f"Key ordering or type check failed: {e}")
 
 def test_multiple_transactions_same_account():
     """Test aggregation of multiple transactions for the same account."""
@@ -192,9 +230,9 @@ def test_mixed_currencies():
     assert data["accounts"][0]["balance_usd"] == "199.00"
 
 def test_performance_large_dataset():
-    """Test performance constraint - 5000 records must process in < 2 seconds."""
+    """Test performance constraint - 10,000 records must process in < 2 seconds."""
     transactions = []
-    for i in range(5000):
+    for i in range(10000):
         transactions.append({
             "id": f"tx{i}",
             "account_id": f"A{i % 100:03d}",
@@ -215,19 +253,21 @@ def test_performance_large_dataset():
     assert code == 0
     assert elapsed < 2.0
     data = parse_output(output)
-    assert data["total_transactions"] == 5000
+    assert data["total_transactions"] == 10000
 
 def test_decimal_precision_edge():
-    """Test precision rounding to 2 decimal places using Banker's rounding on edge case."""
+    """Test precision rounding to 2 decimal places using Banker's rounding on edge case.
+    100.125 should round to 100.12 (nearest even).
+    """
     ledger = {
-        "exchange_rates": {"EUR": 1.18567},
+        "exchange_rates": {"EUR": 1.0},
         "transactions": [
-            {"id": "tx1", "account_id": "A001", "amount": "99.99", "currency": "EUR", "timestamp": "2024-01-01T12:00:00Z"}
+            {"id": "tx1", "account_id": "A001", "amount": "100.125", "currency": "EUR", "timestamp": "2024-01-01T12:00:00Z"}
         ]
     }
     output, code, _ = run_reconcile(ledger)
     data = parse_output(output)
-    assert data["accounts"][0]["balance_usd"] == "118.55"
+    assert data["accounts"][0]["balance_usd"] == "100.12"
 
 def test_case_sensitive_sorting_trap():
     """Test case-sensitive ASCII sorting (A < B < a)."""

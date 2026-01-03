@@ -2,6 +2,11 @@
 # Reconcile Ledger Test Runner
 set -e
 
+# Harbor Compliance: Install test-only dependencies at runtime
+apt-get update && apt-get install -y curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="/root/.local/bin:$PATH"
+
 # Search for test_outputs.py in absolute paths first (Harbor style)
 if [ -f "/tests/test_outputs.py" ]; then
     TEST_FILE="/tests/test_outputs.py"
@@ -17,7 +22,7 @@ fi
 echo "Running tests from $TEST_FILE..."
 set +e
 
-# Run pytest using pre-installed uv
+# Run pytest using runtime-installed uv
 uvx \
   --python 3.11 \
   --with pytest==8.4.1 \

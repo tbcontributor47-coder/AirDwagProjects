@@ -1,8 +1,3 @@
-#!/bin/bash
-set -eu
-
-# Apply the fixed solution to the target application path
-cat <<'EOF' > reconcile.py
 #!/usr/bin/env python3
 import json
 import sys
@@ -98,6 +93,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-EOF
-
-chmod +x reconcile.py
