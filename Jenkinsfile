@@ -1,36 +1,43 @@
 pipeline {
     agent {
-        docker {
-            image "gnucobol:latest" // Assuming a standard GnuCOBOL image
-            args "-v ${WORKSPACE}:/app -w /app"
-        }
+        label 'Linux-01'
     }
 
     environment {
-        TASK_NAME = "cobol-banking-engine"
+        TASK_PATH = 'cobol-banking-engine'
     }
 
     stages {
         stage('Preflight') {
             steps {
-                sh 'echo "Checking environment for ${TASK_NAME}..."'
-                sh 'python3 --version'
-                sh 'cobc --version'
+                sh 'echo "Node: $(hostname)"'
             }
         }
 
         stage('Baseline Test (Buggy)') {
             steps {
-                sh 'echo "Running baseline test (should fail logic checks)..."'
-                sh 'bash tests/test.sh || true'
+                sh '''#!/usr/bin/env bash
+                set -euo pipefail
+                TASK_ABS="$WORKSPACE/$TASK_PATH"
+                IMAGE_NAME="cobol-banking:baseline"
+                docker build -f "$TASK_ABS/environment/Dockerfile" -t "$IMAGE_NAME" "$TASK_ABS/environment"
+                docker run --rm -v "$TASK_ABS/tests:/app/tests" "$IMAGE_NAME" /bin/bash -c "bash /app/tests/test.sh" || true
+                '''
             }
         }
 
         stage('Fix and Verify') {
             steps {
-                sh 'echo "Applying solution and verifying..."'
-                sh 'bash solution/solve.sh'
-                sh 'bash tests/test.sh'
+                sh '''#!/usr/bin/env bash
+                set -euo pipefail
+                TASK_ABS="$WORKSPACE/$TASK_PATH"
+                IMAGE_NAME="cobol-banking:baseline"
+                docker run --rm \
+                    -v "$TASK_ABS/tests:/app/tests" \
+                    -v "$TASK_ABS/solution:/mnt/solution:ro" \
+                    "$IMAGE_NAME" \
+                    /bin/bash -c "bash /mnt/solution/solve.sh && bash /app/tests/test.sh"
+                '''
             }
         }
     }
