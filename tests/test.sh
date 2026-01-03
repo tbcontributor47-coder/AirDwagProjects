@@ -6,6 +6,12 @@ export AWS_SECRET_ACCESS_KEY=testing
 export AWS_DEFAULT_REGION=us-east-1
 
 # 0. Tool Installation (Self-contained environment)
+# Install system dependencies if missing (only works if run as root, which is typical in these containers)
+if ! command -v curl &> /dev/null || ! command -v unzip &> /dev/null || ! command -v jq &> /dev/null; then
+    echo "Installing system dependencies (curl, unzip, jq)..."
+    apt-get update >/dev/null 2>&1 && apt-get install -y curl unzip jq >/dev/null 2>&1 || echo "Warning: Could not install system deps, assuming they exist."
+fi
+
 if ! python3 -c "import yaml" &> /dev/null; then
     echo "Installing pyyaml..."
     pip install pyyaml==6.0.1 >/dev/null 2>&1
@@ -63,7 +69,7 @@ fi
 # Use -refresh=false to skip state refresh (no credentials needed)
 if terraform plan -refresh=false -out=tfplan > tfplan.out 2>&1; then
     terraform show -json tfplan > tfplan.json
-    if python3 "$SCRIPT_DIR/validator.py" --check-iam tfplan.json; then
+    if python3 "$SCRIPT_DIR/validator.py" --check-iam tfplan.json --check-constraints tfplan.json; then
         echo "PASS (IAM Policy)"
     else
         echo "FAIL (IAM Policy - Too Permissive)"
