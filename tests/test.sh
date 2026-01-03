@@ -69,7 +69,7 @@ fi
 # Use -refresh=false to skip state refresh (no credentials needed)
 if terraform plan -refresh=false -out=tfplan > tfplan.out 2>&1; then
     terraform show -json tfplan > tfplan.json
-    if python3 "$SCRIPT_DIR/validator.py" --check-iam tfplan.json --check-constraints tfplan.json; then
+    if python3 "$SCRIPT_DIR/test_outputs.py" --check-iam tfplan.json --check-constraints tfplan.json; then
         echo "PASS (IAM Policy)"
     else
         echo "FAIL (IAM Policy - Too Permissive)"
@@ -85,7 +85,7 @@ fi
 # 3. Prometheus Validation
 echo -n "Checking Prometheus Config... "
 cd "$ENV_DIR/prometheus"
-if promtool check config prometheus.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/validator.py" --check-prometheus prometheus.yml; then
+if promtool check config prometheus.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/test_outputs.py" --check-prometheus prometheus.yml; then
   echo "PASS"
 else
   echo "FAIL (promtool check config)"
@@ -93,7 +93,7 @@ else
 fi
 
 echo -n "Checking Alert Rules... "
-if promtool check rules alerts.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/validator.py" --check-prometheus alerts.yml; then
+if promtool check rules alerts.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/test_outputs.py" --check-prometheus alerts.yml; then
   echo "PASS"
 else
   echo "FAIL (promtool check rules)"
@@ -103,7 +103,7 @@ fi
 # 4. Grafana JSON Validation
 echo -n "Checking Grafana JSON... "
 cd "$ENV_DIR/grafana"
-if python3 "$SCRIPT_DIR/validator.py" --check-grafana dashboard.json; then
+if python3 "$SCRIPT_DIR/test_outputs.py" --check-grafana dashboard.json; then
     echo "PASS"
 else
     echo "FAIL (Grafana JSON/PromQL)"
