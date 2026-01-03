@@ -31,26 +31,36 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 
 ## Output Format
 
+All output files must use **fixed-width** records (100 characters per line, including labels).
+
 ### Balanced Report (balanced_report.txt)
-A summary report containing:
-1. A header line: `BALANCED REPORT SUMMARY`
-2. Total valid record count: `TOTAL COUNT: NNNNN` (5-digit padded)
-3. Net balance: `TOTAL NET: SNNNNNNNNNNNNNN` (Sign followed by 13 digits, 2 decimals implied)
+If the batch is valid, the report must contain:
+1. `BALANCED REPORT SUMMARY` (Line 1)
+2. `TOTAL COUNT: NNNNN` (Line 2, where NNNNN is 5-digit padded count of **valid** transactions)
+3. `TOTAL NET: SNNNNNNNNNNNNNN` (Line 3, where S is sign `+` or `-` and 13 digits for amount with 2 implied decimals)
+
+If the batch is invalid (trailer mismatch), the report must contain exactly:
+`BATCH REJECTED`
 
 ### High-Value Report (high_value.dat)
-- Fixed-width records of Type 02 format for all transactions > 10,000.00.
+- Contains the full Type 02 record for every valid transaction where the amount is strictly greater than **10,000.00**.
 
 ### Anomaly Log (anomalies.dat)
-- Fixed-width records of Type 02 format for all transactions that failed checksum.
+- Contains the full Type 02 record for every transaction that failed the IBAN checksum.
 
 ## Task
 Fix the `reconcile.cbl` program located in `/app/environment/app/` to correctly implement the following business logic:
 
-1.  **Correct Math**: Net Balance = Total Credits - Total Debits.
-2.  **Trailer Validation**: If the calculated record count or net balance does not match the trailer, the program must output "BATCH REJECTED" and stop.
-3.  **High-Value Fraud Detection**: Any transaction exceeding **10,000.00** must be written to a special report file `high_value.dat`.
-4.  **IBAN Checksum**: Implement a basic Modulo 97 check on Account IDs. A valid Account ID `N` must satisfy `N mod 97 = 1`. If invalid, the transaction must be skipped and logged in `anomalies.dat`.
-5.  **Efficiency and Stability**: Ensure the program can handle at least 1,000 transactions without array overflows.
+
+1.  **Transaction Processing**:
+    -   Parse Type 02 records.
+    -   Validate the Account ID using Modulo 97 (Valid if `ID mod 97 = 1`).
+    -   Calculate the Net Balance as `Total Credits - Total Debits`.
+    -   Support up to **1,000** transactions in a single batch without memory overflow.
+2.  **Batch Integrity**:
+    -   Verify that the total count of Type 02 records (valid and invalid) matches `RE-COUNT` in the Type 03 trailer.
+    -   Verify that the calculated Net Balance matches `RE-NET-BALANCE` in the Type 03 trailer.
+    -   If either check fails, reject the entire batch by writing `BATCH REJECTED` to the report.
 
 ## Success Criteria
 The task is successful if the `reconcile.cbl` is fixed such that:

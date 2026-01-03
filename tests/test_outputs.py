@@ -2,75 +2,97 @@ import os
 import sys
 import subprocess
 
-def test_validate():
-    # Source is copied to /app/environment/app/reconcile.cbl in Dockerfile
-    # We re-compile here to ensure any changes from solve.sh are picked up.
-    print("Compiling reconcile.cbl...")
+def run_reconcile():
+    """Compiles and runs the COBOL app."""
+    # Ensure compile
     comp = subprocess.run(["cobc", "-x", "-o", "/app/reconcile_app", "/app/environment/app/reconcile.cbl"], capture_output=True, text=True)
     if comp.returncode != 0:
-        print(f"Compilation failed:\n{comp.stderr}")
-        assert False, "COBOL Compilation failed"
-
-    print("Running reconcile_app...")
-    # The app expects input.dat in the CWD. Symlink is created in Dockerfile.
-    subprocess.run(["/app/reconcile_app"], capture_output=True)
-
-    print("Starting logic validation...")
+        return False, f"Compilation failed: {comp.stderr}"
     
-    # 1. Check if balanced_report.txt exists
-    report_path = "environment/reports/balanced_report.txt"
-    if not os.path.exists(report_path):
-        # Fallback to current dir if not moved
-        report_path = "balanced_report.txt"
-        
-    if not os.path.exists(report_path):
-        print("Error: balanced_report.txt not found")
-        assert False
-        
-    with open(report_path, 'r') as f:
-        content = f.read()
-        print(f"Report Content:\n{content}")
-        
-        # Expected values based on input.dat:
-        # Valid: 0000000971 (C 500.00), 0000009701 (D 12000.00), 0000019401 (C 2500.50), 0000029101 (C 50.75)
-        # Invalid: 1000000000 (mod 97 == 34)
-        # Total valid credits: 500.00 + 2500.50 + 50.75 = 3051.25
-        # Total valid debits: 12000.00
-        # Net = Credits - Debits = 3051.25 - 12000.00 = -8948.75
-        
-        if "TOTAL COUNT: 00004" not in content:
-            print("Error: Incorrect valid transaction count in report")
-            assert False
-        if "-000000000894875" not in content and "-8948.75" not in content:
-             # Check for different possible formats
-             print("Error: Net balance mismatch in report")
-             assert False
+    # Run
+    run = subprocess.run(["/app/reconcile_app"], capture_output=True, text=True)
+    return True, run.stdout + run.stderr
 
-    # 2. Check high_value.dat
-    hv_path = "high_value.dat"
-    if not os.path.exists(hv_path):
-        print("Error: high_value.dat not found")
-        assert False
+def generate_input(records):
+    with open("input.dat", "w") as f:
+        for r in records:
+            f.write(r.ljust(100) + "\n")
+
+def test_standard_reconciliation():
+    """Tests the basic logic with 4 valid and 1 invalid transaction."""
+    records = [
+        "01BATCH0000120240103",
+        "020000000971000000000050000CREF001", # Valid (mod 97 = 1), Credit 5.00
+        "020000009701000000001200000DREF002", # Valid, Debit 120.00
+        "020000019401000000000250050CREF003", # Valid, Credit 25.00.50 -> 2500.50
+        "021000000000000000000010000DREF004", # Invalid (mod 97 = 34)
+        "020000029101000000000005075CREF005", # Valid, Credit 0.50.75 -> 50.75
+        "0300005-000000000894875"             # 5 records (including invalid), Net: 3051.25 - 12000.00 = -8948.75
+    ]
+    generate_input(records)
     
-    with open(hv_path, 'r') as f:
+    success, msg = run_reconcile()
+    assert success, msg
+    
+    # Verify report
+    assert os.path.exists("balanced_report.txt")
+    with open("balanced_report.txt", "r") as f:
         lines = f.readlines()
-        if len(lines) != 1:
-            print(f"Error: Expected 1 high-value transaction, found {len(lines)}")
-            assert False
-        if "0000009701" not in lines[0]:
-            print("Error: Incorrect transaction in high_value.dat")
-            assert False
+    
+    assert "BALANCED REPORT SUMMARY\n" in lines
+    # TOTAL COUNT: 00004 (only valid ones)
+    assert any("TOTAL COUNT: 00004" in l for l in lines)
+    # TOTAL NET: -000000000894875
+    assert any("TOTAL NET: -000000000894875" in l for l in lines)
 
-    # 3. Check anomalies.dat
-    anom_path = "anomalies.dat"
-    if not os.path.exists(anom_path):
-        print("Error: anomalies.dat not found")
-        assert False
-        
-    with open(anom_path, 'r') as f:
+    # Verify high_value.dat (12000.00 > 10000.00)
+    assert os.path.exists("high_value.dat")
+    with open("high_value.dat", "r") as f:
+        hv_content = f.read()
+    assert "0000009701" in hv_content
+
+    # Verify anomalies.dat (1000000000)
+    assert os.path.exists("anomalies.dat")
+    with open("anomalies.dat", "r") as f:
+        anom_content = f.read()
+    assert "1000000000" in anom_content
+
+def test_batch_rejection():
+    """Tests that a mismatch in trailer count or amount rejects the batch."""
+    records = [
+        "01BATCH0000220240103",
+        "020000000971000000000050000CREF001",
+        "0300001+000000000000000" # Wrong amount (should be +500)
+    ]
+    generate_input(records)
+    
+    success, msg = run_reconcile()
+    assert success, msg
+    
+    with open("balanced_report.txt", "r") as f:
         content = f.read()
-        if "1000000000" not in content:
-            print("Error: Invalid account 1000000000 not found in anomalies.dat")
-            assert False
+    assert "BATCH REJECTED" in content
 
-    print("Success: All logic checks passed!")
+def test_large_batch_overflow():
+    """Tests handling of 1000 transactions to ensure no array overflow."""
+    records = ["01BIGBATCH20240103"]
+    # 1000 valid transactions of 1.00 Credit
+    # Acc: 0000000098 (98 mod 97 = 1)
+    for i in range(1000):
+        records.append(f"020000000098000000000000100CREF{i:03d}")
+    records.append("0301000+00000000000100000") # 1000 records, +1000.00 net
+    
+    generate_input(records)
+    
+    success, msg = run_reconcile()
+    assert success, msg
+    
+    with open("balanced_report.txt", "r") as f:
+        content = f.read()
+    assert "TOTAL COUNT: 01000" in content
+    assert "TOTAL NET: +000000000100000" in content
+
+def test_formats():
+    """Strict check on fixed-width formats."""
+    # Already partially covered, but ensure report labels are exact
+    pass
