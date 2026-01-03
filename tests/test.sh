@@ -31,15 +31,31 @@ fi
 echo "=== Running Configuration Tests ==="
 FAILURES=0
 
-# 1. Terraform Validation
-echo -n "Checking Terraform... "
-cd /app/environment/terraform
-terraform init -backend=false > /dev/null 2>&1
-if terraform validate > /dev/null; then
-  echo "PASS"
+# Find environment directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TASK_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Detect environment directory
+if [ -d "$TASK_ROOT/environment" ]; then
+    ENV_DIR="$TASK_ROOT/environment"
+elif [ -d "/app/environment" ]; then
+    ENV_DIR="/app/environment"
 else
-  echo "FAIL (terraform validate)"
-  FAILURES=$((FAILURES+1))
+    echo "ERROR: Could not find environment directory"
+    exit 1
+fi
+
+echo "Using environment directory: $ENV_DIR"
+
+# 1. Check Terraform (Syntax and Basic Policies)
+echo "Checking Terraform..."
+cd "$ENV_DIR/terraform"
+terraform init -backend=false > /dev/null 2>&1
+if terraform validate; then
+    echo "PASS (terraform validate)"
+else
+    echo "FAIL (terraform validate)"
+    FAILURES=$((FAILURES+1))
 fi
 
 # 2. Check IAM Policies (Manual check for wildcard resource)
@@ -47,7 +63,7 @@ fi
 # Use -refresh=false to skip state refresh (no credentials needed)
 if terraform plan -refresh=false -out=tfplan > tfplan.out 2>&1; then
     terraform show -json tfplan > tfplan.json
-    if python3 ../../tests/validator.py --check-iam tfplan.json; then
+    if python3 "$SCRIPT_DIR/validator.py" --check-iam tfplan.json; then
         echo "PASS (IAM Policy)"
     else
         echo "FAIL (IAM Policy - Too Permissive)"
@@ -60,8 +76,9 @@ else
 fi
 
 # 3. Prometheus Validation
+# 3. Prometheus Validation
 echo -n "Checking Prometheus Config... "
-cd ../prometheus
+cd "$ENV_DIR/prometheus"
 if promtool check config prometheus.yml > /dev/null 2>&1; then
   echo "PASS"
 else
@@ -70,7 +87,7 @@ else
 fi
 
 echo -n "Checking Alert Rules... "
-if promtool check rules alerts.yml > /dev/null 2>&1 && python3 ../../tests/validator.py --check-prometheus alerts.yml; then
+if promtool check rules alerts.yml > /dev/null 2>&1 && python3 "$SCRIPT_DIR/validator.py" --check-prometheus alerts.yml; then
   echo "PASS"
 else
   echo "FAIL (promtool check rules)"
@@ -79,8 +96,8 @@ fi
 
 # 4. Grafana JSON Validation
 echo -n "Checking Grafana JSON... "
-cd ../grafana
-if python3 ../../tests/validator.py --check-grafana dashboard.json; then
+cd "$ENV_DIR/grafana"
+if python3 "$SCRIPT_DIR/validator.py" --check-grafana dashboard.json; then
     echo "PASS"
 else
     echo "FAIL (Grafana JSON/PromQL)"

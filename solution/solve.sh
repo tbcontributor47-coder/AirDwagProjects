@@ -1,15 +1,27 @@
 #!/bin/bash
+set -euo pipefail
 
-# This script applies the fixes to the buggy configuration files
-# using cat to ensure exact content and avoid sed regex issues.
+# This script applies the fixes to the buggy configuration files.
+# It uses paths relative to the task root for better portability.
 
 echo "Applying fixes..."
 
-# Ensure we are in the correct directory or use absolute paths
-# Jenkins maps the task to /app
+# Detect environment directory
+if [ -d "environment" ]; then
+    ENV_DIR="environment"
+elif [ -d "../environment" ]; then
+    ENV_DIR="../environment"
+elif [ -d "/app/environment" ]; then
+    ENV_DIR="/app/environment"
+else
+    echo "ERROR: Could not find environment directory"
+    exit 1
+fi
+
+echo "Using environment directory: $ENV_DIR"
 
 # 1. Fix Terraform IAM
-cat <<'EOF' > /app/environment/terraform/iam.tf
+cat <<EOF > "$ENV_DIR/terraform/iam.tf"
 provider "aws" {
   region                      = "us-east-1"
   skip_credentials_validation = true
@@ -53,7 +65,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
         ]
         Resource = [
           aws_s3_bucket.log_bucket.arn,
-          "${aws_s3_bucket.log_bucket.arn}/*"
+          "\${aws_s3_bucket.log_bucket.arn}/*"
         ]
       },
       {
@@ -62,7 +74,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
+        Resource = "\${aws_cloudwatch_log_group.app_logs.arn}:*"
       },
       {
           Effect = "Allow",
@@ -80,7 +92,7 @@ resource "aws_iam_role_policy" "firehose_policy" {
 EOF
 
 # 2. Fix Firehose
-cat <<'EOF' > /app/environment/terraform/firehose.tf
+cat <<EOF > "$ENV_DIR/terraform/firehose.tf"
 resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
   name        = "app-logs-delivery-stream"
   destination = "extended_s3"
@@ -89,7 +101,6 @@ resource "aws_kinesis_firehose_delivery_stream" "log_stream" {
     role_arn   = aws_iam_role.firehose_role.arn
     bucket_arn = aws_s3_bucket.log_bucket.arn
     
-    # Note: extended_s3_configuration uses 'buffering_size' and 'buffering_interval'
     buffering_size     = 5
     buffering_interval = 60
   }
@@ -101,17 +112,18 @@ resource "aws_s3_bucket" "log_bucket" {
 EOF
 
 # 3. Fix CloudWatch Filter
-sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' /app/environment/terraform/cloudwatch.tf
+sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' "$ENV_DIR/terraform/cloudwatch.tf"
 
 # 4. Fix Prometheus Config
-sed -i "s/'localhost:9090'/'localhost:8080'/" /app/environment/prometheus/prometheus.yml
-sed -i 's/replacment/replacement/' /app/environment/prometheus/prometheus.yml
+sed -i "s/'localhost:9090'/'localhost:8080'/" "$ENV_DIR/prometheus/prometheus.yml"
+sed -i 's/replacment/replacement/' "$ENV_DIR/prometheus/prometheus.yml"
 
 # 5. Fix Alert Rules
-sed -i 's/rate(http_requests_total{status=~"5.."}\[])/rate(http_requests_total{status=~"5.."}[5m])/' /app/environment/prometheus/alerts.yml
-sed -i 's/for: 0s/for: 1m/' /app/environment/prometheus/alerts.yml
+# More robust matches for the syntax errors
+sed -i 's/\[\]/\[5m\]/g' "$ENV_DIR/prometheus/alerts.yml"
+sed -i 's/for: 0s/for: 1m/' "$ENV_DIR/prometheus/alerts.yml"
 
 # 6. Fix Grafana Dashboard
-sed -i 's/rate(http_requests_total\[5m/rate(http_requests_total[5m])/' /app/environment/grafana/dashboard.json
+sed -i 's/rate(http_requests_total\[5m/rate(http_requests_total[5m])/' "$ENV_DIR/grafana/dashboard.json"
 
 echo "Fixes applied!"
