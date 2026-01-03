@@ -1,0 +1,45 @@
+{
+    "exchange_rates": {
+        "EUR": 1.18,
+        "GBP": 1.38,
+        "JPY": 0.0091,
+        "CHF": 1.12
+    },
+    "transactions": [
+        {
+            "id": "tx001",
+            "account_id": "ACC-01",
+            "amount": "100.50",
+            "currency": "USD",
+            "timestamp": "2024-01-15T10:30:00Z"
+        },
+        {
+            "id": "tx002",
+            "account_id": "ACC-02",
+            "amount": "50.00",
+            "currency": "EUR",
+            "timestamp": "2024-01-15T11:00:00Z"
+        },
+        {
+            "id": "tx003",
+            "account_id": "ACC-01",
+            "amount": "-25.00",
+            "currency": "USD",
+            "timestamp": "2024-01-15T12:00:00Z"
+        },
+        {
+            "id": "tx002",
+            "account_id": "ACC-02",
+            "amount": "50.00",
+            "currency": "EUR",
+            "timestamp": "2024-01-15T11:00:00Z"
+        },
+        {
+            "id": "tx004",
+            "account_id": "ACC-03",
+            "amount": "10.125",
+            "currency": "USD",
+            "timestamp": "2024-01-15T13:00:00Z"
+        }
+    ]
+}

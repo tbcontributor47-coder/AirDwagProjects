@@ -1,0 +1,35 @@
+id = "reconcile-ledger-001"
+version = "1.0.0"
+title = "Multi-Ledger Currency Reconciliation"
+description = "Fix a financial reconciliation engine with currency conversion, deduplication, and strict output formatting bugs"
+
+[metadata]
+author_name = "TerminalBench Contributors"
+author_email = "tbench@example.com"
+difficulty = "hard"
+category = "data-processing"
+tags = ["python", "finance", "json", "decimal", "performance"]
+
+[environment]
+type = "docker"
+path = "environment"
+build_timeout_sec = 600
+
+[verifier]
+timeout_sec = 60
+
+[agent]
+timeout_sec = 600
+
+[evaluation]
+test_command = "bash ../tests/test.sh"
+oracle_command = "bash ../solution/solve.sh && bash ../tests/test.sh"
+
+[resources]
+cpu_count = 1
+memory_mb = 1024
+disk_size_mb = 5120
+
+[timeouts]
+verifier_timeout = 60
+agent_timeout = 600

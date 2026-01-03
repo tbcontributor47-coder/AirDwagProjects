@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+import json
+import sys
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+import time
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python reconcile.py <input_json_path>")
+        sys.exit(1)
+    
+    start_time = time.time()
+    
+    try:
+        with open(sys.argv[1], 'r') as f:
+            ledger = json.load(f)
+    except Exception as e:
+        sys.exit(1)
+    
+    exchange_rates = ledger.get('exchange_rates', {})
+    transactions = ledger.get('transactions', [])
+    
+    # BUG 1: Inefficient O(N^2) duplicate detection
+    unique_transactions = []
+    duplicates = 0
+    for tx in transactions:
+        is_duplicate = False
+        for utx in unique_transactions:
+            # BUG 2: Missing timestamp in duplicate check
+            if (tx['id'] == utx['id'] and 
+                tx['amount'] == utx['amount'] and 
+                tx['currency'] == utx['currency']):
+                is_duplicate = True
+                duplicates += 1
+                break
+        if not is_duplicate:
+            unique_transactions.append(tx)
+    
+    # Process transactions
+    account_balances = {}
+    for tx in unique_transactions:
+        account_id = tx['account_id']
+        amount = Decimal(tx['amount'])
+        currency = tx['currency']
+        
+        # BUG 3: Wrong rounding mode (should be ROUND_HALF_EVEN for banker's rounding)
+        if currency != 'USD':
+            # Missing rate check/fallback bug
+            rate = Decimal(str(exchange_rates.get(currency, 1.0)))
+            amount = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        if account_id not in account_balances:
+            account_balances[account_id] = Decimal('0')
+        account_balances[account_id] += amount
+    
+    # BUG 4: Wrong sorting (using default dict order instead of sorted by account_id)
+    accounts = []
+    for account_id, balance in account_balances.items():
+        # BUG 5: Incorrect balance formatting (missing proper string formatting)
+        # str(decimal) might produce '1E+2' or other non-standard formats
+        balance_str = str(balance.quantize(Decimal('0.01')))
+        accounts.append({
+            'account_id': account_id,
+            'balance_usd': balance_str
+        })
+    
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    
+    # BUG 6: Keys not in alphabetical order in the final dictionary
+    result = {
+        'total_transactions': len(unique_transactions),
+        'duplicate_count': duplicates,
+        'accounts': accounts,
+        'processing_time_ms': elapsed_ms
+    }
+    
+    # BUG 7: Not sorting keys when dumping JSON
+    print(json.dumps(result))
+
+if __name__ == '__main__':
+    main()
