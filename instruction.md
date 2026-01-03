@@ -40,6 +40,14 @@ Fix all configuration files so that:
 - IAM role service principal: `firehose.amazonaws.com`
 - Firehose stream name: `app-logs-delivery-stream`
 - CloudWatch log group name: `/aws/app/backend-services`
+- CloudWatch subscription filter pattern: empty string (`""`)
+- Prometheus backend-services job target: `localhost:8080`
+- Grafana dashboard title: `App Metrics`
+- Grafana datasource name: `Prometheus-Main`
+- Prometheus alert threshold: `> 0.05`
+- Prometheus alert duration: `1m`
+- Prometheus alert severity label: `critical`
+- Grafana must include a query variable using `label_values`
 
 Do NOT change the overall architecture, maintain existing resource names, keep the same metrics and log formats, and fix only the configuration bugs.
 
