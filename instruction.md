@@ -34,13 +34,13 @@ The system processes a fixed-width file (`input.dat`) with the following record 
 **CRITICAL: All output files must adhere to the exact format specified below. These are not examples; they are strict machine-parsable requirements. Any deviation in line count, line length, or label text will result in total failure.**
 
 ### Balanced Report (balanced_report.txt)
-If the batch satisfies all integrity checks, the report must contain **exactly 3 lines**, each separated by a system line break (`\n` or `\r\n`). Each line must be exactly **100 characters** wide (including the labels, padded with trailing spaces).
+If the batch satisfies all integrity checks, the report must contain **exactly 3 lines**. Each line must be **exactly 100 characters** wide (padded with trailing spaces) and must be terminated by a **newline character** (`\n`).
 
 1. `BALANCED REPORT SUMMARY`
 2. `TOTAL COUNT: NNNNN` (where `NNNNN` is a 5-digit zero-padded count of valid transactions)
 3. `TOTAL NET: SNNNNNNNNNNNNNNN` (where `S` is the sign `+` or `-`, followed by 15 digits including 2 implied decimals)
 
-If the batch is rejected (due to trailer mismatch), the report must contain **exactly 1 line** of 100 characters (with no trailing newline required for the final line, but allowed):
+If the batch is rejected (due to trailer mismatch), the report must contain **exactly 1 line** of 100 characters plus a newline:
 `BATCH REJECTED`
 
 ### High-Value Report (high_value.dat)

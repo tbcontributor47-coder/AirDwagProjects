@@ -14,11 +14,11 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
            SELECT INPUT-FILE ASSIGN TO "input.dat"
                ORGANIZATION IS LINE SEQUENTIAL.
            SELECT BALANCED-REPORT ASSIGN TO "balanced_report.txt"
-               ORGANIZATION IS LINE SEQUENTIAL.
+               ORGANIZATION IS SEQUENTIAL.
            SELECT HIGH-VALUE-REPORT ASSIGN TO "high_value.dat"
-               ORGANIZATION IS LINE SEQUENTIAL.
+               ORGANIZATION IS SEQUENTIAL.
            SELECT ANOMALY-LOG ASSIGN TO "anomalies.dat"
-               ORGANIZATION IS LINE SEQUENTIAL.
+               ORGANIZATION IS SEQUENTIAL.
 
        DATA DIVISION.
        FILE SECTION.
@@ -28,18 +28,27 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
            05  IN-DATA        PIC X(98).
 
        FD  BALANCED-REPORT.
-       01  REPORT-LINE        PIC X(100).
+       01  REPORT-REC.
+           05  REPORT-DATA    PIC X(100).
+           05  REPORT-NL      PIC X(01).
 
        FD  HIGH-VALUE-REPORT.
-       01  HV-LINE            PIC X(100).
+       01  HV-REC.
+           05  HV-DATA        PIC X(100).
+           05  HV-NL          PIC X(01).
 
        FD  ANOMALY-LOG.
-       01  AL-LINE            PIC X(100).
+       01  AL-REC.
+           05  AL-DATA        PIC X(100).
+           05  AL-NL          PIC X(01).
 
        WORKING-STORAGE SECTION.
        01  WS-FLAGS.
            05  WS-EOF          PIC X(01) VALUE 'N'.
            05  WS-REJECTED     PIC X(01) VALUE 'N'.
+
+       01  WS-CONSTANTS.
+           05  WS-NL           PIC X VALUE X"0A".
 
        01  WS-TOTALS.
            05  WS-FILE-COUNT    PIC 9(05)    VALUE 0.
@@ -100,8 +109,10 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
            IF WS-REJECTED = 'N'
                PERFORM GENERATE-REPORTS
            ELSE
-               MOVE SPACES TO REPORT-LINE
-               WRITE REPORT-LINE FROM "BATCH REJECTED"
+               INITIALIZE REPORT-REC
+               MOVE "BATCH REJECTED" TO REPORT-DATA
+               MOVE WS-NL TO REPORT-NL
+               WRITE REPORT-REC
            END-IF
 
            CLOSE INPUT-FILE
@@ -124,7 +135,9 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
                REMAINDER WS-MOD-RESULT
            
            IF WS-MOD-RESULT NOT = 1
-               WRITE AL-LINE FROM WS-TX-REC
+               MOVE IN-RECORD TO AL-DATA
+               MOVE WS-NL TO AL-NL
+               WRITE AL-REC
            ELSE
                ADD 1 TO WS-CALC-COUNT
                SET TX-IDX TO WS-CALC-COUNT
@@ -152,27 +165,33 @@ cat > $APP_DIR/reconcile.cbl << 'EOF'
            END-IF.
 
        GENERATE-REPORTS.
-           MOVE SPACES TO REPORT-LINE
-           WRITE REPORT-LINE FROM "BALANCED REPORT SUMMARY"
+           INITIALIZE REPORT-REC
+           MOVE "BALANCED REPORT SUMMARY" TO REPORT-DATA
+           MOVE WS-NL TO REPORT-NL
+           WRITE REPORT-REC
            
            MOVE WS-CALC-COUNT TO WS-DISP-COUNT
-           MOVE SPACES TO REPORT-LINE
+           INITIALIZE REPORT-REC
            STRING "TOTAL COUNT: " 
                   WS-DISP-COUNT 
-                  DELIMITED BY SIZE INTO REPORT-LINE
-           WRITE REPORT-LINE
+                  DELIMITED BY SIZE INTO REPORT-DATA
+           MOVE WS-NL TO REPORT-NL
+           WRITE REPORT-REC
            
            MOVE WS-CALC-NET TO WS-DISP-NET
-           MOVE SPACES TO REPORT-LINE
+           INITIALIZE REPORT-REC
            STRING "TOTAL NET: " 
                   WS-DISP-NET
-                  DELIMITED BY SIZE INTO REPORT-LINE
-           WRITE REPORT-LINE
+                  DELIMITED BY SIZE INTO REPORT-DATA
+           MOVE WS-NL TO REPORT-NL
+           WRITE REPORT-REC
 
            SET TX-IDX TO 1
            PERFORM UNTIL TX-IDX > WS-CALC-COUNT
                IF TX-AMOUNT(TX-IDX) > 10000.00
-                   WRITE HV-LINE FROM WS-TX-DATA(TX-IDX)
+                   MOVE WS-TX-DATA(TX-IDX) TO HV-DATA
+                   MOVE WS-NL TO HV-NL
+                   WRITE HV-REC
                END-IF
                SET TX-IDX UP BY 1
            END-PERFORM.
