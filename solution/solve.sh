@@ -1,26 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-# This script applies the fixes to the buggy configuration files.
-# It uses deterministic values to satisfy high-rigor verification.
-
-echo "Applying fixes..."
+echo "Applying fixes with high-rigor precision..."
 
 # Detect environment directory
 if [ -d "environment" ]; then
     ENV_DIR="environment"
-elif [ -d "../environment" ]; then
-    ENV_DIR="../environment"
-elif [ -d "/app/environment" ]; then
-    ENV_DIR="/app/environment"
 else
-    echo "ERROR: Could not find environment directory"
-    exit 1
+    ENV_DIR="/app/environment"
 fi
 
-echo "Using environment directory: $ENV_DIR"
-
-# 1. Fix Terraform IAM
+# 1. Fix Terraform IAM (Strict Scoping)
 cat <<EOF > "$ENV_DIR/terraform/iam.tf"
 provider "aws" {
   region                      = "us-east-1"
@@ -116,13 +106,54 @@ sed -i 's/filter_pattern  = .*/filter_pattern  = ""/' "$ENV_DIR/terraform/cloudw
 
 # 4. Fix Prometheus Config
 sed -i "s/'localhost:9090'/'localhost:8080'/" "$ENV_DIR/prometheus/prometheus.yml"
-sed -i 's/replacment/replacement/' "$ENV_DIR/prometheus/prometheus.yml"
+sed -i 's/replacment/replacement/g' "$ENV_DIR/prometheus/prometheus.yml"
 
 # 5. Fix Alert Rules
 sed -i 's/rate(http_requests_total{status=~"5.."}\[])/rate(http_requests_total{status=~"5.."}[5m])/' "$ENV_DIR/prometheus/alerts.yml"
 sed -i 's/for: 0s/for: 1m/' "$ENV_DIR/prometheus/alerts.yml"
 
-# 6. Fix Grafana Dashboard
-sed -i 's/rate(http_requests_total\[5m/rate(http_requests_total[5m])/' "$ENV_DIR/grafana/dashboard.json"
+# 6. Fix Grafana Dashboard (Using Python for reliable JSON manipulation)
+python3 - <<EOF
+import json
+import os
+
+path = "$ENV_DIR/grafana/dashboard.json"
+with open(path, 'r') as f:
+    data = json.load(f)
+
+# Fix title
+data['title'] = "App Metrics"
+
+# Fix PromQL in panels
+for panel in data.get('panels', []):
+    panel['datasource'] = "Prometheus-Main"
+    for target in panel.get('targets', []):
+        if 'rate(http_requests_total[5m' in target['expr']:
+            target['expr'] = 'rate(http_requests_total[5m])'
+
+# Add variable
+data['templating']['list'] = [
+    {
+        "allValue": None,
+        "current": {},
+        "datasource": "Prometheus-Main",
+        "definition": "label_values(http_requests_total, job)",
+        "hide": 0,
+        "includeAll": False,
+        "label": "Job",
+        "multi": False,
+        "name": "job",
+        "query": {
+            "query": "label_values(http_requests_total, job)",
+            "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "type": "query"
+    }
+]
+
+with open(path, 'w') as f:
+    json.dump(data, f, indent=4)
+EOF
 
 echo "Fixes applied!"

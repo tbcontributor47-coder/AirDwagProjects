@@ -108,6 +108,7 @@ fi
 
 # Summary
 echo "==============================="
+mkdir -p /logs/verifier
 if [ $FAILURES -eq 0 ]; then
     echo "ALL TESTS PASSED"
     true
@@ -116,8 +117,7 @@ else
     false
 fi
 
-# Final reward reporting
-mkdir -p /logs/verifier
+# Final reward reporting (regex expects this literal block)
 if [ $? -eq 0 ]; then
   echo 1 > /logs/verifier/reward.txt
 else

@@ -52,10 +52,20 @@ Fix all configuration files so that:
 
 1. ✅ Terraform validates and plans successfully
 2. ✅ IAM policies grant correct permissions (least privilege)
+   - Firehose role must use `firehose.amazonaws.com` service principal.
+   - S3 and CloudWatch permissions must be scoped to specific resource ARNs, not `*`.
 3. ✅ Prometheus configuration is valid (`promtool check config`)
+   - `backend-services` must scrape `localhost:8080`.
+   - `node-exporter` relabeling must fix the `replacment` typo to `replacement`.
 4. ✅ PromQL queries return correct results
+   - Alerts threshold for `HighErrorRate` must be `> 0.05` for the `5..` status codes.
+   - Grafana dashboard panels must use the `Prometheus-Main` datasource.
 5. ✅ Grafana dashboard JSON is valid
+   - Dashboard title must be `App Metrics`.
+   - RPS panel must use the correct `rate()` expression with `[5m]` interval.
 6. ✅ Alert rules fire at correct thresholds
+   - Alerts must have a `severity: critical` label.
+   - Alert duration (`for`) must be exactly `1m`.
 
 ## Files to Fix
 
