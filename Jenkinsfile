@@ -187,7 +187,7 @@ docker run --rm \
     "$IMAGE_NAME" \
     /bin/bash -c '
         set -euo pipefail
-        echo "Applying solution fixer to /app/merge.cbl"
+        echo "Applying solution fixer to /app/environment/app/reconcile.cbl"
         if [ -f /mnt/solution/solve.sh ]; then
             echo "Mounted solve.sh sha256: $(sha256sum /mnt/solution/solve.sh | cut -d" " -f1)"
             if grep -q "ws-dot-count" /mnt/solution/solve.sh; then
