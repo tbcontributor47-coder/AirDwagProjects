@@ -1,0 +1,453 @@
+[?2004hroot@a947a12fd547:/app# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@a947a12fd547:/app# clear
+[?2004l[H[J[3J[?2004hroot@a947a12fd547:/app# ls -la
+[?2004ltotal 16
+drwxr-xr-x 1 root root 4096 Jan  4 11:12 .
+drwxr-xr-x 1 root root 4096 Jan  4 11:26 ..
+drwxr-xr-x 2 root root 4096 Jan  3 18:17 data
+-rwxrwxrwx 1 root root 2904 Jan  3 18:21 reconcile.py
+[?2004hroot@a947a12fd547:/app# cat reconcile.py
+[?2004l#!/usr/bin/env python3
+import json
+import sys
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+import time
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python reconcile.py <input_json_path>")
+        sys.exit(1)
+    
+    start_time = time.time()
+    
+    try:
+        with open(sys.argv[1], 'r') as f:
+            ledger = json.load(f)
+    except Exception as e:
+        sys.exit(1)
+    
+    exchange_rates = ledger.get('exchange_rates', {})
+    transactions = ledger.get('transactions', [])
+    
+    # BUG 1: Inefficient O(N^2) duplicate detection
+    unique_transactions = []
+    duplicates = 0
+    for tx in transactions:
+        is_duplicate = False
+        for utx in unique_transactions:
+            # BUG 2: Missing timestamp in duplicate check
+            if (tx['id'] == utx['id'] and 
+                tx['amount'] == utx['amount'] and 
+                tx['currency'] == utx['currency']):
+                is_duplicate = True
+                duplicates += 1
+                break
+        if not is_duplicate:
+            unique_transactions.append(tx)
+    
+    # Process transactions
+    account_balances = {}
+    for tx in unique_transactions:
+        account_id = tx['account_id']
+        amount = Decimal(tx['amount'])
+        currency = tx['currency']
+        
+        # BUG 3: Wrong rounding mode (should be ROUND_HALF_EVEN for banker's rounding)
+        if currency != 'USD':
+            # Missing rate check/fallback bug
+            rate = Decimal(str(exchange_rates.get(currency, 1.0)))
+            amount = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        if account_id not in account_balances:
+            account_balances[account_id] = Decimal('0')
+        account_balances[account_id] += amount
+    
+    # BUG 4: Wrong sorting (using default dict order instead of sorted by account_id)
+    accounts = []
+    for account_id, balance in account_balances.items():
+        # BUG 5: Incorrect balance formatting (missing proper string formatting)
+        # str(decimal) might produce '1E+2' or other non-standard formats
+        balance_str = str(balance.quantize(Decimal('0.01')))
+        accounts.append({
+            'account_id': account_id,
+            'balance_usd': balance_str
+        })
+    
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    
+    # BUG 6: Keys not in alphabetical order in the final dictionary
+    result = {
+        'total_transactions': len(unique_transactions),
+        'duplicate_count': duplicates,
+        'accounts': accounts,
+        'processing_time_ms': elapsed_ms
+    }
+    
+    # BUG 7: Not sorting keys when dumping JSON
+    print(json.dumps(result))
+
+if __name__ == '__main__':
+    main()
+[?2004hroot@a947a12fd547:/app# ls -la data/
+[?2004ltotal 12
+drwxr-xr-x 2 root root 4096 Jan  3 18:17 .
+drwxr-xr-x 1 root root 4096 Jan  4 11:12 ..
+-rwxrwxrwx 1 root root 1163 Jan  3 18:17 sample.json
+[?2004hroot@a947a12fd547:/app# cat data/test1.json 2>/dev/null || cat data/*.json 2>/dev/null | head -50
+[?2004l{
+    "exchange_rates": {
+        "EUR": 1.18,
+        "GBP": 1.38,
+        "JPY": 0.0091,
+        "CHF": 1.12
+    },
+    "transactions": [
+        {
+            "id": "tx001",
+            "account_id": "ACC-01",
+            "amount": "100.50",
+            "currency": "USD",
+            "timestamp": "2024-01-15T10:30:00Z"
+        },
+        {
+            "id": "tx002",
+            "account_id": "ACC-02",
+            "amount": "50.00",
+            "currency": "EUR",
+            "timestamp": "2024-01-15T11:00:00Z"
+        },
+        {
+            "id": "tx003",
+            "account_id": "ACC-01",
+            "amount": "-25.00",
+            "currency": "USD",
+            "timestamp": "2024-01-15T12:00:00Z"
+        },
+        {
+            "id": "tx002",
+            "account_id": "ACC-02",
+            "amount": "50.00",
+            "currency": "EUR",
+            "timestamp": "2024-01-15T11:00:00Z"
+        },
+        {
+            "id": "tx004",
+            "account_id": "ACC-03",
+            "amount": "10.125",
+            "currency": "USD",
+            "timestamp": "2024-01-15T13:00:00Z"
+        }
+    ]
+}[?2004hroot@a947a12fd547:/app# cat > reconcile.py << 'EOF'
+[?2004l[?2004h> #!/usr/bin/env python3
+[?2004l[?2004h> import json
+[?2004l[?2004h> import sys
+[?2004l[?2004h> from decimal import Decimal, ROUND_HALF_EVEN
+[?2004l[?2004h> from datetime import datetime
+[?2004l[?2004h> import time
+[?2004l[?2004h> 
+[?2004l[?2004h> def main():
+[?2004l[?2004h>     if len(sys.argv) < 2:
+[?2004l[?2004h>         print("Usage: python reconcile.py <input_json_path>")
+[?2004l[?2004h>         sys.exit(1)
+[?2004l[?2004h> 
+[?2004l[?2004h>     start_time = time.time()
+[?2004l[?2004h> 
+[?2004l[?2004h>     try:
+[?2004l[?2004h>         with open(sys.argv[1], 'r') as f:
+[?2004l[?2004h>             ledger = json.load(f)
+[?2004l[?2004h>     except Exception as e:
+[?2004l[?2004h>         sys.exit(1)
+[?2004l[?2004h> 
+[?2004l[?2004h>     exchange_rates = ledger.get('exchange_rates', {})
+[?2004l[?2004h>     transactions = ledger.get('transactions', [])
+[?2004l[?2004h> 
+[?2004l[?2004h>     # Fixed: Efficient O(N) duplicate detection with timestamp
+[?2004l[?2004h>     seen = set()
+[?2004l[?2004h>     unique_transactions = []
+[?2004l[?2004h>     duplicates = 0
+[?2004l[?2004h>     
+[?2004l[?2004h>     for tx in transactions:
+[?2004l[?2004h>         # Create tuple with id, amount, currency, and timestamp
+[?2004l[?2004h>         key = (tx['id'], tx['amount'], tx['currency'], tx['timestamp'])
+[?2004l[?2004h>         if key in seen:
+[?2004l[?2004h>             duplicates += 1
+[?2004l[?2004h>         else:
+[?2004l[?2004h>             seen.add(key)
+[?2004l[?2004h>             unique_transactions.append(tx)
+[?2004l[?2004h> 
+[?2004l[?2004h>     # Process transactions
+[?2004l[?2004h>     account_balances = {}
+[?2004l[?2004h>     for tx in unique_transactions:
+[?2004l[?2004h>         account_id = tx['account_id']
+[?2004l[?2004h>         amount = Decimal(tx['amount'])
+[?2004l[?2004h>         currency = tx['currency']
+[?2004l[?2004h> 
+[?2004l[?2004h>         # Fixed: Use ROUND_HALF_EVEN for banker's rounding
+[?2004l[?2004h>         if currency != 'USD':
+[?2004l[?2004h>             rate = Decimal(str(exchange_rates.get(currency, 1.0)))
+[?2004l[?2004h>             amount = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN)
+[?2004l[?2004h>         else:
+[?2004l[?2004h>             amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN)
+[?2004l[?2004h> 
+[?2004l[?2004h>         if account_id not in account_balances:
+[?2004l[?2004h>             account_balances[account_id] = Decimal('0')
+[?2004l[?2004h>         account_balances[account_id] += amount
+[?2004l[?2004h> 
+[?2004l[?2004h>     # Fixed: Sort accounts by account_id (case-sensitive ASCII)
+[?2004l[?2004h>     sorted_account_ids = sorted(account_balances.keys())
+[?2004l[?2004h>     accounts = []
+[?2004l[?2004h>     for account_id in sorted_account_ids:
+[?2004l[?2004h>         balance = account_balances[account_id]
+[?2004l[?2004h>         # Fixed: Proper balance formatting with exactly 2 decimal places
+[?2004l[?2004h>         balance_str = format(balance, '.2f')
+[?2004l[?2004h>         accounts.append({
+[?2004l[?2004h>             'account_id': account_id,
+[?2004l[?2004h>             'balance_usd': balance_str
+[?2004l[?2004h>         })
+[?2004l[?2004h> 
+[?2004l[?2004h>     elapsed_ms = int((time.time() - start_time) * 1000)
+[?2004l[?2004h> 
+[?2004l[?2004h>     # Fixed: Create result with keys in alphabetical order
+[?2004l[?2004h>     result = {
+[?2004l[?2004h>         'accounts': accounts,
+[?2004l[?2004h>         'duplicate_count': duplicates,
+[?2004l[?2004h>         'processing_time_ms': elapsed_ms,
+[?2004l[?2004h>         'total_transactions': len(unique_transactions)
+[?2004l[?2004h>     }
+[?2004l[?2004h> 
+[?2004l[?2004h>     # Fixed: Use sort_keys=True for JSON output
+[?2004l[?2004h>     print(json.dumps(result, sort_keys=True))
+[?2004l[?2004h> 
+[?2004l[?2004h> if __name__ == '__main__':
+[?2004l[?2004h>     main()
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@a947a12fd547:/app# chmod +x reconcile.py
+[?2004l[?2004hroot@a947a12fd547:/app# python3 reconcile.py data/sample.json
+[?2004l{"accounts": [{"account_id": "ACC-01", "balance_usd": "75.50"}, {"account_id": "ACC-02", "balance_usd": "59.00"}, {"account_id": "ACC-03", "balance_usd": "10.12"}], "duplicate_count": 1, "processing_time_ms": 0, "total_transactions": 4}
+[?2004hroot@a947a12fd547:/app# cat > /tmp/test_empty.json << 'EOF'
+[?2004l[?2004h> {
+[?2004l[?2004h>     "exchange_rates": {},
+[?2004l[?2004h>     "transactions": []
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@a947a12fd547:/app# python3 reconcile.py /tmp/test_empty.json
+[?2004l{"accounts": [], "duplicate_count": 0, "processing_time_ms": 0, "total_transactions": 0}
+[?2004hroot@a947a12fd547:/app# cat > /tmp/test_bankers_rounding.json << 'EOF'
+[?2004l[?2004h> {
+[?2004l[?2004h>     "exchange_rates": {"EUR": 1.0},
+[?2004l[?2004h>     "transactions": [
+[?2004l[?2004h>         {"id": "t1", "account_id": "A1", "amount": "10.125", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t2", "account_id": "A2", "amount": "10.135", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t3", "account_id": "A3", "amount": "10.225", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t4", "account_id": "A4", "amount": "10.235", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t5", "account_id": "A5", "amount": "-5.50", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t6", "account_id": "A6", "amount": "0.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"}
+[?2004l[?2004h>     ]
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@a947a12fd547:/app# python3 reconcile.py /tmp/test_bankers_rounding.json
+[?2004l{"accounts": [{"account_id": "A1", "balance_usd": "10.12"}, {"account_id": "A2", "balance_usd": "10.14"}, {"account_id": "A3", "balance_usd": "10.22"}, {"account_id": "A4", "balance_usd": "10.24"}, {"account_id": "A5", "balance_usd": "-5.50"}, {"account_id": "A6", "balance_usd": "0.00"}], "duplicate_count": 0, "processing_time_ms": 0, "total_transactions": 6}
+[?2004hroot@a947a12fd547:/app# python3 << 'EOF'
+[?2004l[?2004h> import json
+[?2004l[?2004h> import random
+[?2004l[?2004h> 
+[?2004l[?2004h> # Generate 10,000 transactions
+[?2004l[?2004h> transactions = []
+[?2004l[?2004h> for i in range(10000):
+[?2004l[?2004h>     transactions.append({
+[?2004l[?2004h>         "id": f"tx{i}",
+[?2004l[?2004h>         "account_id": f"ACC{i % 100}",
+[?2004l[?2004h>         "amount": str(round(random.uniform(-1000, 1000), 2)),
+[?2004l[?2004h>         "currency": random.choice(["USD", "EUR", "GBP", "JPY"]),
+[?2004l[?2004h>         "timestamp": f"2024-01-{(i % 28) + 1:02d}T{(i % 24):02d}:00:00Z"
+[?2004l[?2004h>     })
+[?2004l[?2004h> 
+[?2004l[?2004h> ledger = {
+[?2004l[?2004h>     "exchange_rates": {"EUR": 1.18, "GBP": 1.38, "JPY": 0.0091},
+[?2004l[?2004h>     "transactions": transactions
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> with open('/tmp/test_large.json', 'w') as f:
+[?2004l[?2004h>     json.dump(ledger, f)
+[?2004l[?2004h>     
+[?2004l[?2004h> print("Generated 10,000 transactions")
+[?2004l[?2004h> EOF
+[?2004lGenerated 10,000 transactions
+[?2004hroot@a947a12fd547:/app# time python3 reconcile.py /tmp/test_large.json > /tmp/output.json
+[?2004l
+real	0m0.086s
+user	0m0.067s
+sys	0m0.021s
+[?2004hroot@a947a12fd547:/app# cat /tmp/output.json | python3 -m json.tool | head -30
+[?2004l{
+    "accounts": [
+        {
+            "account_id": "ACC0",
+            "balance_usd": "13809.55"
+        },
+        {
+            "account_id": "ACC1",
+            "balance_usd": "1653.45"
+        },
+        {
+            "account_id": "ACC10",
+            "balance_usd": "6337.49"
+        },
+        {
+            "account_id": "ACC11",
+            "balance_usd": "-4268.83"
+        },
+        {
+            "account_id": "ACC12",
+            "balance_usd": "17047.02"
+        },
+        {
+            "account_id": "ACC13",
+            "balance_usd": "-1619.22"
+        },
+        {
+            "account_id": "ACC14",
+            "balance_usd": "2592.71"
+        },
+[?2004hroot@a947a12fd547:/app# cat /tmp/output.json | head -c 200
+[?2004l{"accounts": [{"account_id": "ACC0", "balance_usd": "13809.55"}, {"account_id": "ACC1", "balance_usd": "1653.45"}, {"account_id": "ACC10", "balance_usd": "6337.49"}, {"account_id": "ACC11", "balance_u[?2004hroot@a947a12fd547:/app# cat > /tmp/test_sorting.json << 'EOF'
+[?2004l[?2004h> {
+[?2004l[?2004h>     "exchange_rates": {},
+[?2004l[?2004h>     "transactions": [
+[?2004l[?2004h>         {"id": "t1", "account_id": "acc-01", "amount": "10.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t2", "account_id": "ACC-02", "amount": "20.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t3", "account_id": "ACC-01", "amount": "30.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t4", "account_id": "Zacc", "amount": "40.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "t5", "account_id": "AAA", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"}
+[?2004l[?2004h>     ]
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@a947a12fd547:/app# python3 reconcile.py /tmp/test_sorting.json
+[?2004l{"accounts": [{"account_id": "AAA", "balance_usd": "50.00"}, {"account_id": "ACC-01", "balance_usd": "30.00"}, {"account_id": "ACC-02", "balance_usd": "20.00"}, {"account_id": "Zacc", "balance_usd": "40.00"}, {"account_id": "acc-01", "balance_usd": "10.00"}], "duplicate_count": 0, "processing_time_ms": 0, "total_transactions": 5}
+[?2004hroot@a947a12fd547:/app# cat > /tmp/test_duplicates.json << 'EOF'
+[?2004l[?2004h> {
+[?2004l[?2004h>     "exchange_rates": {},
+[?2004l[?2004h>     "transactions": [
+[?2004l[?2004h>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-02T00:00:00Z"},
+[?2004l[?2004h>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+[?2004l[?2004h>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"}
+[?2004l[?2004h>     ]
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@a947a12fd547:/app# python3 reconcile.py /tmp/test_duplicates.json
+[?2004l{"accounts": [{"account_id": "A1", "balance_usd": "200.00"}, {"account_id": "A2", "balance_usd": "50.00"}], "duplicate_count": 3, "processing_time_ms": 0, "total_transactions": 3}
+[?2004hroot@a947a12fd547:/app# echo 'Testing with original sample data:'
+[?2004lTesting with original sample data:
+[?2004hroot@a947a12fd547:/app# python3 reconcile.py data/sample.json | python3 -m json.tool
+[?2004l{
+    "accounts": [
+        {
+            "account_id": "ACC-01",
+            "balance_usd": "75.50"
+        },
+        {
+            "account_id": "ACC-02",
+            "balance_usd": "59.00"
+        },
+        {
+            "account_id": "ACC-03",
+            "balance_usd": "10.12"
+        }
+    ],
+    "duplicate_count": 1,
+    "processing_time_ms": 0,
+    "total_transactions": 4
+}
+[?2004hroot@a947a12fd547:/app# cat reconcile.py
+[?2004l#!/usr/bin/env python3
+import json
+import sys
+from decimal import Decimal, ROUND_HALF_EVEN
+from datetime import datetime
+import time
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python reconcile.py <input_json_path>")
+        sys.exit(1)
+
+    start_time = time.time()
+
+    try:
+        with open(sys.argv[1], 'r') as f:
+            ledger = json.load(f)
+    except Exception as e:
+        sys.exit(1)
+
+    exchange_rates = ledger.get('exchange_rates', {})
+    transactions = ledger.get('transactions', [])
+
+    # Fixed: Efficient O(N) duplicate detection with timestamp
+    seen = set()
+    unique_transactions = []
+    duplicates = 0
+    
+    for tx in transactions:
+        # Create tuple with id, amount, currency, and timestamp
+        key = (tx['id'], tx['amount'], tx['currency'], tx['timestamp'])
+        if key in seen:
+            duplicates += 1
+        else:
+            seen.add(key)
+            unique_transactions.append(tx)
+
+    # Process transactions
+    account_balances = {}
+    for tx in unique_transactions:
+        account_id = tx['account_id']
+        amount = Decimal(tx['amount'])
+        currency = tx['currency']
+
+        # Fixed: Use ROUND_HALF_EVEN for banker's rounding
+        if currency != 'USD':
+            rate = Decimal(str(exchange_rates.get(currency, 1.0)))
+            amount = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN)
+        else:
+            amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN)
+
+        if account_id not in account_balances:
+            account_balances[account_id] = Decimal('0')
+        account_balances[account_id] += amount
+
+    # Fixed: Sort accounts by account_id (case-sensitive ASCII)
+    sorted_account_ids = sorted(account_balances.keys())
+    accounts = []
+    for account_id in sorted_account_ids:
+        balance = account_balances[account_id]
+        # Fixed: Proper balance formatting with exactly 2 decimal places
+        balance_str = format(balance, '.2f')
+        accounts.append({
+            'account_id': account_id,
+            'balance_usd': balance_str
+        })
+
+    elapsed_ms = int((time.time() - start_time) * 1000)
+
+    # Fixed: Create result with keys in alphabetical order
+    result = {
+        'accounts': accounts,
+        'duplicate_count': duplicates,
+        'processing_time_ms': elapsed_ms,
+        'total_transactions': len(unique_transactions)
+    }
+
+    # Fixed: Use sort_keys=True for JSON output
+    print(json.dumps(result, sort_keys=True))
+
+if __name__ == '__main__':
+    main()
+[?2004hroot@a947a12fd547:/app# 

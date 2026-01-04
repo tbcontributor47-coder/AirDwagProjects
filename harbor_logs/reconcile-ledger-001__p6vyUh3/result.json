@@ -1,0 +1,102 @@
+{
+    "id": "9552ce7d-35ad-4a56-8cd2-68e14eeb6089",
+    "task_name": "reconcile-ledger-001",
+    "trial_name": "reconcile-ledger-001__p6vyUh3",
+    "trial_uri": "file:///mnt/d/Manoj/Projects/Portfolio/TerminalBench/jobs/2026-01-04__16-56-28/reconcile-ledger-001__p6vyUh3",
+    "task_id": {
+        "path": "reconcile-ledger-001"
+    },
+    "source": null,
+    "task_checksum": "55b5a86c626bb4c74185682562e8649b118563471dbafb372b184d5d7e1e3902",
+    "config": {
+        "task": {
+            "path": "reconcile-ledger-001",
+            "git_url": null,
+            "git_commit_id": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "reconcile-ledger-001__p6vyUh3",
+        "trials_dir": "jobs/2026-01-04__16-56-28",
+        "timeout_multiplier": 1.0,
+        "agent": {
+            "name": "terminus-2",
+            "import_path": null,
+            "model_name": "openai/@anthropic-tbench/claude-sonnet-4-5-20250929",
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {}
+        },
+        "environment": {
+            "type": "docker",
+            "force_build": true,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "job_id": "2fcea80f-6253-4994-b6c1-1349c2507a97"
+    },
+    "agent_info": {
+        "name": "terminus-2",
+        "version": "2.0.0",
+        "model_info": {
+            "name": "@anthropic-tbench/claude-sonnet-4-5-20250929",
+            "provider": "openai"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": 77771,
+        "n_cache_tokens": 0,
+        "n_output_tokens": 9448,
+        "cost_usd": null,
+        "rollout_details": [],
+        "metadata": {
+            "n_episodes": 10,
+            "api_request_times_msec": [
+                12520.753383636475,
+                9595.1509475708,
+                23802.7446269989,
+                16099.623441696167,
+                16081.729650497437,
+                17963.11354637146,
+                13792.645931243896,
+                19046.111822128296,
+                11736.759185791016,
+                22112.496614456177
+            ],
+            "summarization_count": 0
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 0.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-01-04T16:56:28.804111",
+    "finished_at": "2026-01-04T17:00:11.059218",
+    "environment_setup": {
+        "started_at": "2026-01-04T16:56:29.445616",
+        "finished_at": "2026-01-04T16:56:34.167663"
+    },
+    "agent_setup": {
+        "started_at": "2026-01-04T16:56:34.167717",
+        "finished_at": "2026-01-04T16:56:52.561498"
+    },
+    "agent_execution": {
+        "started_at": "2026-01-04T16:56:52.561553",
+        "finished_at": "2026-01-04T16:59:54.417990"
+    },
+    "verifier": {
+        "started_at": "2026-01-04T16:59:54.418249",
+        "finished_at": "2026-01-04T17:00:08.173116"
+    }
+}

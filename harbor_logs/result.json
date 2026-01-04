@@ -1,0 +1,29 @@
+{
+    "id": "2fcea80f-6253-4994-b6c1-1349c2507a97",
+    "started_at": "2026-01-04T16:56:28.773291",
+    "finished_at": "2026-01-04T17:00:11.082219",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 0,
+        "evals": {
+            "terminus-2__@anthropic-tbench-claude-sonnet-4-5-20250929__adhoc": {
+                "n_trials": 1,
+                "n_errors": 0,
+                "metrics": [
+                    {
+                        "mean": 0.0
+                    }
+                ],
+                "reward_stats": {
+                    "reward": {
+                        "0.0": [
+                            "reconcile-ledger-001__p6vyUh3"
+                        ]
+                    }
+                },
+                "exception_stats": {}
+            }
+        }
+    }
+}

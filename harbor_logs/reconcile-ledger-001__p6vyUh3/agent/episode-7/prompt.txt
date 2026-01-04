@@ -1,0 +1,45 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@a947a12fd547:/app# cat > /tmp/test_duplicates.json << 'EOF'
+> {
+>     "exchange_rates": {},
+>     "transactions": [
+>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+>         {"id": "tx001", "account_id": "A1", "amount": "100.00", "currency": "USD", "timestamp": "2024-01-02T00:00:00Z"},
+>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"},
+>         {"id": "tx002", "account_id": "A2", "amount": "50.00", "currency": "USD", "timestamp": "2024-01-01T00:00:00Z"}
+>     ]
+> }
+> EOF
+root@a947a12fd547:/app# python3 reconcile.py /tmp/test_duplicates.json
+{"accounts": [{"account_id": "A1", "balance_usd": "200.00"}, {"account_id": "A2", "balance_usd": "50.00"}], "duplicate_count": 3, "processing_time_ms": 0, "tota
+l_transactions": 3}
+root@a947a12fd547:/app# echo 'Testing with original sample data:'
+Testing with original sample data:
+root@a947a12fd547:/app# python3 reconcile.py data/sample.json | python3 -m json.tool
+{
+    "accounts": [
+        {
+            "account_id": "ACC-01",
+            "balance_usd": "75.50"
+        },
+        {
+            "account_id": "ACC-02",
+            "balance_usd": "59.00"
+        },
+        {
+            "account_id": "ACC-03",
+            "balance_usd": "10.12"
+        }
+    ],
+    "duplicate_count": 1,
+    "processing_time_ms": 0,
+    "total_transactions": 4
+}
+root@a947a12fd547:/app#

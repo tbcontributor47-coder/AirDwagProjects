@@ -1,0 +1,188 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 18,
+            "passed": 16,
+            "failed": 2,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1767526207.0159557,
+            "stop": 1767526208.0388803
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_single_transaction_usd",
+                "status": "passed",
+                "duration": 0.05361477299811668,
+                "start": 1767526207.0616844,
+                "stop": 1767526207.1158073,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_currency_conversion_eur",
+                "status": "passed",
+                "duration": 0.04711510600100155,
+                "start": 1767526207.1162546,
+                "stop": 1767526207.1637816,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_bankers_rounding",
+                "status": "passed",
+                "duration": 0.04022123300092062,
+                "start": 1767526207.164319,
+                "stop": 1767526207.205084,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_missing_exchange_rate_default",
+                "status": "passed",
+                "duration": 0.04139034199943126,
+                "start": 1767526207.205429,
+                "stop": 1767526207.247218,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_timestamp_standardization_z",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.0393027379996056,
+                "start": 1767526207.2476678,
+                "stop": 1767526207.3152986,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_timestamp_standardization_z():\n        \"\"\"Test that timestamps with +00:00 are recognized as duplicates of Z.\"\"\"\n        ledger = {\n            \"exchange_rates\": {},\n            \"transactions\": [\n                {\"id\": \"tx1\", \"account_id\": \"A001\", \"amount\": \"100.00\", \"currency\": \"USD\", \"timestamp\": \"2024-01-01T12:00:00Z\"},\n                {\"id\": \"tx1\", \"account_id\": \"A001\", \"amount\": \"100.00\", \"currency\": \"USD\", \"timestamp\": \"2024-01-01T12:00:00+00:00\"}\n            ]\n        }\n        output, code, _ = run_reconcile(ledger)\n        data = parse_output(output)\n        # They refer to the same point in time, so they SHOULD be deduplicated if standardization works\n>       assert data[\"duplicate_count\"] == 1\nE       assert 0 == 1\n\n/tests/test_outputs.py:112: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            },
+            {
+                "name": "test_outputs.py::test_duplicate_detection",
+                "status": "passed",
+                "duration": 0.044267433000641176,
+                "start": 1767526207.3156967,
+                "stop": 1767526207.3602889,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_account_sorting",
+                "status": "passed",
+                "duration": 0.03892251500110433,
+                "start": 1767526207.360729,
+                "stop": 1767526207.3999705,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_negative_balance",
+                "status": "passed",
+                "duration": 0.03889621199959947,
+                "start": 1767526207.400273,
+                "stop": 1767526207.4395254,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_empty_ledger",
+                "status": "passed",
+                "duration": 0.04272931099876587,
+                "start": 1767526207.4399593,
+                "stop": 1767526207.48304,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_json_key_order",
+                "status": "passed",
+                "duration": 0.03851229300198611,
+                "start": 1767526207.4833872,
+                "stop": 1767526207.5223324,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_multiple_transactions_same_account",
+                "status": "passed",
+                "duration": 0.03909328400186496,
+                "start": 1767526207.522761,
+                "stop": 1767526207.562512,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_zero_balance_format",
+                "status": "passed",
+                "duration": 0.03737564699986251,
+                "start": 1767526207.562946,
+                "stop": 1767526207.6006494,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_mixed_currencies",
+                "status": "passed",
+                "duration": 0.03978490700137627,
+                "start": 1767526207.60124,
+                "stop": 1767526207.6414397,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_performance_large_dataset",
+                "status": "passed",
+                "duration": 0.20955539799979306,
+                "start": 1767526207.641951,
+                "stop": 1767526207.8518088,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_decimal_precision_edge",
+                "status": "passed",
+                "duration": 0.03847175600094488,
+                "start": 1767526207.852261,
+                "stop": 1767526207.891205,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_case_sensitive_sorting_trap",
+                "status": "passed",
+                "duration": 0.039745531999869854,
+                "start": 1767526207.8916626,
+                "stop": 1767526207.9317641,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_keep_first_occurrence",
+                "status": "passed",
+                "duration": 0.04741429100067762,
+                "start": 1767526207.932175,
+                "stop": 1767526207.9799466,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_timestamp_standardization_variants",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.04047606199856091,
+                "start": 1767526207.9803677,
+                "stop": 1767526208.0385334,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_timestamp_standardization_variants():\n        \"\"\"Test that various ISO-8601 UTC formats are standardized and deduplicated.\"\"\"\n        ledger = {\n            \"exchange_rates\": {},\n            \"transactions\": [\n                {\"id\": \"tx1\", \"account_id\": \"A1\", \"amount\": \"10.00\", \"currency\": \"USD\", \"timestamp\": \"2024-01-01T12:00:00Z\"},\n                {\"id\": \"tx1\", \"account_id\": \"A1\", \"amount\": \"10.00\", \"currency\": \"USD\", \"timestamp\": \"2024-01-01T12:00:00+00:00\"},\n                {\"id\": \"tx1\", \"account_id\": \"A1\", \"amount\": \"10.00\", \"currency\": \"USD\", \"timestamp\": \"2024-01-01T12:00:00.000Z\"}\n            ]\n        }\n        output, code, _ = run_reconcile(ledger)\n        data = parse_output(output)\n        # All three represent the same point in time and should collapse to ONE transaction\n>       assert data[\"total_transactions\"] == 1\nE       assert 3 == 1\n\n/tests/test_outputs.py:324: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            }
+        ]
+    }
+}
