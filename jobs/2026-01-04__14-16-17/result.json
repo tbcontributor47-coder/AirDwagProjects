@@ -1,0 +1,29 @@
+{
+    "id": "3e33c2c7-5d5d-429c-807f-b59b120b9282",
+    "started_at": "2026-01-04T14:16:17.635304",
+    "finished_at": "2026-01-04T14:16:25.381326",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 0,
+        "evals": {
+            "oracle__adhoc": {
+                "n_trials": 1,
+                "n_errors": 0,
+                "metrics": [
+                    {
+                        "mean": 1.0
+                    }
+                ],
+                "reward_stats": {
+                    "reward": {
+                        "1.0": [
+                            "infra-k8s-restart-loop__hQ8mmAR"
+                        ]
+                    }
+                },
+                "exception_stats": {}
+            }
+        }
+    }
+}

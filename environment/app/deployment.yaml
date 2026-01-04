@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-processor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-processor
+  template:
+    metadata:
+      labels:
+        app: order-processor
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: order-processor
+        image: order-processor:latest
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            memory: "16Mi"
+          requests:
+            memory: "16Mi"
+        env:
+        - name: DB_CONNECTION_STRING
+          value: "postgresql://user:password@db:5432/orders"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 5

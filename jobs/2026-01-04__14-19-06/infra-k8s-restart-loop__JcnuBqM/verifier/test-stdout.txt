@@ -1,0 +1,3 @@
+Verifying infra-k8s-restart-loop solution...
+PASS: Liveness probe port is 8080
+PASS: DB_CONNECTION_STRING environment variable found
