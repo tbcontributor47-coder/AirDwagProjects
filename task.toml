@@ -14,15 +14,12 @@ tags = ["python", "finance", "json", "decimal", "performance"]
 type = "docker"
 path = "environment"
 build_timeout_sec = 600
+cpus = 2
+memory_mb = 2048
+storage_mb = 5120
 
 [verifier]
 timeout_sec = 600
 
 [agent]
 timeout_sec = 600
-
-[environment]
-build_timeout_sec = 300
-cpus = 2
-memory_mb = 2048
-storage_mb = 5120

@@ -2,7 +2,6 @@
 import json
 import sys
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime
 import time
 
 def main():
@@ -15,13 +14,12 @@ def main():
     try:
         with open(sys.argv[1], 'r') as f:
             ledger = json.load(f)
-    except Exception as e:
+    except Exception:
         sys.exit(1)
     
     exchange_rates = ledger.get('exchange_rates', {})
     transactions = ledger.get('transactions', [])
     
-    # BUG 1: Inefficient O(N^2) duplicate detection
     unique_transactions = []
     duplicates = 0
     for tx in transactions:
@@ -44,9 +42,7 @@ def main():
         amount = Decimal(tx['amount'])
         currency = tx['currency']
         
-        # BUG 3: Wrong rounding mode (should be ROUND_HALF_EVEN for banker's rounding)
         if currency != 'USD':
-            # Missing rate check/fallback bug
             rate = Decimal(str(exchange_rates.get(currency, 1.0)))
             amount = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
@@ -56,11 +52,8 @@ def main():
             account_balances[account_id] = Decimal('0')
         account_balances[account_id] += amount
     
-    # BUG 4: Wrong sorting (using default dict order instead of sorted by account_id)
     accounts = []
     for account_id, balance in account_balances.items():
-        # BUG 5: Incorrect balance formatting (missing proper string formatting)
-        # str(decimal) might produce '1E+2' or other non-standard formats
         balance_str = str(balance.quantize(Decimal('0.01')))
         accounts.append({
             'account_id': account_id,
@@ -69,7 +62,6 @@ def main():
     
     elapsed_ms = int((time.time() - start_time) * 1000)
     
-    # BUG 6: Keys not in alphabetical order in the final dictionary
     result = {
         'total_transactions': len(unique_transactions),
         'duplicate_count': duplicates,
@@ -77,7 +69,6 @@ def main():
         'processing_time_ms': elapsed_ms
     }
     
-    # BUG 7: Not sorting keys when dumping JSON
     print(json.dumps(result))
 
 if __name__ == '__main__':

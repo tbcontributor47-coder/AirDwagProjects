@@ -5,7 +5,7 @@ import tempfile
 import os
 import time
 import pytest
-from pathlib import Path
+
 
 def run_reconcile(ledger_data):
     """Helper to run reconcile.py with temporary input file"""
@@ -37,7 +37,7 @@ def parse_output(output_str):
     try:
         data = json.loads(output_str)
         return data
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         pytest.fail(f"Output is not valid JSON: {output_str}")
 
 def test_single_transaction_usd():
