@@ -7,8 +7,8 @@
         "download_dir": null,
         "source": null
     },
-    "trial_name": "infra-k8s-restart-loop__KQP8nRP",
-    "trials_dir": "jobs/2026-01-04__20-30-15",
+    "trial_name": "infra-k8s-restart-loop__hfkr5Jd",
+    "trials_dir": "jobs/2026-01-04__23-26-00",
     "timeout_multiplier": 1.0,
     "agent": {
         "name": "oracle",
@@ -32,5 +32,5 @@
         "max_timeout_sec": null,
         "disable": false
     },
-    "job_id": "8ce08c6a-d872-4b4b-aabf-eb8325344176"
+    "job_id": "9e6760a2-4e33-4933-9e31-6314557359c0"
 }

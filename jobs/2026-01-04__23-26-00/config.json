@@ -1,5 +1,5 @@
 {
-    "job_name": "2026-01-04__23-29-13",
+    "job_name": "2026-01-04__23-26-00",
     "jobs_dir": "jobs",
     "n_attempts": 1,
     "timeout_multiplier": 1.0,
@@ -13,10 +13,10 @@
             "include_exceptions": null,
             "exclude_exceptions": [
                 "RewardFileNotFoundError",
-                "RewardFileEmptyError",
-                "AgentTimeoutError",
+                "VerifierTimeoutError",
                 "VerifierOutputParseError",
-                "VerifierTimeoutError"
+                "AgentTimeoutError",
+                "RewardFileEmptyError"
             ],
             "wait_multiplier": 1.0,
             "min_wait_sec": 1.0,

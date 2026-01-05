@@ -10,7 +10,7 @@ RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_am
     chmod +x /usr/local/bin/yq
 
 WORKDIR /app
-RUN mkdir -p /logs/agent /logs/verifier
+RUN mkdir -p /logs/agent /logs/verifier && chmod -R 777 /logs
 
 # The context is the 'environment/' directory.
 # This copies 'environment/app/' to '/app/app/'

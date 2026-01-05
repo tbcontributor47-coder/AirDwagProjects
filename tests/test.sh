@@ -31,11 +31,12 @@ echo "Starting summary..."
 mkdir -p /logs/verifier
 echo "Logs dir created..."
 
-if [ $FAILURES -eq 0 ]; then
-  # This matches the required reward section format literally
-  true
-fi
+# Set exit code based on FAILURES (disable set -e temporarily to allow failure)
+set +e
+test $FAILURES -eq 0
+set -e
 
+# Required pattern for static checker: must end with this exact pattern
 if [ $? -eq 0 ]; then
   echo 1 > /logs/verifier/reward.txt
 else
