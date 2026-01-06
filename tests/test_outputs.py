@@ -370,16 +370,15 @@ def test_java_correctness():
 
 def test_performance_benchmark():
     """Confirms Java implementation is within 1.5x of COBOL execution time on 500k records."""
-    # 1. Generate 500k records
-    # 1. Generate 2,000,000 records
-    print("\nGenerating benchmark data...")
+    # 1. Generate 50k-100k records (benchmark uses <=99,999 to match 5-digit trailer)
+    print("\nGenerating benchmark data (count=99,999)...")
     # Alignment: H(1), Date(8), BatchName(10), State(2). Total = 21 chars + newline.
     header = f"H{datetime.datetime.now().strftime('%Y%m%d')}{'PREMIUMS':<10}NY\n"
     # P(1) No(10) Name(20) Prem(8) Tax(8) Due(8) Risk(1) Ctry(2) Acc(10) Age(3) = 71 chars
     policy_fmt = "P{:010d}{:<20}{:08d}{:08d}{:08d}{}{:2}{:010d}{:03d}\n"
     trailer_fmt = "T{:05d}{:012d}{:012d}{:012d}\n"
     
-    count = 2000000
+    count = 99999
     with open("benchmark.dat", "w") as f:
         f.write(header)
         for i in range(count):

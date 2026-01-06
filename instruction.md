@@ -64,6 +64,10 @@ The file `/app/validate.cbl` is an older version of the validator. It implements
 - You must verify every rule above against the Code.
 - Fix ANY logic that contradicts the "Validation Rules".
 
+Note on large benchmarks and trailer width
+----------------------------------------
+The trailer field `Policy Count` is defined as `PIC 9(5)` (five digits) in the file format. Test generators and performance benchmarks in this task therefore use record counts less than or equal to `99,999` so the trailer can store the full count exactly. If you choose to support larger batch sizes, update the trailer field width in the instruction, COBOL source (`/app/validate.cbl`), and any test generators accordingly.
+
 ## Java Requirements
 -   **Class**: `com.tbench.insurance.Validator`
 -   **Input**: Read from `stdin` or file args (match COBOL behavior).

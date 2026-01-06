@@ -1,25 +1,24 @@
 FROM eclipse-temurin:17-jdk
 
-WORKDIR /app
-
 # Install Maven, GnuCOBOL, Python, and other dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        maven \
-        gnucobol \
-        bash \
-        curl \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /logs/verifier
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    maven \
+    gnucobol \
+    bash \
+    curl \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-install pytest
+RUN pip install --no-cache-dir pytest --break-system-packages
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-COPY app/ /app/
-COPY app/validate.cbl /baseline/validate.cbl
-# Compile hidden oracle and remove source
-COPY app/.oracle_ref.cbl /tmp/.oracle_ref.cbl
-RUN cobc -x -O2 -o /usr/bin/insurance_validator_ref /tmp/.oracle_ref.cbl \
-    && rm /tmp/.oracle_ref.cbl
+WORKDIR /app
 
-CMD ["mvn", "test"]
+# Copy the environment directory to /app/environment
+COPY . /app/environment/
+
+WORKDIR /app
